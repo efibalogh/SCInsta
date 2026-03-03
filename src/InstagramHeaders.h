@@ -156,6 +156,12 @@
 - (void)addLongPressGestureRecognizer; // new
 @end
 
+@interface IGSundialViewerPhotoCell : UIView
+@end
+
+@interface IGSundialViewerCarouselCell : UIView
+@end
+
 @interface IGSundialViewerPhotoView : UIView
 - (void)addLongPressGestureRecognizer; // new
 @end
@@ -390,6 +396,12 @@
 
 @interface _TtC27IGGalleryDestinationToolbar31IGGalleryDestinationToolbarView : UIView
 @property(nonatomic, copy, readwrite) NSArray *tools;
+@end
+
+@interface IGUFIInteractionCountsView : UIView
+@end
+
+@interface IGUFIButtonWithCountsView : UIView
 @end
 
 @interface IGSundialViewerVerticalUFI : UIView
