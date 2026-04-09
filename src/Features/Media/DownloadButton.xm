@@ -14,14 +14,15 @@ static SCIDownloadDelegate *dlBtnImageDelegate;
 static SCIDownloadDelegate *dlBtnVideoDelegate;
 
 static NSInteger const kSCIDownloadButtonTag = 8315931;
+static NSInteger const kSCIDirectDownloadButtonTag = 13123;
 static void *kSCIStorySectionControllerKey = &kSCIStorySectionControllerKey;
 static void (*orig_socialUFI_layoutSubviews)(id, SEL);
 
 static void SCIInitDownloadButtonDownloaders(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        dlBtnImageDelegate = [[SCIDownloadDelegate alloc] initWithAction:quickLook showProgress:NO];
-        dlBtnVideoDelegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
+        dlBtnImageDelegate = [[SCIDownloadDelegate alloc] initWithAction:preview showProgress:YES];
+        dlBtnVideoDelegate = [[SCIDownloadDelegate alloc] initWithAction:preview showProgress:YES];
     });
 }
 
@@ -181,11 +182,11 @@ static BOOL SCIIsDirectVisualMessageContext(UIView *view) {
     return [controller isKindOfClass:%c(IGDirectVisualMessageViewerController)];
 }
 
-static UIButton *SCIDownloadButtonInContainer(UIView *container, id target, SEL action, CGFloat pointSize, UIColor *tintColor) {
-    UIButton *button = (UIButton *)[container viewWithTag:kSCIDownloadButtonTag];
+static UIButton *SCIDownloadButtonInContainer(UIView *container, NSInteger tag, id target, SEL action, CGFloat pointSize, UIColor *tintColor) {
+    UIButton *button = (UIButton *)[container viewWithTag:tag];
     if (![button isKindOfClass:[UIButton class]]) {
         button = [UIButton buttonWithType:UIButtonTypeCustom];
-        button.tag = kSCIDownloadButtonTag;
+        button.tag = tag;
         button.accessibilityIdentifier = @"com.socuul.scinsta.download-button";
         button.adjustsImageWhenHighlighted = YES;
         button.imageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -197,7 +198,7 @@ static UIButton *SCIDownloadButtonInContainer(UIView *container, id target, SEL 
     UIImage *image = SCIShareButtonImage();
     if (!image) {
         UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:UIImageSymbolWeightMedium];
-        image = [[UIImage systemImageNamed:@"square.and.arrow.down" withConfiguration:configuration] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        image = [[UIImage systemImageNamed:@"square.and.arrow.up" withConfiguration:configuration] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
 
     [button setImage:image forState:UIControlStateNormal];
@@ -238,17 +239,16 @@ static UIEdgeInsets SCIContentInsetsFromView(id view) {
 }
 
 static UIView *SCIAnyFeedButtonFromView(UIView *view) {
-    NSArray<NSString *> *selectors = @[
-        @"saveButton",
-        @"sendButton",
-        @"commentButton",
-        @"likeButton",
-        @"visualSearchButton"
-    ];
+    UIView *saveButton = [SCIUtils getIvarForObj:view name:"_saveButton"];
+    if ([saveButton isKindOfClass:[UIView class]] && !saveButton.hidden) {
+        return saveButton;
+    }
+
+    NSArray<NSString *> *selectors = @[@"sendButton", @"commentButton", @"likeButton", @"saveButton"];
 
     for (NSString *selectorName in selectors) {
         UIView *button = SCIViewForNamedSelector(view, selectorName);
-        if (button && !button.hidden && CGRectGetWidth(button.bounds) > 0.0) {
+        if (button && !button.hidden && button.superview) {
             return button;
         }
     }
@@ -279,12 +279,24 @@ static CGRect SCIAnyFeedButtonFrameFromView(UIView *view) {
 }
 
 static UIView *SCIFirstRightFeedButton(UIView *view) {
-    NSArray<NSString *> *selectors = @[@"visualSearchButton", @"saveButton"];
-    for (NSString *selectorName in selectors) {
-        UIView *button = SCIViewForNamedSelector(view, selectorName);
-        if (button && !button.hidden && CGRectGetWidth(button.bounds) > 0.0) {
-            return button;
-        }
+    UIView *visualSearchButton = SCIViewForNamedSelector(view, @"visualSearchButton");
+    if (visualSearchButton && !visualSearchButton.hidden && visualSearchButton.superview) {
+        return visualSearchButton;
+    }
+
+    visualSearchButton = [SCIUtils getIvarForObj:view name:"_visualSearchButton"];
+    if ([visualSearchButton isKindOfClass:[UIView class]] && !visualSearchButton.hidden && visualSearchButton.superview) {
+        return visualSearchButton;
+    }
+
+    UIView *saveButton = SCIViewForNamedSelector(view, @"saveButton");
+    if (saveButton && !saveButton.hidden && saveButton.superview) {
+        return saveButton;
+    }
+
+    saveButton = [SCIUtils getIvarForObj:view name:"_saveButton"];
+    if ([saveButton isKindOfClass:[UIView class]] && !saveButton.hidden && saveButton.superview) {
+        return saveButton;
     }
 
     UIView *bestCandidate = nil;
@@ -581,6 +593,20 @@ static BOOL SCIDownloadDirectMessage(id message) {
         return YES;
     }
 
+    if (SCIDownloadMediaCandidate(message, nil)) {
+        return YES;
+    }
+
+    id media = SCIObjectForSelector(message, @"media");
+    if (SCIDownloadMediaCandidate(media, nil)) {
+        return YES;
+    }
+
+    id visualMessage = SCIObjectForSelector(message, @"visualMessage");
+    if (SCIDownloadMediaCandidate(visualMessage, nil)) {
+        return YES;
+    }
+
     [SCIUtils showErrorHUDWithDescription:@"Could not extract media from visual message"];
     return NO;
 }
@@ -592,20 +618,29 @@ static void SCIUpdateFeedDownloadButton(UIView *view, id target, SEL action) {
         return;
     }
 
-    UIButton *button = SCIDownloadButtonInContainer(view, target, action, 18.0, UIColor.labelColor);
+    UIButton *button = SCIDownloadButtonInContainer(view, kSCIDownloadButtonTag, target, action, 18.0, UIColor.labelColor);
 
     CGRect referenceFrame = SCIAnyFeedButtonFrameFromView(view);
     UIView *firstRightButton = SCIFirstRightFeedButton(view);
     CGRect rightFrame = SCIFrameInContainer(firstRightButton, view);
 
-    CGFloat width = 30.0;
-    CGFloat height = CGRectGetHeight(referenceFrame) > 0.0 ? CGRectGetHeight(referenceFrame) : 48.0;
-    CGFloat x = CGRectGetWidth(view.bounds) - width;
-    if (!CGRectIsEmpty(rightFrame)) {
-        x = CGRectGetMinX(rightFrame) - width;
+    CGFloat width = CGRectGetWidth(referenceFrame) > 0.0 ? CGRectGetWidth(referenceFrame) : 40.0;
+    if (!CGRectIsEmpty(rightFrame) && CGRectGetWidth(rightFrame) > 0.0) {
+        width = CGRectGetWidth(rightFrame);
     }
 
-    button.frame = CGRectIntegral(CGRectMake(MAX(0.0, x), CGRectGetMinY(referenceFrame), width, height));
+    CGFloat height = CGRectGetHeight(referenceFrame) > 0.0 ? CGRectGetHeight(referenceFrame) : 48.0;
+    if (!CGRectIsEmpty(rightFrame) && CGRectGetHeight(rightFrame) > 0.0) {
+        height = CGRectGetHeight(rightFrame);
+    }
+
+    CGFloat anchorX = CGRectGetWidth(view.bounds);
+    if (!CGRectIsEmpty(rightFrame)) {
+        anchorX = CGRectGetMinX(rightFrame);
+    }
+
+    button.contentEdgeInsets = SCIContentInsetsFromView(firstRightButton);
+    button.frame = CGRectIntegral(CGRectMake(anchorX - width, CGRectGetMinY(referenceFrame), width, height));
     [view bringSubviewToFront:button];
 }
 
@@ -616,7 +651,7 @@ static void SCIUpdateReelDownloadButton(UIView *view, id target, SEL action) {
         return;
     }
 
-    UIButton *button = SCIDownloadButtonInContainer(view, target, action, 19.0, UIColor.whiteColor);
+    UIButton *button = SCIDownloadButtonInContainer(view, kSCIDownloadButtonTag, target, action, 19.0, UIColor.whiteColor);
     CGFloat side = 38.0;
     button.frame = CGRectIntegral(CGRectMake((CGRectGetWidth(view.bounds) - side) / 2.0, -(side + 5.0), side, side));
 
@@ -635,7 +670,7 @@ static void SCIUpdateStoryDownloadButton(UIView *overlay, id target, SEL action)
         return;
     }
 
-    UIButton *button = SCIDownloadButtonInContainer(overlay, target, action, 19.0, UIColor.whiteColor);
+    UIButton *button = SCIDownloadButtonInContainer(overlay, kSCIDownloadButtonTag, target, action, 19.0, UIColor.whiteColor);
 
     UIView *mediaView = [SCIUtils getIvarForObj:overlay name:"_mediaView"];
     UIView *footerView = [SCIUtils getIvarForObj:overlay name:"_footerContainerView"];
@@ -674,7 +709,7 @@ static void SCIUpdateStoryDownloadButton(UIView *overlay, id target, SEL action)
 
 static void SCIUpdateDirectDownloadButton(UIViewController *controller, id target, SEL action) {
     UIView *overlayView = SCIDirectOverlayView(controller);
-    UIButton *existingButton = (UIButton *)[overlayView viewWithTag:kSCIDownloadButtonTag];
+    UIButton *existingButton = (UIButton *)[overlayView viewWithTag:kSCIDirectDownloadButtonTag];
     if (![SCIUtils getBoolPref:@"show_download_button"]) {
         [existingButton removeFromSuperview];
         return;
@@ -682,11 +717,11 @@ static void SCIUpdateDirectDownloadButton(UIViewController *controller, id targe
 
     if (!overlayView) return;
 
-    UIButton *button = SCIDownloadButtonInContainer(overlayView, target, action, 19.0, UIColor.whiteColor);
+    UIButton *button = SCIDownloadButtonInContainer(overlayView, kSCIDirectDownloadButtonTag, target, action, 19.0, UIColor.whiteColor);
 
     UIView *inputView = [SCIUtils getIvarForObj:controller name:"_inputView"];
     CGFloat bottomInset = controller.view.safeAreaInsets.bottom + 12.0 + CGRectGetHeight(inputView.frame);
-    CGFloat side = 38.0;
+    CGFloat side = 44.0;
     CGFloat x = CGRectGetWidth(overlayView.bounds) - side - 10.0;
     CGFloat y = CGRectGetHeight(overlayView.bounds) - bottomInset - side;
 

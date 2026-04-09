@@ -9,8 +9,8 @@ static void initDownloaders () {
     // Init downloaders only once
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        imageDownloadDelegate = [[SCIDownloadDelegate alloc] initWithAction:quickLook showProgress:NO];
-        videoDownloadDelegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
+        imageDownloadDelegate = [[SCIDownloadDelegate alloc] initWithAction:preview showProgress:YES];
+        videoDownloadDelegate = [[SCIDownloadDelegate alloc] initWithAction:preview showProgress:YES];
     });
 }
 

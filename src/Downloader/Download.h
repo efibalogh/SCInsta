@@ -1,23 +1,25 @@
 #import <UIKit/UIKit.h>
 #import <Foundation/Foundation.h>
-#import "../../modules/JGProgressHUD/JGProgressHUD.h"
 
 #import "../InstagramHeaders.h"
 #import "../Utils.h"
 
 #import "Manager.h"
+#import "../MediaPreview/SCIDownloadProgressView.h"
+#import "../MediaPreview/SCIMediaPreviewController.h"
 
 @interface SCIDownloadDelegate : NSObject <SCIDownloadDelegateProtocol>
 
 typedef NS_ENUM(NSUInteger, DownloadAction) {
     share,
-    quickLook
+    quickLook,
+    preview   // New: custom media preview
 };
 @property (nonatomic, readonly) DownloadAction action;
 @property (nonatomic, readonly) BOOL showProgress;
 
 @property (nonatomic, strong) SCIDownloadManager *downloadManager;
-@property (nonatomic, strong) JGProgressHUD *hud;
+@property (nonatomic, strong) SCIDownloadProgressView *progressView;
 
 - (instancetype)initWithAction:(DownloadAction)action showProgress:(BOOL)showProgress;
 

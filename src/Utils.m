@@ -94,13 +94,8 @@
 }
 
 // MARK: Display View Controllers
-+ (void)showQuickLookVC:(NSArray<id> *)items {
-    QLPreviewController *previewController = [[QLPreviewController alloc] init];
-    QuickLookDelegate *quickLookDelegate = [[QuickLookDelegate alloc] initWithPreviewItemURLs:items];
-
-    previewController.dataSource = quickLookDelegate;
-    
-    [topMostController() presentViewController:previewController animated:true completion:nil];
++ (void)showMediaPreview:(NSURL *)fileURL {
+    [SCIMediaPreviewController showPreviewForFileURL:fileURL];
 }
 + (void)showShareVC:(id)item {
     UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[item] applicationActivities:nil];

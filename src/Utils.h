@@ -1,13 +1,12 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <QuickLook/QuickLook.h>
 #import <os/log.h>
 #import <objc/message.h>
 
 #import "../modules/JGProgressHUD/JGProgressHUD.h"
 
 #import "InstagramHeaders.h"
-#import "QuickLook.h"
+#import "MediaPreview/SCIMediaPreviewController.h"
 
 #import "Settings/SCISettingsViewController.h"
 
@@ -37,7 +36,7 @@
 + (void)cleanCache;
 
 // Display View Controllers
-+ (void)showQuickLookVC:(NSArray<id> *)items;
++ (void)showMediaPreview:(NSURL *)fileURL;
 + (void)showShareVC:(id)item;
 + (void)showSettingsVC:(UIWindow *)window;
 
