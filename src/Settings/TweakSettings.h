@@ -3,6 +3,7 @@
 #import "SCISymbol.h"
 #import "../Utils.h"
 #import "../Tweak.h"
+#import "../Vault/SCIVaultViewController.h"
 
 NS_ASSUME_NONNULL_BEGIN
 

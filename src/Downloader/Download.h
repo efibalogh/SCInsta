@@ -14,7 +14,8 @@ typedef NS_ENUM(NSUInteger, DownloadAction) {
     share,
     saveToPhotos,
     quickLook,
-    preview   // New: custom media preview
+    preview,
+    saveToVault
 };
 @property (nonatomic, readonly) DownloadAction action;
 @property (nonatomic, readonly) BOOL showProgress;

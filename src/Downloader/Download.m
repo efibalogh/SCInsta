@@ -1,4 +1,5 @@
 #import "Download.h"
+#import "../Vault/SCIVaultFile.h"
 #import <Photos/Photos.h>
 
 @implementation SCIDownloadDelegate
@@ -130,6 +131,21 @@
                     [SCIUtils showToastForDuration:3.0 title:@"Failed to save" subtitle:error.localizedDescription ?: @""];
                 }
             }];
+            return;
+        }
+
+        if (self.action == saveToVault) {
+            BOOL isVideo = [self isVideoFileAtURL:fileURL];
+            SCIVaultMediaType vaultType = isVideo ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
+            NSError *error;
+            SCIVaultFile *file = [SCIVaultFile saveFileToVault:fileURL source:SCIVaultSourceOther mediaType:vaultType error:&error];
+            if (file) {
+                [self showCompletionPillAndDismissAfter:0.45 completion:^{
+                    [SCIUtils showToastForDuration:2.0 title:@"Saved to Vault"];
+                }];
+            } else {
+                [self.progressView showError:@"Failed to save to vault"];
+            }
             return;
         }
 

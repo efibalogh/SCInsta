@@ -3,6 +3,7 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
 #import "../../Downloader/Download.h"
+#import "../../Vault/SCIVaultFile.h"
 
 @interface IGUFIButtonBarView : UIView
 @end
@@ -14,6 +15,8 @@ static SCIDownloadDelegate *dlBtnImageDelegate;
 static SCIDownloadDelegate *dlBtnVideoDelegate;
 static SCIDownloadDelegate *dlBtnShareImageDelegate;
 static SCIDownloadDelegate *dlBtnShareVideoDelegate;
+static SCIDownloadDelegate *dlBtnVaultImageDelegate;
+static SCIDownloadDelegate *dlBtnVaultVideoDelegate;
 
 static NSInteger const kSCIDownloadButtonTag = 8315931;
 static NSInteger const kSCIDirectDownloadButtonTag = 13123;
@@ -102,6 +105,8 @@ static void SCIInitDownloadButtonDownloaders(void) {
         dlBtnVideoDelegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:YES];
         dlBtnShareImageDelegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
         dlBtnShareVideoDelegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
+        dlBtnVaultImageDelegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:YES];
+        dlBtnVaultVideoDelegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:YES];
     });
 }
 
@@ -790,6 +795,32 @@ static BOOL SCICopyMediaLinkForCandidate(id candidate, NSString *failureDescript
     return YES;
 }
 
+static BOOL SCISaveToVaultMediaCandidate(id candidate, NSString *failureDescription) {
+    SCIInitDownloadButtonDownloaders();
+
+    NSURL *videoURL = SCIVideoURLFromCandidate(candidate);
+    if (videoURL) {
+        [dlBtnVaultVideoDelegate downloadFileWithURL:videoURL
+                                       fileExtension:videoURL.pathExtension
+                                            hudLabel:nil];
+        return YES;
+    }
+
+    NSURL *photoURL = SCIPhotoURLFromCandidate(candidate);
+    if (photoURL) {
+        [dlBtnVaultImageDelegate downloadFileWithURL:photoURL
+                                       fileExtension:photoURL.pathExtension
+                                            hudLabel:nil];
+        return YES;
+    }
+
+    if (failureDescription.length) {
+        [SCIUtils showErrorHUDWithDescription:failureDescription];
+    }
+
+    return NO;
+}
+
 static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger currentIndex, NSString *failureDescription) {
     id resolvedCurrent = currentMedia;
     NSArray *items = SCIItemsFromMedia(baseMedia);
@@ -879,6 +910,12 @@ static void SCIPresentMediaActionSheet(UIButton *sender, id baseMedia, id curren
         SCICopyMediaLinkForCandidate(currentMedia, failureDescription);
     }]];
 
+    [actionSheet addAction:[UIAlertAction actionWithTitle:@"Save to Vault"
+                                                   style:UIAlertActionStyleDefault
+                                                 handler:^(__unused UIAlertAction *action) {
+        SCISaveToVaultMediaCandidate(currentMedia, failureDescription);
+    }]];
+
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Expand"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
@@ -917,6 +954,7 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
         UIImage *downloadIcon = [UIImage systemImageNamed:@"arrow.down"];
         UIImage *shareIcon = [UIImage systemImageNamed:@"square.and.arrow.up"];
         UIImage *copyIcon = [UIImage systemImageNamed:@"link"];
+        UIImage *vaultIcon = [UIImage systemImageNamed:@"tray.full"];
         UIImage *expandIcon = [UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"];
 
         UIAction *downloadAction = [UIAction actionWithTitle:@"Download" image:downloadIcon identifier:nil handler:^(__unused UIAction *action) {
@@ -934,6 +972,11 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
             SCICopyMediaLinkForCandidate(current, failureCopy);
         }];
 
+        UIAction *vaultAction = [UIAction actionWithTitle:@"Save to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
+            id current = currentMediaBlock ? currentMediaBlock() : nil;
+            SCISaveToVaultMediaCandidate(current, failureCopy);
+        }];
+
         UIAction *expandAction = [UIAction actionWithTitle:@"Expand" image:expandIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
             id base = baseMediaBlock ? baseMediaBlock() : current;
@@ -948,7 +991,7 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
             [button addTarget:button action:@selector(sci_menuActionTriggered:) forControlEvents:UIControlEventMenuActionTriggered];
         }
 
-        button.menu = [UIMenu menuWithChildren:@[downloadAction, shareAction, copyAction, expandAction]];
+        button.menu = [UIMenu menuWithChildren:@[downloadAction, shareAction, copyAction, vaultAction, expandAction]];
         button.showsMenuAsPrimaryAction = YES;
         SCISetButtonDesiredAlpha(button, button.alpha);
         return;

@@ -112,6 +112,16 @@
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
+                                                [SCISetting buttonCellWithTitle:@"Media Vault"
+                                                                      subtitle:@"View your saved media"
+                                                                          icon:[SCISymbol symbolWithName:@"tray.full"]
+                                                                        action:^(void) { [SCIVaultViewController presentVault]; }
+                                                ],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"",
+                                            @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Show download button" subtitle:@"Adds a download button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_download_button"],
                                                 [SCISetting switchCellWithTitle:@"Download feed posts" subtitle:@"Long-press with finger(s) to download posts in the home tab" defaultsKey:@"dw_feed_posts"],
                                                 [SCISetting switchCellWithTitle:@"Download reels" subtitle:@"Long-press with finger(s) on a reel to download" defaultsKey:@"dw_reels"],

@@ -1,6 +1,7 @@
 #import "SCIMediaPreviewController.h"
 #import "../InstagramHeaders.h"
 #import "../Utils.h"
+#import "../Vault/SCIVaultFile.h"
 #import <Photos/Photos.h>
 #import <dlfcn.h>
 
@@ -814,6 +815,11 @@ static CGFloat const kMinZoom           = 1.0;
         [buttons addObject:copyBtn];
     }
 
+    // Vault
+    UIImage *vaultIcon = [UIImage systemImageNamed:@"tray.full" withConfiguration:config];
+    UIButton *vaultBtn = [self actionButtonWithTitle:@"Vault" image:vaultIcon action:@selector(saveToVault)];
+    [buttons addObject:vaultBtn];
+
     // Stack them horizontally
     UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:buttons];
     stack.axis = UILayoutConstraintAxisHorizontal;
@@ -949,6 +955,107 @@ static CGFloat const kMinZoom           = 1.0;
             [SCIUtils showToastForDuration:1.5 title:@"Copied"];
         }
     }
+}
+
+- (void)saveToVault {
+    NSURL *targetURL = [self activeMediaURL];
+    if (!targetURL) {
+        [self showVaultFeedback:NO message:@"No media to save"];
+        return;
+    }
+
+    SCIVaultMediaType vaultType = (self.mediaType == SCIMediaTypeVideo) ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
+
+    if (targetURL.isFileURL && [[NSFileManager defaultManager] fileExistsAtPath:targetURL.path]) {
+        [self vaultSaveLocalFile:targetURL mediaType:vaultType];
+        return;
+    }
+
+    [self showVaultFeedback:NO message:@"Downloading..."];
+
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *data = [NSData dataWithContentsOfURL:targetURL];
+        if (!data.length) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf showVaultFeedback:NO message:@"Download failed"];
+            });
+            return;
+        }
+
+        NSString *ext = targetURL.pathExtension.length > 0 ? targetURL.pathExtension : (vaultType == SCIVaultMediaTypeVideo ? @"mp4" : @"jpg");
+        NSString *tmpName = [NSString stringWithFormat:@"%@.%@", NSUUID.UUID.UUIDString, ext];
+        NSString *tmpPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
+        [data writeToFile:tmpPath atomically:YES];
+
+        NSURL *localURL = [NSURL fileURLWithPath:tmpPath];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf vaultSaveLocalFile:localURL mediaType:vaultType];
+            [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
+        });
+    });
+}
+
+- (void)vaultSaveLocalFile:(NSURL *)localURL mediaType:(SCIVaultMediaType)vaultType {
+    NSError *error;
+    SCIVaultFile *file = [SCIVaultFile saveFileToVault:localURL source:SCIVaultSourceOther mediaType:vaultType error:&error];
+
+    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
+    if (file) {
+        [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
+        [self showVaultFeedback:YES message:@"Saved to Vault"];
+    } else {
+        [haptic notificationOccurred:UINotificationFeedbackTypeError];
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
+        [self showVaultFeedback:NO message:msg];
+    }
+}
+
+- (void)showVaultFeedback:(BOOL)success message:(NSString *)message {
+    for (UIView *sub in self.view.subviews) {
+        if (sub.tag == 9991) [sub removeFromSuperview];
+    }
+
+    UIView *pill = [[UIView alloc] initWithFrame:CGRectZero];
+    pill.tag = 9991;
+    pill.translatesAutoresizingMaskIntoConstraints = NO;
+    pill.backgroundColor = success ? [[UIColor systemGreenColor] colorWithAlphaComponent:0.9]
+                                   : [[UIColor colorWithWhite:0.2 alpha:0.9] colorWithAlphaComponent:0.9];
+    pill.layer.cornerRadius = 18;
+    pill.layer.cornerCurve = kCACornerCurveContinuous;
+    pill.clipsToBounds = YES;
+    pill.alpha = 0.0;
+    [self.view addSubview:pill];
+
+    UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.text = message;
+    label.textColor = [UIColor whiteColor];
+    label.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    label.textAlignment = NSTextAlignmentCenter;
+    [pill addSubview:label];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [pill.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [pill.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:12],
+        [pill.heightAnchor constraintEqualToConstant:36],
+        [label.centerXAnchor constraintEqualToAnchor:pill.centerXAnchor],
+        [label.centerYAnchor constraintEqualToAnchor:pill.centerYAnchor],
+        [pill.leadingAnchor constraintEqualToAnchor:label.leadingAnchor constant:-20],
+        [pill.trailingAnchor constraintEqualToAnchor:label.trailingAnchor constant:20],
+    ]];
+
+    [UIView animateWithDuration:0.25 animations:^{
+        pill.alpha = 1.0;
+    } completion:^(BOOL finished) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [UIView animateWithDuration:0.25 animations:^{
+                pill.alpha = 0.0;
+            } completion:^(BOOL finished2) {
+                [pill removeFromSuperview];
+            }];
+        });
+    }];
 }
 
 #pragma mark - Swipe to Dismiss
