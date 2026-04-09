@@ -1,6 +1,44 @@
 #import "Download.h"
+#import <Photos/Photos.h>
 
 @implementation SCIDownloadDelegate
+
+- (BOOL)isVideoFileAtURL:(NSURL *)fileURL {
+    NSString *ext = fileURL.pathExtension.lowercaseString;
+    NSSet<NSString *> *videoExtensions = [NSSet setWithArray:@[@"mp4", @"mov", @"m4v", @"avi", @"webm", @"mkv", @"3gp"]];
+    return [videoExtensions containsObject:ext];
+}
+
+- (void)saveDownloadedFileToPhotos:(NSURL *)fileURL completion:(void(^)(BOOL success, NSError *error))completion {
+    BOOL isVideo = [self isVideoFileAtURL:fileURL];
+
+    [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+        if (isVideo) {
+            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:fileURL];
+        } else {
+            [PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:fileURL];
+        }
+    } completionHandler:^(BOOL success, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion(success, error);
+            }
+        });
+    }];
+}
+
+- (void)showCompletionPillAndDismissAfter:(NSTimeInterval)delay completion:(void(^)(void))completion {
+    [self.progressView showSuccess];
+    self.progressView.onTapWhenCompleted = nil;
+    self.progressView.onCancel = nil;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.progressView dismiss];
+        if (completion) {
+            completion();
+        }
+    });
+}
 
 - (instancetype)initWithAction:(DownloadAction)action showProgress:(BOOL)showProgress {
     self = [super init];
@@ -22,8 +60,14 @@
         
         // Allow cancelling
         __weak typeof(self) weakSelf = self;
+        NSURL *retryURL = [url copy];
+        NSString *retryExtension = [fileExtension copy];
+        NSString *retryHudLabel = [hudLabel copy];
         self.progressView.onCancel = ^{
             [weakSelf.downloadManager cancelDownload];
+        };
+        self.progressView.onRetry = ^{
+            [weakSelf downloadFileWithURL:retryURL fileExtension:retryExtension hudLabel:retryHudLabel];
         };
     });
 
@@ -68,19 +112,30 @@
         NSLog(@"[SCInsta] Download: Download finished with url: \"%@\"", [fileURL absoluteString]);
         NSLog(@"[SCInsta] Download: Completed with action %d", (int)self.action);
 
-        [self.progressView showSuccess];
+        if (self.action == share) {
+            [self showCompletionPillAndDismissAfter:0.25 completion:^{
+                [SCIUtils showShareVC:fileURL];
+            }];
+            return;
+        }
 
-        __weak typeof(self) weakSelf = self;
-        self.progressView.onTapWhenCompleted = ^{
-            switch (weakSelf.action) {
-                case preview:
-                case quickLook:
-                case share:
-                default:
-                    [SCIMediaPreviewController showPreviewForFileURL:fileURL];
-                    break;
-            }
-        };
+        if (self.action == saveToPhotos) {
+            [self saveDownloadedFileToPhotos:fileURL completion:^(BOOL success, NSError *error) {
+                if (success) {
+                    [self showCompletionPillAndDismissAfter:0.45 completion:^{
+                        [SCIUtils showToastForDuration:2.0 title:@"Saved to Photos"];
+                    }];
+                } else {
+                    [self.progressView showError:@"Failed to save"];
+                    [SCIUtils showToastForDuration:3.0 title:@"Failed to save" subtitle:error.localizedDescription ?: @""];
+                }
+            }];
+            return;
+        }
+
+        [self showCompletionPillAndDismissAfter:0.25 completion:^{
+            [SCIMediaPreviewController showPreviewForFileURL:fileURL];
+        }];
     });
 }
 

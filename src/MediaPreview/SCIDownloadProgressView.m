@@ -5,7 +5,7 @@ static CGFloat const kPillMarginTop  = 8.0;
 static CGFloat const kPillCorner     = 25.0;
 static CGFloat const kProgressHeight = 3.0;
 static CGFloat const kHorizontalPad  = 16.0;
-static CGFloat const kPillWidth      = 200.0;
+static CGFloat const kPillWidth      = 230.0;
 
 @interface SCIDownloadProgressView () <UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIVisualEffectView *blurView;
@@ -20,6 +20,7 @@ static CGFloat const kPillWidth      = 200.0;
 @property (nonatomic, strong) NSLayoutConstraint *progressWidthConstraint;
 @property (nonatomic, strong) NSLayoutConstraint *progressHeightConstraint;
 @property (nonatomic, strong) NSLayoutConstraint *topConstraint;
+@property (nonatomic, assign) BOOL isErrorState;
 @end
 
 @implementation SCIDownloadProgressView
@@ -100,11 +101,7 @@ static CGFloat const kPillWidth      = 200.0;
     // Close / cancel button
     _closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _closeButton.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImageSymbolConfiguration *closeConfig = [UIImageSymbolConfiguration configurationWithPointSize:9 weight:UIImageSymbolWeightSemibold];
-    UIImage *closeImage = [UIImage systemImageNamed:@"xmark" withConfiguration:closeConfig];
-    [_closeButton setImage:closeImage forState:UIControlStateNormal];
-    _closeButton.tintColor = [[UIColor whiteColor] colorWithAlphaComponent:0.78];
-    _closeButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12];
+    [self applyCancelButtonStyle];
     _closeButton.layer.cornerRadius = 11.0;
     _closeButton.layer.cornerCurve = kCACornerCurveContinuous;
     [_closeButton addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -174,10 +171,35 @@ static CGFloat const kPillWidth      = 200.0;
     return self;
 }
 
+- (void)applyCancelButtonStyle {
+    UIImageSymbolConfiguration *closeConfig = [UIImageSymbolConfiguration configurationWithPointSize:9 weight:UIImageSymbolWeightSemibold];
+    UIImage *closeImage = [UIImage systemImageNamed:@"xmark" withConfiguration:closeConfig];
+    [self.closeButton setImage:closeImage forState:UIControlStateNormal];
+    self.closeButton.tintColor = [[UIColor whiteColor] colorWithAlphaComponent:0.78];
+    self.closeButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12];
+}
+
+- (void)applyRetryButtonStyle {
+    [self applyCancelButtonStyle];
+
+    UIImageSymbolConfiguration *retryConfig = [UIImageSymbolConfiguration configurationWithPointSize:9 weight:UIImageSymbolWeightSemibold];
+    UIImage *retryImage = [UIImage systemImageNamed:@"arrow.trianglehead.counterclockwise" withConfiguration:retryConfig];
+    if (!retryImage) {
+        retryImage = [UIImage systemImageNamed:@"arrow.clockwise" withConfiguration:retryConfig];
+    }
+
+    [self.closeButton setImage:retryImage forState:UIControlStateNormal];
+}
+
 #pragma mark - Public
 
 - (void)setProgress:(float)progress animated:(BOOL)animated {
     _currentProgress = MIN(MAX(progress, 0.0), 1.0);
+
+    if (self.isErrorState) {
+        self.isErrorState = NO;
+        [self applyCancelButtonStyle];
+    }
 
     if (!self.isCompleted) {
         self.titleCenterYConstraint.constant = -kProgressHeight;
@@ -202,7 +224,10 @@ static CGFloat const kPillWidth      = 200.0;
 
 - (void)showSuccess {
     self.isCompleted = YES;
+    self.isErrorState = NO;
     self.onCancel = nil;
+    self.onRetry = nil;
+    [self applyCancelButtonStyle];
 
     // Success haptic
     UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
@@ -215,7 +240,7 @@ static CGFloat const kPillWidth      = 200.0;
     [UIView transitionWithView:self duration:0.3 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
         self.iconView.image = checkImage;
         self.iconView.tintColor = [UIColor systemGreenColor];
-        self.titleLabel.text = @"Tap to open";
+        self.titleLabel.text = @"Download complete";
 
         self.titleCenterYConstraint.constant = 0.0;
         self.progressHeightConstraint.constant = 0.0;
@@ -226,8 +251,10 @@ static CGFloat const kPillWidth      = 200.0;
 
 - (void)showError:(NSString *)message {
     self.isCompleted = NO;
+    self.isErrorState = YES;
     self.onTapWhenCompleted = nil;
     self.onCancel = nil;
+    [self applyRetryButtonStyle];
 
     // Error haptic
     UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
@@ -244,11 +271,7 @@ static CGFloat const kPillWidth      = 200.0;
         self.progressHeightConstraint.constant = 0.0;
         self.progressTrack.alpha = 0;
         [self layoutIfNeeded];
-    } completion:^(BOOL finished) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [self dismissWithCompletion:nil];
-        });
-    }];
+    } completion:nil];
 }
 
 - (void)dismiss {
@@ -257,8 +280,10 @@ static CGFloat const kPillWidth      = 200.0;
 
 - (void)dismissWithCompletion:(void(^)(void))completion {
     self.isCompleted = NO;
+    self.isErrorState = NO;
     self.onTapWhenCompleted = nil;
     self.onCancel = nil;
+    self.onRetry = nil;
 
     self.topConstraint.constant = -kPillHeight - 10;
     [UIView animateWithDuration:0.4 delay:0 usingSpringWithDamping:0.85 initialSpringVelocity:0 options:0 animations:^{
@@ -293,6 +318,16 @@ static CGFloat const kPillWidth      = 200.0;
 }
 
 - (void)closeTapped {
+    if (self.isErrorState) {
+        if (self.onRetry) {
+            self.onRetry();
+            return;
+        }
+
+        [self dismissWithCompletion:nil];
+        return;
+    }
+
     if (!self.isCompleted && self.onCancel) {
         self.onCancel();
     }

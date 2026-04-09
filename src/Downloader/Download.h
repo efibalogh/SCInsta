@@ -12,6 +12,7 @@
 
 typedef NS_ENUM(NSUInteger, DownloadAction) {
     share,
+    saveToPhotos,
     quickLook,
     preview   // New: custom media preview
 };

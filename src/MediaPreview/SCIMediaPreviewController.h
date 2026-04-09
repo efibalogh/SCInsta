@@ -25,7 +25,13 @@ typedef NS_ENUM(NSUInteger, SCIMediaType) {
 /// Convenience: auto-detect media type from file extension.
 + (instancetype)previewWithFileURL:(NSURL *)fileURL;
 
+/// Convenience: present a photo carousel in the same preview controller.
++ (instancetype)previewWithPhotoURLs:(NSArray<NSURL *> *)photoURLs initialIndex:(NSInteger)initialIndex;
+
 /// Present the preview from the top-most view controller.
 + (void)showPreviewForFileURL:(NSURL *)fileURL;
+
+/// Present a photo carousel from the top-most view controller.
++ (void)showPreviewForPhotoURLs:(NSArray<NSURL *> *)photoURLs initialIndex:(NSInteger)initialIndex;
 
 @end

@@ -7,7 +7,8 @@
  * Inspired by the AirPods/Dynamic Island pill indicators.
  *
  * Shows download progress with a thin inline progress bar.
- * On success, it switches to a tappable "Saved" state so opening media is explicit.
+ * On success, it switches to a completed state and callers can choose what to do next.
+ * On error, the trailing button turns into retry.
  */
 @interface SCIDownloadProgressView : UIView
 
@@ -18,7 +19,6 @@
 - (void)setProgress:(float)progress animated:(BOOL)animated;
 
 /// Transition the pill to a success state.
-/// The pill remains visible until tapped.
 - (void)showSuccess;
 
 /// Transition the pill to an error state and auto-dismiss.
@@ -29,6 +29,9 @@
 
 /// Called when user taps the xmark while a download is in progress.
 @property (nonatomic, copy) void(^onCancel)(void);
+
+/// Called when user taps retry while in error state.
+@property (nonatomic, copy) void(^onRetry)(void);
 
 /// Called when user taps the pill body after success state is shown.
 @property (nonatomic, copy) void(^onTapWhenCompleted)(void);

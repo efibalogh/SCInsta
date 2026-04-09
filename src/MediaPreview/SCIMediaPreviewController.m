@@ -10,8 +10,179 @@ static CGFloat const kCloseButtonSize   = 36.0;
 static CGFloat const kMaxZoom           = 5.0;
 static CGFloat const kMinZoom           = 1.0;
 
+@interface SCIInlinePhotoCarouselCell : UICollectionViewCell <UIScrollViewDelegate>
 
-@interface SCIMediaPreviewController () <UIScrollViewDelegate, UIGestureRecognizerDelegate>
+- (void)configureWithURL:(NSURL *)url cache:(NSCache<NSString *, UIImage *> *)cache;
+- (BOOL)isZoomedIn;
+
+@property (nonatomic, copy) void (^zoomStateChanged)(BOOL zoomed);
+
+@end
+
+@interface SCIInlinePhotoCarouselCell ()
+
+@property (nonatomic, strong) UIScrollView *scrollView;
+@property (nonatomic, strong) UIImageView *imageView;
+@property (nonatomic, strong) UIActivityIndicatorView *spinner;
+@property (nonatomic, copy) NSString *currentURLKey;
+
+@end
+
+@implementation SCIInlinePhotoCarouselCell
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.contentView.backgroundColor = [UIColor clearColor];
+
+        _scrollView = [[UIScrollView alloc] initWithFrame:CGRectZero];
+        _scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+        _scrollView.delegate = self;
+        _scrollView.minimumZoomScale = kMinZoom;
+        _scrollView.maximumZoomScale = kMaxZoom;
+        _scrollView.showsHorizontalScrollIndicator = NO;
+        _scrollView.showsVerticalScrollIndicator = NO;
+        _scrollView.bouncesZoom = YES;
+        _scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        _scrollView.scrollEnabled = NO;
+        [self.contentView addSubview:_scrollView];
+
+        _imageView = [[UIImageView alloc] initWithFrame:CGRectZero];
+        _imageView.translatesAutoresizingMaskIntoConstraints = NO;
+        _imageView.contentMode = UIViewContentModeScaleAspectFit;
+        _imageView.clipsToBounds = YES;
+        [_scrollView addSubview:_imageView];
+
+        _spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+        _spinner.translatesAutoresizingMaskIntoConstraints = NO;
+        _spinner.color = [UIColor whiteColor];
+        [self.contentView addSubview:_spinner];
+
+        [NSLayoutConstraint activateConstraints:@[
+            [_scrollView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
+            [_scrollView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
+            [_scrollView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
+            [_scrollView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor],
+
+            [_imageView.topAnchor constraintEqualToAnchor:_scrollView.topAnchor],
+            [_imageView.bottomAnchor constraintEqualToAnchor:_scrollView.bottomAnchor],
+            [_imageView.leadingAnchor constraintEqualToAnchor:_scrollView.leadingAnchor],
+            [_imageView.trailingAnchor constraintEqualToAnchor:_scrollView.trailingAnchor],
+
+            [_imageView.widthAnchor constraintEqualToAnchor:_scrollView.widthAnchor],
+            [_imageView.heightAnchor constraintEqualToAnchor:_scrollView.heightAnchor],
+
+            [_spinner.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
+            [_spinner.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        ]];
+
+        UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTap:)];
+        doubleTap.numberOfTapsRequired = 2;
+        [_scrollView addGestureRecognizer:doubleTap];
+    }
+
+    return self;
+}
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+
+    self.currentURLKey = nil;
+    self.imageView.image = nil;
+    [self.scrollView setZoomScale:kMinZoom animated:NO];
+    self.scrollView.scrollEnabled = NO;
+    if (self.zoomStateChanged) {
+        self.zoomStateChanged(NO);
+    }
+    [self.spinner stopAnimating];
+}
+
+- (void)configureWithURL:(NSURL *)url cache:(NSCache<NSString *,UIImage *> *)cache {
+    NSString *key = url.absoluteString ?: @"";
+    self.currentURLKey = key;
+
+    if (key.length == 0) {
+        self.imageView.image = nil;
+        [self.spinner stopAnimating];
+        return;
+    }
+
+    UIImage *cached = [cache objectForKey:key];
+    if (cached) {
+        [self.scrollView setZoomScale:kMinZoom animated:NO];
+        self.scrollView.scrollEnabled = NO;
+        self.imageView.image = cached;
+        [self.spinner stopAnimating];
+        if (self.zoomStateChanged) {
+            self.zoomStateChanged(NO);
+        }
+        return;
+    }
+
+    [self.scrollView setZoomScale:kMinZoom animated:NO];
+    self.scrollView.scrollEnabled = NO;
+    self.imageView.image = nil;
+    [self.spinner startAnimating];
+
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *data = [NSData dataWithContentsOfURL:url];
+        UIImage *image = data ? [UIImage imageWithData:data] : nil;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!weakSelf || ![weakSelf.currentURLKey isEqualToString:key]) {
+                return;
+            }
+
+            [weakSelf.spinner stopAnimating];
+            weakSelf.imageView.image = image;
+            [weakSelf.scrollView setZoomScale:kMinZoom animated:NO];
+            weakSelf.scrollView.scrollEnabled = NO;
+            if (weakSelf.zoomStateChanged) {
+                weakSelf.zoomStateChanged(NO);
+            }
+
+            if (image) {
+                [cache setObject:image forKey:key];
+            }
+        });
+    });
+}
+
+- (BOOL)isZoomedIn {
+    return self.scrollView.zoomScale > (kMinZoom + 0.01);
+}
+
+- (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
+    return self.imageView;
+}
+
+- (void)scrollViewDidZoom:(UIScrollView *)scrollView {
+    BOOL zoomed = [self isZoomedIn];
+    self.scrollView.scrollEnabled = zoomed;
+    if (self.zoomStateChanged) {
+        self.zoomStateChanged(zoomed);
+    }
+}
+
+- (void)handleDoubleTap:(UITapGestureRecognizer *)recognizer {
+    if ([self isZoomedIn]) {
+        [self.scrollView setZoomScale:kMinZoom animated:YES];
+        return;
+    }
+
+    CGPoint point = [recognizer locationInView:self.imageView];
+    CGFloat newZoom = kMaxZoom / 2.0;
+    CGSize scrollSize = self.scrollView.bounds.size;
+    CGFloat w = scrollSize.width / newZoom;
+    CGFloat h = scrollSize.height / newZoom;
+    CGRect zoomRect = CGRectMake(point.x - w / 2.0, point.y - h / 2.0, w, h);
+    [self.scrollView zoomToRect:zoomRect animated:YES];
+}
+
+@end
+
+@interface SCIMediaPreviewController () <UIScrollViewDelegate, UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate>
 
 // Common
 @property (nonatomic, strong) NSURL        *fileURL;
@@ -21,6 +192,13 @@ static CGFloat const kMinZoom           = 1.0;
 // Photo
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIImageView  *imageView;
+@property (nonatomic, copy) NSArray<NSURL *> *photoURLs;
+@property (nonatomic, strong) UICollectionView *photoCollectionView;
+@property (nonatomic, strong) UILabel *photoCounterLabel;
+@property (nonatomic, strong) NSCache<NSString *, UIImage *> *photoImageCache;
+@property (nonatomic, assign) NSInteger currentPhotoIndex;
+@property (nonatomic, assign) BOOL didApplyInitialPhotoIndex;
+@property (nonatomic, assign) BOOL isCarouselItemZoomed;
 
 // Video
 @property (nonatomic, strong) AVPlayer           *player;
@@ -58,8 +236,32 @@ static CGFloat const kMinZoom           = 1.0;
     return [[SCIMediaPreviewController alloc] initWithFileURL:fileURL mediaType:type];
 }
 
++ (instancetype)previewWithPhotoURLs:(NSArray<NSURL *> *)photoURLs initialIndex:(NSInteger)initialIndex {
+    if (photoURLs.count == 0) {
+        return nil;
+    }
+
+    NSInteger boundedIndex = MAX(0, MIN(initialIndex, (NSInteger)photoURLs.count - 1));
+    SCIMediaPreviewController *controller = [[SCIMediaPreviewController alloc] initWithFileURL:photoURLs[boundedIndex] mediaType:SCIMediaTypePhoto];
+    controller.photoURLs = [photoURLs copy];
+    controller.currentPhotoIndex = boundedIndex;
+    controller.photoImageCache = [[NSCache alloc] init];
+    return controller;
+}
+
 + (void)showPreviewForFileURL:(NSURL *)fileURL {
     SCIMediaPreviewController *vc = [SCIMediaPreviewController previewWithFileURL:fileURL];
+    vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    vc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+    [topMostController() presentViewController:vc animated:YES completion:nil];
+}
+
++ (void)showPreviewForPhotoURLs:(NSArray<NSURL *> *)photoURLs initialIndex:(NSInteger)initialIndex {
+    SCIMediaPreviewController *vc = [SCIMediaPreviewController previewWithPhotoURLs:photoURLs initialIndex:initialIndex];
+    if (!vc) {
+        return;
+    }
+
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     vc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [topMostController() presentViewController:vc animated:YES completion:nil];
@@ -72,6 +274,7 @@ static CGFloat const kMinZoom           = 1.0;
     if (self) {
         _fileURL = fileURL;
         _mediaType = type;
+        _currentPhotoIndex = 0;
     }
     return self;
 }
@@ -86,7 +289,9 @@ static CGFloat const kMinZoom           = 1.0;
     [self setupBackground];
     [self setupCloseButton];
 
-    if (self.mediaType == SCIMediaTypePhoto) {
+    if (self.mediaType == SCIMediaTypePhoto && self.photoURLs.count > 1) {
+        [self setupPhotoCarouselViewer];
+    } else if (self.mediaType == SCIMediaTypePhoto) {
         [self setupPhotoViewer];
     } else {
         [self setupVideoPlayer];
@@ -101,6 +306,24 @@ static CGFloat const kMinZoom           = 1.0;
 
     if (self.mediaType == SCIMediaTypeVideo && self.playerLayer) {
         self.playerLayer.frame = self.playerContainerView.bounds;
+    }
+
+    if (self.photoCollectionView) {
+        UICollectionViewFlowLayout *layout = (UICollectionViewFlowLayout *)self.photoCollectionView.collectionViewLayout;
+        if (!CGSizeEqualToSize(layout.itemSize, self.photoCollectionView.bounds.size)) {
+            layout.itemSize = self.photoCollectionView.bounds.size;
+            [layout invalidateLayout];
+        }
+
+        if (!self.didApplyInitialPhotoIndex && self.photoURLs.count > 0) {
+            self.didApplyInitialPhotoIndex = YES;
+            NSIndexPath *indexPath = [NSIndexPath indexPathForItem:self.currentPhotoIndex inSection:0];
+            [self.photoCollectionView scrollToItemAtIndexPath:indexPath
+                                             atScrollPosition:UICollectionViewScrollPositionCenteredHorizontally
+                                                     animated:NO];
+            [self updatePhotoCounter];
+            [self updateCurrentFileURLForPhotoIndex:self.currentPhotoIndex];
+        }
     }
 }
 
@@ -201,7 +424,137 @@ static CGFloat const kMinZoom           = 1.0;
     [_scrollView addGestureRecognizer:doubleTap];
 }
 
+- (void)setupPhotoCarouselViewer {
+    UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
+    layout.scrollDirection = UICollectionViewScrollDirectionHorizontal;
+    layout.minimumLineSpacing = 0.0;
+    layout.minimumInteritemSpacing = 0.0;
+
+    _photoCollectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
+    _photoCollectionView.translatesAutoresizingMaskIntoConstraints = NO;
+    _photoCollectionView.backgroundColor = [UIColor clearColor];
+    _photoCollectionView.pagingEnabled = YES;
+    _photoCollectionView.showsHorizontalScrollIndicator = NO;
+    _photoCollectionView.showsVerticalScrollIndicator = NO;
+    _photoCollectionView.alwaysBounceVertical = NO;
+    _photoCollectionView.dataSource = self;
+    _photoCollectionView.delegate = self;
+    _photoCollectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    [_photoCollectionView registerClass:[SCIInlinePhotoCarouselCell class] forCellWithReuseIdentifier:@"SCIInlinePhotoCarouselCell"];
+    [self.view insertSubview:_photoCollectionView aboveSubview:_backgroundBlur];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [_photoCollectionView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_photoCollectionView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [_photoCollectionView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [_photoCollectionView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+    ]];
+
+    _photoCounterLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _photoCounterLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    _photoCounterLabel.textColor = [UIColor whiteColor];
+    _photoCounterLabel.font = [UIFont monospacedDigitSystemFontOfSize:14.0 weight:UIFontWeightSemibold];
+    _photoCounterLabel.textAlignment = NSTextAlignmentCenter;
+    [self.view addSubview:_photoCounterLabel];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [_photoCounterLabel.centerYAnchor constraintEqualToAnchor:self.closeButton.centerYAnchor],
+        [_photoCounterLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+    ]];
+
+    [self updatePhotoCounter];
+    [self updateCurrentFileURLForPhotoIndex:self.currentPhotoIndex];
+}
+
+- (void)updatePhotoCounter {
+    if (!self.photoCounterLabel) {
+        return;
+    }
+
+    if (self.photoURLs.count <= 1) {
+        self.photoCounterLabel.text = @"";
+        return;
+    }
+
+    self.photoCounterLabel.text = [NSString stringWithFormat:@"%ld / %lu",
+                                   (long)self.currentPhotoIndex + 1,
+                                   (unsigned long)self.photoURLs.count];
+}
+
+- (void)updateCurrentFileURLForPhotoIndex:(NSInteger)index {
+    if (self.photoURLs.count == 0) {
+        return;
+    }
+
+    NSInteger boundedIndex = MAX(0, MIN(index, (NSInteger)self.photoURLs.count - 1));
+    self.currentPhotoIndex = boundedIndex;
+    self.fileURL = self.photoURLs[boundedIndex];
+}
+
+- (void)updateCurrentPhotoIndexFromScrollView:(UIScrollView *)scrollView {
+    CGFloat pageWidth = CGRectGetWidth(scrollView.bounds);
+    if (pageWidth <= 0.0 || self.photoURLs.count == 0) {
+        return;
+    }
+
+    NSInteger index = (NSInteger)llround(scrollView.contentOffset.x / pageWidth);
+    index = MAX(0, MIN(index, (NSInteger)self.photoURLs.count - 1));
+    if (index == self.currentPhotoIndex) {
+        return;
+    }
+
+    [self updateCurrentFileURLForPhotoIndex:index];
+    [self updatePhotoCounter];
+}
+
+- (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
+    return self.photoURLs.count;
+}
+
+- (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
+    SCIInlinePhotoCarouselCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"SCIInlinePhotoCarouselCell"
+                                                                                   forIndexPath:indexPath];
+    __weak typeof(self) weakSelf = self;
+    __weak SCIInlinePhotoCarouselCell *weakCell = cell;
+    cell.zoomStateChanged = ^(BOOL zoomed) {
+        SCIInlinePhotoCarouselCell *strongCell = weakCell;
+        if (!weakSelf || !strongCell) {
+            return;
+        }
+
+        NSIndexPath *cellIndexPath = [weakSelf.photoCollectionView indexPathForCell:strongCell];
+        if (!cellIndexPath || cellIndexPath.item != weakSelf.currentPhotoIndex) {
+            return;
+        }
+
+        weakSelf.isCarouselItemZoomed = zoomed;
+        weakSelf.photoCollectionView.scrollEnabled = !zoomed;
+    };
+    [cell configureWithURL:self.photoURLs[indexPath.item] cache:self.photoImageCache];
+    return cell;
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if (scrollView == self.photoCollectionView) {
+        self.isCarouselItemZoomed = NO;
+        self.photoCollectionView.scrollEnabled = YES;
+        [self updateCurrentPhotoIndexFromScrollView:scrollView];
+    }
+}
+
+- (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView {
+    if (scrollView == self.photoCollectionView) {
+        self.isCarouselItemZoomed = NO;
+        self.photoCollectionView.scrollEnabled = YES;
+        [self updateCurrentPhotoIndexFromScrollView:scrollView];
+    }
+}
+
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
+    if (scrollView != _scrollView) {
+        return nil;
+    }
+
     return _imageView;
 }
 
@@ -521,13 +874,26 @@ static CGFloat const kMinZoom           = 1.0;
 
 #pragma mark - Actions
 
+- (NSURL *)activeMediaURL {
+    if (self.mediaType == SCIMediaTypePhoto && self.photoURLs.count > 0) {
+        NSInteger boundedIndex = MAX(0, MIN(self.currentPhotoIndex, (NSInteger)self.photoURLs.count - 1));
+        NSURL *url = self.photoURLs[boundedIndex];
+        if (url) {
+            return url;
+        }
+    }
+
+    return self.fileURL;
+}
+
 - (void)closeTapped {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)saveToPhotos {
+    NSURL *targetURL = [self activeMediaURL];
     if (self.mediaType == SCIMediaTypePhoto) {
-        NSData *imageData = [NSData dataWithContentsOfURL:self.fileURL];
+        NSData *imageData = [NSData dataWithContentsOfURL:targetURL];
         UIImage *image = [UIImage imageWithData:imageData];
         if (image) {
             [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
@@ -540,7 +906,7 @@ static CGFloat const kMinZoom           = 1.0;
         }
     } else {
         [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:self.fileURL];
+            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:targetURL];
         } completionHandler:^(BOOL success, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self showSaveResult:success error:error];
@@ -562,7 +928,8 @@ static CGFloat const kMinZoom           = 1.0;
 }
 
 - (void)shareMedia {
-    UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[self.fileURL] applicationActivities:nil];
+    NSURL *targetURL = [self activeMediaURL];
+    UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[targetURL] applicationActivities:nil];
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         acVC.popoverPresentationController.sourceView = self.view;
         acVC.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2.0, self.view.bounds.size.height - 50, 1, 1);
@@ -572,7 +939,7 @@ static CGFloat const kMinZoom           = 1.0;
 
 - (void)copyMedia {
     if (self.mediaType == SCIMediaTypePhoto) {
-        NSData *imageData = [NSData dataWithContentsOfURL:self.fileURL];
+        NSData *imageData = [NSData dataWithContentsOfURL:[self activeMediaURL]];
         UIImage *image = [UIImage imageWithData:imageData];
         if (image) {
             [[UIPasteboard generalPasteboard] setImage:image];
@@ -600,42 +967,72 @@ static CGFloat const kMinZoom           = 1.0;
     CGPoint translation = [pan translationInView:self.view];
     CGPoint velocity = [pan velocityInView:self.view];
 
-    // Only dismiss on predominantly downward swipe
+    BOOL verticalIntent = fabs(velocity.y) >= fabs(velocity.x);
+
     if (pan.state == UIGestureRecognizerStateBegan) {
-        _isDismissing = (translation.y > 0 || velocity.y > 0);
+        _isDismissing = verticalIntent;
+
         if (self.mediaType == SCIMediaTypePhoto && _scrollView.zoomScale > kMinZoom) {
+            _isDismissing = NO;
+        }
+
+        if (self.photoCollectionView && self.isCarouselItemZoomed) {
             _isDismissing = NO;
         }
     }
 
     if (!_isDismissing) return;
 
-    CGFloat progress = MIN(MAX(translation.y / 300.0, 0), 1.0);
+    if (self.photoCollectionView && fabs(translation.y) < fabs(translation.x)) {
+        if (pan.state == UIGestureRecognizerStateChanged) {
+            return;
+        }
+    }
+
+    CGFloat progress = MIN(MAX(fabs(translation.y) / 300.0, 0), 1.0);
 
     switch (pan.state) {
         case UIGestureRecognizerStateChanged: {
-            UIView *contentView = (self.mediaType == SCIMediaTypePhoto) ? _scrollView : _playerContainerView;
+            UIView *contentView = nil;
+            if (self.mediaType == SCIMediaTypeVideo) {
+                contentView = _playerContainerView;
+            } else if (self.photoCollectionView) {
+                contentView = self.photoCollectionView;
+            } else {
+                contentView = _scrollView;
+            }
+
             contentView.transform = CGAffineTransformMakeTranslation(0, translation.y);
             CGFloat scale = 1.0 - progress * 0.2;
             contentView.transform = CGAffineTransformScale(contentView.transform, scale, scale);
             _backgroundBlur.alpha = 1.0 - progress;
             _actionBar.alpha = 1.0 - progress * 2;
             _closeButton.alpha = 1.0 - progress * 2;
+            if (self.photoCounterLabel) self.photoCounterLabel.alpha = 1.0 - progress * 2;
             if (_videoControlsBar) _videoControlsBar.alpha = 1.0 - progress * 2;
             break;
         }
         case UIGestureRecognizerStateEnded:
         case UIGestureRecognizerStateCancelled: {
-            if (progress > 0.3 || velocity.y > 800) {
+            if (progress > 0.3 || fabs(velocity.y) > 800) {
                 [self dismissViewControllerAnimated:YES completion:nil];
             } else {
                 // Spring back
                 [UIView animateWithDuration:0.4 delay:0 usingSpringWithDamping:0.75 initialSpringVelocity:0 options:0 animations:^{
-                    UIView *contentView = (self.mediaType == SCIMediaTypePhoto) ? self->_scrollView : self->_playerContainerView;
+                    UIView *contentView = nil;
+                    if (self.mediaType == SCIMediaTypeVideo) {
+                        contentView = self->_playerContainerView;
+                    } else if (self.photoCollectionView) {
+                        contentView = self.photoCollectionView;
+                    } else {
+                        contentView = self->_scrollView;
+                    }
+
                     contentView.transform = CGAffineTransformIdentity;
                     self->_backgroundBlur.alpha = 1;
                     self->_actionBar.alpha = 1;
                     self->_closeButton.alpha = 1;
+                    if (self.photoCounterLabel) self.photoCounterLabel.alpha = 1;
                     if (self->_videoControlsBar) self->_videoControlsBar.alpha = 1;
                 } completion:nil];
             }
