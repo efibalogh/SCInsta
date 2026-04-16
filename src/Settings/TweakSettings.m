@@ -126,7 +126,9 @@
                                                 [SCISetting switchCellWithTitle:@"Download feed posts" subtitle:@"Long-press with finger(s) to download posts in the home tab" defaultsKey:@"dw_feed_posts"],
                                                 [SCISetting switchCellWithTitle:@"Download reels" subtitle:@"Long-press with finger(s) on a reel to download" defaultsKey:@"dw_reels"],
                                                 [SCISetting switchCellWithTitle:@"Download stories" subtitle:@"Long-press with finger(s) while viewing someone's story to download" defaultsKey:@"dw_story"],
-                                                [SCISetting switchCellWithTitle:@"Save profile picture" subtitle:@"On someone's profile, click their profile picture to enlarge it, then hold to download" defaultsKey:@"save_profile"]
+                                                [SCISetting switchCellWithTitle:@"Save profile picture" subtitle:@"On someone's profile, click their profile picture to enlarge it, then hold to download" defaultsKey:@"save_profile"],
+                                                [SCISetting switchCellWithTitle:@"Zoom profile photo" subtitle:@"Long-press on a profile picture to open it in full screen" defaultsKey:@"profile_photo_zoom"],
+                                                [SCISetting switchCellWithTitle:@"Expand cover" subtitle:@"Adds an expand cover action to the download menu that shows the cover image or video thumbnail" defaultsKey:@"expand_cover"]
                                             ]
                                         },
                                         @{

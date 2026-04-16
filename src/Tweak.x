@@ -33,6 +33,8 @@ BOOL dmVisualMsgsViewedButtonEnabled = false;
         @"dw_reels": @(YES),
         @"dw_story": @(YES),
         @"save_profile": @(YES),
+        @"profile_photo_zoom": @(YES),
+        @"expand_cover": @(YES),
         @"dw_finger_count": @(3),
         @"dw_finger_duration": @(0.5),
         @"reels_tap_control": @"default",
