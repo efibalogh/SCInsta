@@ -14,12 +14,22 @@ static CGFloat const kThumbnailSize = 300.0;
 @dynamic dateAdded;
 @dynamic fileSize;
 @dynamic isFavorite;
+@dynamic folderPath;
+@dynamic customName;
 
 #pragma mark - Save to Vault
 
 + (SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
                            source:(SCIVaultSource)source
                         mediaType:(SCIVaultMediaType)mediaType
+                            error:(NSError **)error {
+    return [self saveFileToVault:fileURL source:source mediaType:mediaType folderPath:nil error:error];
+}
+
++ (SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
+                           source:(SCIVaultSource)source
+                        mediaType:(SCIVaultMediaType)mediaType
+                       folderPath:(NSString *)folderPath
                             error:(NSError **)error {
     NSFileManager *fm = [NSFileManager defaultManager];
 
@@ -56,6 +66,7 @@ static CGFloat const kThumbnailSize = 300.0;
     file.dateAdded = [NSDate date];
     file.fileSize = size;
     file.isFavorite = NO;
+    file.folderPath = folderPath;
 
     NSError *saveError;
     if (![ctx save:&saveError]) {
@@ -119,6 +130,48 @@ static CGFloat const kThumbnailSize = 300.0;
 
 - (BOOL)thumbnailExists {
     return [[NSFileManager defaultManager] fileExistsAtPath:[self thumbnailPath]];
+}
+
+#pragma mark - Display helpers
+
+- (NSString *)displayName {
+    if (self.customName.length > 0) return self.customName;
+
+    // relativePath format: "<epochMs>_<originalFilename>"
+    NSString *rel = self.relativePath ?: @"";
+    NSRange sep = [rel rangeOfString:@"_"];
+    if (sep.location != NSNotFound && sep.location + 1 < rel.length) {
+        return [rel substringFromIndex:sep.location + 1];
+    }
+    return rel;
+}
+
+- (NSString *)sourceLabel {
+    return [SCIVaultFile labelForSource:(SCIVaultSource)self.source];
+}
+
++ (NSString *)labelForSource:(SCIVaultSource)source {
+    switch (source) {
+        case SCIVaultSourceFeed:    return @"Feed";
+        case SCIVaultSourceStories: return @"Stories";
+        case SCIVaultSourceReels:   return @"Reels";
+        case SCIVaultSourceProfile: return @"Profile";
+        case SCIVaultSourceDMs:     return @"DMs";
+        case SCIVaultSourceOther:
+        default:                    return @"Other";
+    }
+}
+
++ (NSString *)symbolNameForSource:(SCIVaultSource)source {
+    switch (source) {
+        case SCIVaultSourceFeed:    return @"rectangle.stack";
+        case SCIVaultSourceStories: return @"rectangle.portrait.on.rectangle.portrait.angled";
+        case SCIVaultSourceReels:   return @"film.stack";
+        case SCIVaultSourceProfile: return @"person.crop.circle";
+        case SCIVaultSourceDMs:     return @"bubble.left.and.bubble.right";
+        case SCIVaultSourceOther:
+        default:                    return @"tray";
+    }
 }
 
 #pragma mark - Thumbnails

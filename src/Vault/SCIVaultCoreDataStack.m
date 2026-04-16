@@ -70,7 +70,17 @@
     isFavorite.optional = NO;
     isFavorite.defaultValue = @NO;
 
-    entity.properties = @[identifier, relativePath, mediaType, source, dateAdded, fileSize, isFavorite];
+    NSAttributeDescription *folderPath = [[NSAttributeDescription alloc] init];
+    folderPath.name = @"folderPath";
+    folderPath.attributeType = NSStringAttributeType;
+    folderPath.optional = YES;
+
+    NSAttributeDescription *customName = [[NSAttributeDescription alloc] init];
+    customName.name = @"customName";
+    customName.attributeType = NSStringAttributeType;
+    customName.optional = YES;
+
+    entity.properties = @[identifier, relativePath, mediaType, source, dateAdded, fileSize, isFavorite, folderPath, customName];
     model.entities = @[entity];
 
     return model;
