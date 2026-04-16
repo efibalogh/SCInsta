@@ -54,6 +54,21 @@ static id SCIUserFromViewHierarchy(UIView *view) {
     return nil;
 }
 
+static NSString *SCIUsernameFromIGUser(id user) {
+    if (!user) {
+        return nil;
+    }
+    id name = nil;
+    @try {
+        name = [user valueForKey:@"username"];
+    } @catch (__unused NSException *e) {
+    }
+    if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+        return (NSString *)name;
+    }
+    return nil;
+}
+
 static NSURL *SCIImageURLFromViewHierarchy(UIView *view) {
     Class igImageViewClass = NSClassFromString(@"IGImageView");
     if (igImageViewClass && [view isKindOfClass:igImageViewClass]) {
@@ -92,7 +107,8 @@ static BOOL SCIShouldInterceptProfileLongPress(UILongPressGestureRecognizer *ges
         return NO;
     }
 
-    [SCIFullScreenMediaPlayer showRemoteImageURL:url];
+    NSString *username = SCIUsernameFromIGUser(user);
+    [SCIFullScreenMediaPlayer showRemoteImageURL:url profileUsername:username];
     return YES;
 }
 

@@ -5,6 +5,7 @@
 #import "../InstagramHeaders.h"
 #import "../Utils.h"
 #import "../Vault/SCIVaultFile.h"
+#import "../Vault/SCIVaultSaveMetadata.h"
 #import "../Vault/SCIVaultCoreDataStack.h"
 #import <Photos/Photos.h>
 
@@ -112,7 +113,25 @@ static CGFloat const kDismissCancelSpringDamping = 0.82;
 
 + (void)showRemoteImageURL:(NSURL *)url {
     if (!url) return;
-    [self showFileURL:url fromVault:NO];
+
+    SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
+    SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
+    UIViewController *presenter = topMostController();
+    [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
+}
+
++ (void)showRemoteImageURL:(NSURL *)url profileUsername:(NSString *)username {
+    if (!url) return;
+
+    SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
+    if (username.length) {
+        item.title = username;
+    }
+    item.vaultSaveSource = (NSInteger)SCIVaultSourceProfile;
+
+    SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
+    UIViewController *presenter = topMostController();
+    [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
 }
 
 #pragma mark - Present
@@ -591,7 +610,25 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)vaultSaveLocalFile:(NSURL *)localURL mediaType:(SCIVaultMediaType)vaultType {
     NSError *error;
-    SCIVaultFile *file = [SCIVaultFile saveFileToVault:localURL source:SCIVaultSourceOther mediaType:vaultType error:&error];
+    SCIMediaItem *item = [self currentItem];
+    SCIVaultSaveMetadata *meta = nil;
+    if (item.title.length > 0 || item.vaultSaveSource >= 0) {
+        meta = [[SCIVaultSaveMetadata alloc] init];
+        if (item.title.length) {
+            meta.sourceUsername = item.title;
+        }
+        if (item.vaultSaveSource >= 0) {
+            meta.source = (int16_t)item.vaultSaveSource;
+        } else {
+            meta.source = (int16_t)SCIVaultSourceOther;
+        }
+    }
+    SCIVaultFile *file = [SCIVaultFile saveFileToVault:localURL
+                                                source:SCIVaultSourceOther
+                                             mediaType:vaultType
+                                            folderPath:nil
+                                              metadata:meta
+                                                 error:&error];
 
     UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
     if (file) {

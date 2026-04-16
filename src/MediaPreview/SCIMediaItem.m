@@ -3,6 +3,13 @@
 
 @implementation SCIMediaItem
 
+- (instancetype)init {
+    if ((self = [super init])) {
+        _vaultSaveSource = -1;
+    }
+    return self;
+}
+
 + (instancetype)itemWithFileURL:(NSURL *)url {
     SCIMediaItem *item = [[SCIMediaItem alloc] init];
     item.fileURL = url;

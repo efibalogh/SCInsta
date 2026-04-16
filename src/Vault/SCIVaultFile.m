@@ -2,8 +2,113 @@
 #import "SCIVaultPaths.h"
 #import "SCIVaultCoreDataStack.h"
 #import <AVFoundation/AVFoundation.h>
+#import <ImageIO/ImageIO.h>
 
 static CGFloat const kThumbnailSize = 300.0;
+
+static NSString *SCIVaultNormalizedExtension(NSString * _Nullable origExt, SCIVaultMediaType mediaType) {
+    NSString *e = origExt.length ? origExt.lowercaseString : @"";
+    static NSSet<NSString *> *imageExts;
+    static NSSet<NSString *> *videoExts;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        imageExts = [NSSet setWithArray:@[ @"jpg", @"jpeg", @"png", @"heic", @"webp", @"gif" ]];
+        videoExts = [NSSet setWithArray:@[ @"mp4", @"mov", @"m4v", @"webm" ]];
+    });
+    if (e.length > 0 && e.length <= 5 && ([imageExts containsObject:e] || [videoExts containsObject:e])) {
+        return [e isEqualToString:@"jpeg"] ? @"jpg" : e;
+    }
+    return (mediaType == SCIVaultMediaTypeVideo) ? @"mp4" : @"jpg";
+}
+
+static NSString *SCIVaultSourceSlug(SCIVaultSource source) {
+    switch (source) {
+        case SCIVaultSourceFeed:    return @"feed";
+        case SCIVaultSourceStories: return @"story";
+        case SCIVaultSourceReels:   return @"reel";
+        case SCIVaultSourceProfile: return @"profile-photo";
+        case SCIVaultSourceDMs:     return @"dms";
+        case SCIVaultSourceOther:
+        default:                    return @"other";
+    }
+}
+
+/// Safe single path segment: ASCII-ish, no path separators.
+static NSString *SCISanitizedVaultUsername(NSString *raw) {
+    if (!raw.length) {
+        return @"";
+    }
+    NSMutableString *out = [NSMutableString stringWithCapacity:MIN((NSUInteger)48, raw.length)];
+    NSUInteger maxLen = 48;
+    [raw enumerateSubstringsInRange:NSMakeRange(0, raw.length)
+                            options:NSStringEnumerationByComposedCharacterSequences
+                         usingBlock:^(NSString * _Nullable substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
+        if (out.length >= maxLen) {
+            *stop = YES;
+            return;
+        }
+        if (substring.length != 1) {
+            [out appendString:@"_"];
+            return;
+        }
+        unichar c = [substring characterAtIndex:0];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.') {
+            [out appendString:substring];
+        } else if (c == ' ') {
+            [out appendString:@"_"];
+        } else {
+            [out appendString:@"_"];
+        }
+    }];
+    NSString *collapsed = [out stringByReplacingOccurrencesOfString:@"__" withString:@"_"];
+    while ([collapsed containsString:@"__"]) {
+        collapsed = [collapsed stringByReplacingOccurrencesOfString:@"__" withString:@"_"];
+    }
+    collapsed = [collapsed stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"._-"]];
+    return collapsed.length ? collapsed : @"user";
+}
+
+static BOOL SCIStringLooksLikeUUIDFilename(NSString *baseName) {
+    if (baseName.length < 32 || baseName.length > 40) {
+        return NO;
+    }
+    NSUUID *u = [[NSUUID alloc] initWithUUIDString:baseName];
+    return u != nil;
+}
+
+static NSString *SCIVaultRelativeFileName(NSURL *fileURL,
+                                         long long epochMs,
+                                         SCIVaultMediaType mediaType,
+                                         SCIVaultSaveMetadata * _Nullable metadata) {
+    NSString *orig = fileURL.lastPathComponent ?: @"";
+    NSString *origExt = orig.pathExtension;
+    NSString *ext = SCIVaultNormalizedExtension(origExt, mediaType);
+    NSString *base = [orig stringByDeletingPathExtension];
+
+    static NSDateFormatter *compactDateFmt;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        compactDateFmt = [[NSDateFormatter alloc] init];
+        compactDateFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        compactDateFmt.timeZone = [NSTimeZone localTimeZone];
+        compactDateFmt.dateFormat = @"yyyyMMddHHmmss";
+    });
+    NSString *dateCompact = [compactDateFmt stringFromDate:[NSDate date]];
+
+    SCIVaultSource src = metadata ? (SCIVaultSource)metadata.source : SCIVaultSourceOther;
+    NSString *slug = SCIVaultSourceSlug(src);
+
+    if (metadata.sourceUsername.length > 0) {
+        NSString *user = SCISanitizedVaultUsername(metadata.sourceUsername);
+        return [NSString stringWithFormat:@"%lld_%@_%@_%@.%@", epochMs, user, slug, dateCompact, ext];
+    }
+
+    if (SCIStringLooksLikeUUIDFilename(base) || base.length == 0) {
+        return [NSString stringWithFormat:@"%lld_%@_%@.%@", epochMs, slug, dateCompact, ext];
+    }
+
+    return [NSString stringWithFormat:@"%lld_%@", epochMs, orig];
+}
 
 @implementation SCIVaultFile
 
@@ -16,6 +121,10 @@ static CGFloat const kThumbnailSize = 300.0;
 @dynamic isFavorite;
 @dynamic folderPath;
 @dynamic customName;
+@dynamic sourceUsername;
+@dynamic pixelWidth;
+@dynamic pixelHeight;
+@dynamic durationSeconds;
 
 #pragma mark - Save to Vault
 
@@ -23,13 +132,88 @@ static CGFloat const kThumbnailSize = 300.0;
                            source:(SCIVaultSource)source
                         mediaType:(SCIVaultMediaType)mediaType
                             error:(NSError **)error {
-    return [self saveFileToVault:fileURL source:source mediaType:mediaType folderPath:nil error:error];
+    return [self saveFileToVault:fileURL source:source mediaType:mediaType folderPath:nil metadata:nil error:error];
 }
 
 + (SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
                            source:(SCIVaultSource)source
                         mediaType:(SCIVaultMediaType)mediaType
                        folderPath:(NSString *)folderPath
+                            error:(NSError **)error {
+    return [self saveFileToVault:fileURL source:source mediaType:mediaType folderPath:folderPath metadata:nil error:error];
+}
+
++ (void)applyMetadata:(nullable SCIVaultSaveMetadata *)metadata toFile:(SCIVaultFile *)file fallbackSource:(SCIVaultSource)fallbackSource {
+    if (metadata) {
+        file.source = metadata.source;
+        file.sourceUsername = metadata.sourceUsername.length ? metadata.sourceUsername : nil;
+        file.pixelWidth = metadata.pixelWidth;
+        file.pixelHeight = metadata.pixelHeight;
+        file.durationSeconds = metadata.durationSeconds;
+    } else {
+        file.source = fallbackSource;
+        file.sourceUsername = nil;
+        file.pixelWidth = 0;
+        file.pixelHeight = 0;
+        file.durationSeconds = 0;
+    }
+}
+
++ (void)probeMediaAtPath:(NSString *)path mediaType:(SCIVaultMediaType)mediaType file:(SCIVaultFile *)file {
+    if (mediaType == SCIVaultMediaTypeImage) {
+        CGImageSourceRef src = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], NULL);
+        if (!src) {
+            return;
+        }
+        CFDictionaryRef props = CGImageSourceCopyPropertiesAtIndex(src, 0, NULL);
+        CFRelease(src);
+        if (!props) {
+            return;
+        }
+        NSNumber *w = CFDictionaryGetValue(props, kCGImagePropertyPixelWidth);
+        NSNumber *h = CFDictionaryGetValue(props, kCGImagePropertyPixelHeight);
+        if (file.pixelWidth <= 0 && [w respondsToSelector:@selector(intValue)]) {
+            file.pixelWidth = (int32_t)w.intValue;
+        }
+        if (file.pixelHeight <= 0 && [h respondsToSelector:@selector(intValue)]) {
+            file.pixelHeight = (int32_t)h.intValue;
+        }
+        CFRelease(props);
+        return;
+    }
+
+    NSURL *url = [NSURL fileURLWithPath:path];
+    AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:nil];
+    CMTime dur = asset.duration;
+    if (file.durationSeconds <= 0.05 && CMTIME_IS_NUMERIC(dur)) {
+        double sec = CMTimeGetSeconds(dur);
+        if (sec > 0.05 && !isnan(sec)) {
+            file.durationSeconds = sec;
+        }
+    }
+    NSArray<AVAssetTrack *> *tracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+    if (tracks.count == 0) {
+        return;
+    }
+    AVAssetTrack *track = tracks.firstObject;
+    CGSize natural = track.naturalSize;
+    CGAffineTransform tx = track.preferredTransform;
+    CGSize rendered = CGSizeApplyAffineTransform(natural, tx);
+    int32_t w = (int32_t)lround(fabs(rendered.width));
+    int32_t h = (int32_t)lround(fabs(rendered.height));
+    if (file.pixelWidth <= 0) {
+        file.pixelWidth = w;
+    }
+    if (file.pixelHeight <= 0) {
+        file.pixelHeight = h;
+    }
+}
+
++ (SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
+                           source:(SCIVaultSource)source
+                        mediaType:(SCIVaultMediaType)mediaType
+                       folderPath:(NSString *)folderPath
+                         metadata:(SCIVaultSaveMetadata *)metadata
                             error:(NSError **)error {
     NSFileManager *fm = [NSFileManager defaultManager];
 
@@ -41,10 +225,23 @@ static CGFloat const kThumbnailSize = 300.0;
         return nil;
     }
 
-    NSString *originalName = fileURL.lastPathComponent;
     long long epochMs = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
-    NSString *fileName = [NSString stringWithFormat:@"%lld_%@", epochMs, originalName];
+    NSString *fileName = SCIVaultRelativeFileName(fileURL, epochMs, mediaType, metadata);
     NSString *destPath = [[SCIVaultPaths vaultMediaDirectory] stringByAppendingPathComponent:fileName];
+
+    if ([fm fileExistsAtPath:destPath]) {
+        NSString *stem = [fileName stringByDeletingPathExtension];
+        NSString *ext = fileName.pathExtension;
+        for (int n = 1; n < 100; n++) {
+            NSString *candidate = [NSString stringWithFormat:@"%@-%d.%@", stem, n, ext];
+            NSString *candidatePath = [[SCIVaultPaths vaultMediaDirectory] stringByAppendingPathComponent:candidate];
+            if (![fm fileExistsAtPath:candidatePath]) {
+                fileName = candidate;
+                destPath = candidatePath;
+                break;
+            }
+        }
+    }
 
     NSError *copyError;
     if (![fm copyItemAtPath:fileURL.path toPath:destPath error:&copyError]) {
@@ -62,11 +259,13 @@ static CGFloat const kThumbnailSize = 300.0;
     file.identifier = [NSUUID UUID].UUIDString;
     file.relativePath = fileName;
     file.mediaType = mediaType;
-    file.source = source;
     file.dateAdded = [NSDate date];
     file.fileSize = size;
     file.isFavorite = NO;
     file.folderPath = folderPath;
+
+    [self applyMetadata:metadata toFile:file fallbackSource:source];
+    [self probeMediaAtPath:destPath mediaType:mediaType file:file];
 
     NSError *saveError;
     if (![ctx save:&saveError]) {
@@ -137,7 +336,7 @@ static CGFloat const kThumbnailSize = 300.0;
 - (NSString *)displayName {
     if (self.customName.length > 0) return self.customName;
 
-    // relativePath format: "<epochMs>_<originalFilename>"
+    // relativePath: "<epochMs>_<rest>" — rest may be "user_slug_date.ext" or legacy "originalFilename".
     NSString *rel = self.relativePath ?: @"";
     NSRange sep = [rel rangeOfString:@"_"];
     if (sep.location != NSNotFound && sep.location + 1 < rel.length) {
@@ -150,11 +349,94 @@ static CGFloat const kThumbnailSize = 300.0;
     return [SCIVaultFile labelForSource:(SCIVaultSource)self.source];
 }
 
+- (NSString *)shortSourceLabel {
+    return [SCIVaultFile shortLabelForSource:(SCIVaultSource)self.source];
+}
+
+- (NSString *)listPrimaryTitle {
+    if (self.sourceUsername.length) {
+        return self.sourceUsername;
+    }
+    return [self displayName];
+}
+
+- (NSString *)listFormattedDuration {
+    if (self.durationSeconds <= 0.05) {
+        return @"";
+    }
+    NSInteger total = (NSInteger)llround(self.durationSeconds);
+    NSInteger m = total / 60;
+    NSInteger s = total % 60;
+    return [NSString stringWithFormat:@"%ld:%02ld", (long)m, (long)s];
+}
+
+- (NSString *)listBitrateString {
+    if (self.mediaType != SCIVaultMediaTypeVideo) {
+        return @"";
+    }
+    if (self.durationSeconds < 0.5 || self.fileSize <= 0) {
+        return @"";
+    }
+    double mbps = (double)self.fileSize * 8.0 / self.durationSeconds / 1e6;
+    if (mbps < 0.01) {
+        return @"";
+    }
+    return [NSString stringWithFormat:@"%.1f Mbps", mbps];
+}
+
+- (NSString *)listTechnicalLine {
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    BOOL isVideo = self.mediaType == SCIVaultMediaTypeVideo;
+    if (isVideo) {
+        NSString *d = [self listFormattedDuration];
+        if (d.length) {
+            [parts addObject:d];
+        }
+    }
+    NSString *sz = [NSByteCountFormatter stringFromByteCount:self.fileSize
+                                                    countStyle:NSByteCountFormatterCountStyleFile];
+    if (sz.length) {
+        [parts addObject:sz];
+    }
+    if (self.pixelWidth > 0 && self.pixelHeight > 0) {
+        [parts addObject:[NSString stringWithFormat:@"%dx%d", self.pixelWidth, self.pixelHeight]];
+    }
+    if (isVideo) {
+        NSString *br = [self listBitrateString];
+        if (br.length) {
+            [parts addObject:br];
+        }
+    }
+    return [parts componentsJoinedByString:@" · "];
+}
+
+- (NSString *)listDownloadDateString {
+    static NSDateFormatter *fmt;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        fmt = [[NSDateFormatter alloc] init];
+        fmt.dateFormat = @"MMM d 'at' h:mm a";
+    });
+    return self.dateAdded ? [fmt stringFromDate:self.dateAdded] : @"";
+}
+
 + (NSString *)labelForSource:(SCIVaultSource)source {
     switch (source) {
         case SCIVaultSourceFeed:    return @"Feed";
         case SCIVaultSourceStories: return @"Stories";
         case SCIVaultSourceReels:   return @"Reels";
+        case SCIVaultSourceProfile: return @"Profile";
+        case SCIVaultSourceDMs:     return @"DMs";
+        case SCIVaultSourceOther:
+        default:                    return @"Other";
+    }
+}
+
++ (NSString *)shortLabelForSource:(SCIVaultSource)source {
+    switch (source) {
+        case SCIVaultSourceFeed:    return @"Feed";
+        case SCIVaultSourceStories: return @"Story";
+        case SCIVaultSourceReels:   return @"Reel";
         case SCIVaultSourceProfile: return @"Profile";
         case SCIVaultSourceDMs:     return @"DMs";
         case SCIVaultSourceOther:

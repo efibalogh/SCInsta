@@ -1,6 +1,8 @@
 #import <CoreData/CoreData.h>
 #import <UIKit/UIKit.h>
 
+#import "SCIVaultSaveMetadata.h"
+
 NS_ASSUME_NONNULL_BEGIN
 
 typedef NS_ENUM(int16_t, SCIVaultMediaType) {
@@ -28,6 +30,10 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
 @property (nonatomic) BOOL isFavorite;
 @property (nonatomic, copy, nullable) NSString *folderPath;
 @property (nonatomic, copy, nullable) NSString *customName;
+@property (nonatomic, copy, nullable) NSString *sourceUsername;
+@property (nonatomic) int32_t pixelWidth;
+@property (nonatomic) int32_t pixelHeight;
+@property (nonatomic) double durationSeconds;
 
 + (nullable SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
                                     source:(SCIVaultSource)source
@@ -39,6 +45,14 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
                                     source:(SCIVaultSource)source
                                  mediaType:(SCIVaultMediaType)mediaType
                                 folderPath:(nullable NSString *)folderPath
+                                     error:(NSError **)error;
+
+/// When `metadata` is non-nil, its fields override `source` and populate list UI (Regram-style). File is probed for any missing dimensions/duration.
++ (nullable SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
+                                    source:(SCIVaultSource)source
+                                 mediaType:(SCIVaultMediaType)mediaType
+                                folderPath:(nullable NSString *)folderPath
+                                  metadata:(nullable SCIVaultSaveMetadata *)metadata
                                      error:(NSError **)error;
 
 - (BOOL)removeWithError:(NSError *_Nullable *_Nullable)error;
@@ -54,6 +68,20 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
 
 /// Human-readable label for the source type.
 - (NSString *)sourceLabel;
+
+/// Short label for origin pill (e.g. Reel, Feed).
+- (NSString *)shortSourceLabel;
+
+/// Primary line in list mode: username when known, else `displayName`.
+- (NSString *)listPrimaryTitle;
+
+/// Second line: duration · size · resolution · bitrate (video), or size · resolution (image).
+- (NSString *)listTechnicalLine;
+
+/// Third line: human-readable download date (e.g. Apr 17 at 2:04 AM).
+- (NSString *)listDownloadDateString;
+
++ (NSString *)shortLabelForSource:(SCIVaultSource)source;
 
 + (void)generateThumbnailForFile:(SCIVaultFile *)file
                       completion:(void(^_Nullable)(BOOL success))completion;

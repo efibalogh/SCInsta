@@ -5,6 +5,7 @@
 #import "../../Utils.h"
 #import "../../Downloader/Download.h"
 #import "../../Vault/SCIVaultFile.h"
+#import "../../Vault/SCIVaultSaveMetadata.h"
 #import "../../MediaPreview/SCIFullScreenMediaPlayer.h"
 
 @interface IGUFIButtonBarView : UIView
@@ -24,6 +25,7 @@ static NSInteger const kSCIDownloadButtonTag = 8315931;
 static NSInteger const kSCIDirectDownloadButtonTag = 13123;
 static void *kSCIStorySectionControllerKey = &kSCIStorySectionControllerKey;
 static void *kSCIDownloadButtonDesiredAlphaKey = &kSCIDownloadButtonDesiredAlphaKey;
+static void *kSCIDirectVaultHostControllerKey = &kSCIDirectVaultHostControllerKey;
 static void (*orig_socialUFI_layoutSubviews)(id, SEL);
 
 typedef id (^SCIResolveObjectBlock)(void);
@@ -650,14 +652,75 @@ static id SCIStoryMediaFromOverlay(id overlay) {
     return nil;
 }
 
+/// Resolves the DM fullscreen viewer VC used for vault metadata (button → superviews often lack a useful `viewDelegate`).
+static UIViewController *SCIDirectVisualMessageHostForAnchor(UIView *anchorView) {
+    if (!anchorView) {
+        return nil;
+    }
+
+    UIViewController *pinned = objc_getAssociatedObject(anchorView, kSCIDirectVaultHostControllerKey);
+    if (pinned) {
+        return pinned;
+    }
+
+    UIView *walker = anchorView;
+    for (NSUInteger depth = 0; depth < 22 && walker; depth++) {
+        UIViewController *vc = [SCIUtils nearestViewControllerForView:walker];
+        if (vc) {
+            NSString *name = NSStringFromClass(vc.class);
+            if ([name containsString:@"VisualMessage"] || [name containsString:@"DirectVisualMessage"]) {
+                return vc;
+            }
+        }
+        walker = walker.superview;
+    }
+
+    UIViewController *fallback = [SCIUtils nearestViewControllerForView:anchorView];
+    if (fallback && [NSStringFromClass(fallback.class) containsString:@"Direct"]) {
+        return fallback;
+    }
+    return nil;
+}
+
 static id SCIDirectCurrentMessage(id controller) {
+    if (!controller) {
+        return nil;
+    }
+
+    id msg = SCIObjectForSelector(controller, @"currentMessage");
+    if (msg) {
+        return msg;
+    }
+
     id dataSource = [SCIUtils getIvarForObj:controller name:"_dataSource"];
-    if (!dataSource) return nil;
+    if (!dataSource) {
+        dataSource = SCIKVCObject(controller, @"dataSource");
+    }
+    if (!dataSource) {
+        return nil;
+    }
 
     id currentMessage = [SCIUtils getIvarForObj:dataSource name:"_currentMessage"];
-    if (currentMessage) return currentMessage;
+    if (currentMessage) {
+        return currentMessage;
+    }
 
-    return SCIObjectForSelector(dataSource, @"currentMessage");
+    currentMessage = SCIObjectForSelector(dataSource, @"currentMessage");
+    if (currentMessage) {
+        return currentMessage;
+    }
+
+    currentMessage = [SCIUtils getIvarForObj:dataSource name:"_visibleMessage"];
+    if (currentMessage) {
+        return currentMessage;
+    }
+
+    currentMessage = SCIObjectForSelector(dataSource, @"visibleMessage");
+    if (currentMessage) {
+        return currentMessage;
+    }
+
+    return nil;
 }
 
 static id SCIDirectOverlayView(id controller) {
@@ -665,6 +728,180 @@ static id SCIDirectOverlayView(id controller) {
     if (!viewerContainerView) return nil;
 
     return SCIObjectForSelector(viewerContainerView, @"overlayView");
+}
+
+static NSString *SCIUsernameStringFromUserLike(id userObj) {
+    if (!userObj) {
+        return nil;
+    }
+    id name = SCIKVCObject(userObj, @"username");
+    if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+        return (NSString *)name;
+    }
+    return nil;
+}
+
+static id SCICurrentInstagramSessionUser(void) {
+    UIApplication *app = [UIApplication sharedApplication];
+    id delegate = [app delegate];
+    if (!delegate) {
+        return nil;
+    }
+    id session = SCIKVCObject(delegate, @"userSession");
+    return SCIKVCObject(session, @"user");
+}
+
+static NSString *SCIUsernamePreferringNotSelf(id userObj) {
+    NSString *u = SCIUsernameStringFromUserLike(userObj);
+    if (!u.length) {
+        return nil;
+    }
+    NSString *me = SCIUsernameStringFromUserLike(SCICurrentInstagramSessionUser());
+    if (me.length && [me compare:u options:NSCaseInsensitiveSearch] == NSOrderedSame) {
+        return nil;
+    }
+    return u;
+}
+
+static NSString *SCIUsernameStringPreferringNotSelf(NSString *candidate) {
+    if (!candidate.length) {
+        return nil;
+    }
+    NSString *me = SCIUsernameStringFromUserLike(SCICurrentInstagramSessionUser());
+    if (me.length && [me compare:candidate options:NSCaseInsensitiveSearch] == NSOrderedSame) {
+        return nil;
+    }
+    return candidate;
+}
+
+static NSString *SCIUsernameFromThreadLikeObject(id thread) {
+    if (!thread) {
+        return nil;
+    }
+
+    NSArray<NSString *> *thrKeys = @[
+        @"primaryUser", @"peerUser", @"otherUser", @"recipient", @"localRecipient", @"user", @"inviter",
+        @"pendingPeer", @"displayedUser", @"threadPartner", @"correspondentUser"
+    ];
+    for (NSString *key in thrKeys) {
+        id u = SCIKVCObject(thread, key);
+        NSString *s = SCIUsernamePreferringNotSelf(u);
+        if (s.length) {
+            return s;
+        }
+    }
+
+    id users = SCIKVCObject(thread, @"users");
+    if ([users isKindOfClass:[NSArray class]]) {
+        for (id u in (NSArray *)users) {
+            NSString *s = SCIUsernamePreferringNotSelf(u);
+            if (s.length) {
+                return s;
+            }
+        }
+    }
+
+    id recipients = SCIKVCObject(thread, @"recipients");
+    if ([recipients isKindOfClass:[NSArray class]]) {
+        for (id r in (NSArray *)recipients) {
+            id u = SCIKVCObject(r, @"user") ?: SCIKVCObject(r, @"userSummary") ?: r;
+            NSString *s = SCIUsernamePreferringNotSelf(u);
+            if (s.length) {
+                return s;
+            }
+        }
+    }
+
+    id otherUsers = SCIKVCObject(thread, @"otherUsers") ?: SCIKVCObject(thread, @"secondaryUsers");
+    if ([otherUsers isKindOfClass:[NSArray class]]) {
+        for (id u in (NSArray *)otherUsers) {
+            NSString *s = SCIUsernamePreferringNotSelf(u);
+            if (s.length) {
+                return s;
+            }
+        }
+    }
+
+    id allUsers = SCIKVCObject(thread, @"allUsers");
+    if ([allUsers isKindOfClass:[NSArray class]]) {
+        for (id u in (NSArray *)allUsers) {
+            NSString *s = SCIUsernamePreferringNotSelf(u);
+            if (s.length) {
+                return s;
+            }
+        }
+    }
+
+    return nil;
+}
+
+static NSString *SCIUsernameFromDirectMessage(id message, UIViewController *viewerVC) {
+    if (!message) {
+        return nil;
+    }
+
+    NSArray<NSString *> *keyPaths = @[
+        @"sender.username", @"author.username", @"user.username", @"fromUser.username",
+        @"messageSender.username", @"senderUser.username", @"peerUser.username", @"contactUser.username"
+    ];
+    for (NSString *kp in keyPaths) {
+        @try {
+            id v = [message valueForKeyPath:kp];
+            if (![v isKindOfClass:[NSString class]]) {
+                continue;
+            }
+            NSString *s = SCIUsernameStringPreferringNotSelf((NSString *)v);
+            if (s.length) {
+                return s;
+            }
+        } @catch (__unused NSException *e) {
+        }
+    }
+
+    NSArray<NSString *> *msgUserKeys = @[
+        @"sender", @"senderUser", @"author", @"user", @"fromUser", @"peerUser", @"messageSender",
+        @"contactUser", @"instagramActor", @"igActor", @"forwardingUser", @"rankedRecipient",
+        @"senderUserSession"
+    ];
+    for (NSString *key in msgUserKeys) {
+        id u = SCIKVCObject(message, key);
+        NSString *s = SCIUsernamePreferringNotSelf(u);
+        if (!s.length && u) {
+            s = SCIUsernamePreferringNotSelf(SCIKVCObject(u, @"user"));
+        }
+        if (s.length) {
+            return s;
+        }
+    }
+
+    id thread = SCIKVCObject(message, @"thread") ?: SCIKVCObject(message, @"conversation") ?: SCIKVCObject(message, @"directThread");
+    NSString *fromThread = SCIUsernameFromThreadLikeObject(thread);
+    if (fromThread.length) {
+        return fromThread;
+    }
+
+    if (viewerVC) {
+        id vthread = SCIKVCObject(viewerVC, @"thread");
+        if (!vthread) {
+            vthread = [SCIUtils getIvarForObj:viewerVC name:"_thread"];
+        }
+        fromThread = SCIUsernameFromThreadLikeObject(vthread);
+        if (fromThread.length) {
+            return fromThread;
+        }
+
+        id dataSource = [SCIUtils getIvarForObj:viewerVC name:"_dataSource"];
+        id dsThread = SCIKVCObject(dataSource, @"thread");
+        if (!dsThread) {
+            dsThread = [SCIUtils getIvarForObj:dataSource name:"_thread"];
+        }
+        fromThread = SCIUsernameFromThreadLikeObject(dsThread);
+        if (fromThread.length) {
+            return fromThread;
+        }
+    }
+
+    return nil;
 }
 
 static BOOL SCIDownloadMediaCandidate(id candidate, NSString *failureDescription);
@@ -695,6 +932,153 @@ static NSURL *SCIVideoURLFromCandidate(id candidate) {
 
 static NSURL *SCIPhotoURLFromCandidate(id candidate) {
     return [SCIUtils getPhotoUrl:SCIPhotoFromCandidate(candidate)];
+}
+
+static NSString *SCIUsernameFromMediaCandidate(id candidate) {
+    if (!candidate) {
+        return nil;
+    }
+
+    NSMutableArray *roots = [NSMutableArray arrayWithObject:candidate];
+    id nestedMedia = SCIKVCObject(candidate, @"media");
+    if (nestedMedia && nestedMedia != candidate) {
+        [roots addObject:nestedMedia];
+    }
+
+    for (id root in roots) {
+        for (NSString *key in @[ @"user", @"owner" ]) {
+            id userObj = SCIKVCObject(root, key);
+            if (!userObj) {
+                continue;
+            }
+
+            id name = SCIKVCObject(userObj, @"username");
+            if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+                return (NSString *)name;
+            }
+        }
+    }
+
+    return nil;
+}
+
+static SCIVaultSource SCIVaultSourceFromAnchorView(UIView *view) {
+    if (!view) {
+        return SCIVaultSourceFeed;
+    }
+
+    UIViewController *vc = [SCIUtils nearestViewControllerForView:view];
+    NSString *cls = NSStringFromClass(vc.class);
+
+    if ([cls rangeOfString:@"Story"].location != NSNotFound) {
+        return SCIVaultSourceStories;
+    }
+    if ([cls containsString:@"Reel"] || [cls containsString:@"Sundial"] || [cls containsString:@"Clips"]) {
+        return SCIVaultSourceReels;
+    }
+    if ([cls containsString:@"Direct"]) {
+        return SCIVaultSourceDMs;
+    }
+    if ([cls containsString:@"ProfilePicture"] || [cls containsString:@"PicturePreview"] ||
+        [cls containsString:@"ProfilePhoto"] || [cls containsString:@"CoinFlip"] ||
+        [cls containsString:@"Avatar"]) {
+        return SCIVaultSourceProfile;
+    }
+    if ([cls containsString:@"Profile"] || [cls containsString:@"UserDetail"]) {
+        return SCIVaultSourceProfile;
+    }
+
+    return SCIVaultSourceFeed;
+}
+
+static void SCIApplyVideoMetricsFromCandidate(id candidate, SCIVaultSaveMetadata *meta) {
+    if (!meta) {
+        return;
+    }
+
+    id video = SCIVideoFromCandidate(candidate);
+    if (!video) {
+        return;
+    }
+
+    for (NSString *key in @[ @"duration", @"length", @"videoDuration" ]) {
+        id val = SCIKVCObject(video, key);
+        if ([val respondsToSelector:@selector(doubleValue)]) {
+            double d = [val doubleValue];
+            if (d > 0.1) {
+                meta.durationSeconds = d;
+                break;
+            }
+        }
+    }
+
+    NSNumber *w = SCIKVCObject(video, @"width");
+    NSNumber *h = SCIKVCObject(video, @"height");
+    if (!w || !h) {
+        w = SCIKVCObject(video, @"renderWidth");
+        h = SCIKVCObject(video, @"renderHeight");
+    }
+    if ([w respondsToSelector:@selector(intValue)] && [w intValue] > 0) {
+        meta.pixelWidth = (int32_t)[w intValue];
+    }
+    if ([h respondsToSelector:@selector(intValue)] && [h intValue] > 0) {
+        meta.pixelHeight = (int32_t)[h intValue];
+    }
+}
+
+static void SCIApplyPhotoMetricsFromCandidate(id candidate, SCIVaultSaveMetadata *meta) {
+    if (!meta) {
+        return;
+    }
+
+    id photo = SCIPhotoFromCandidate(candidate);
+    if (!photo) {
+        return;
+    }
+
+    NSNumber *w = SCIKVCObject(photo, @"width");
+    NSNumber *h = SCIKVCObject(photo, @"height");
+    if ([w respondsToSelector:@selector(intValue)] && [w intValue] > 0) {
+        meta.pixelWidth = (int32_t)[w intValue];
+    }
+    if ([h respondsToSelector:@selector(intValue)] && [h intValue] > 0) {
+        meta.pixelHeight = (int32_t)[h intValue];
+    }
+}
+
+static SCIVaultSaveMetadata *SCIVaultMetadataForMediaCandidate(id candidate, UIView *anchorView) {
+    SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
+    meta.sourceUsername = SCIUsernameFromMediaCandidate(candidate);
+
+    UIViewController *dmHost = SCIDirectVisualMessageHostForAnchor(anchorView);
+    if (dmHost) {
+        meta.source = (int16_t)SCIVaultSourceDMs;
+        if (!meta.sourceUsername.length) {
+            id dmMessage = SCIDirectCurrentMessage(dmHost);
+            NSString *resolved = SCIUsernameFromDirectMessage(dmMessage, dmHost);
+            if (resolved.length) {
+                meta.sourceUsername = resolved;
+            }
+        }
+    } else {
+        meta.source = (int16_t)SCIVaultSourceFromAnchorView(anchorView);
+        if (!meta.sourceUsername.length) {
+            UIViewController *hostVC = anchorView ? [SCIUtils nearestViewControllerForView:anchorView] : nil;
+            NSString *hostName = hostVC ? NSStringFromClass(hostVC.class) : @"";
+            if ([hostName containsString:@"Direct"]) {
+                id dmMessage = SCIDirectCurrentMessage(hostVC);
+                meta.sourceUsername = SCIUsernameFromDirectMessage(dmMessage, hostVC) ?: meta.sourceUsername;
+            }
+        }
+    }
+
+    if (SCIVideoURLFromCandidate(candidate)) {
+        SCIApplyVideoMetricsFromCandidate(candidate, meta);
+    } else {
+        SCIApplyPhotoMetricsFromCandidate(candidate, meta);
+    }
+
+    return meta;
 }
 
 static NSInteger SCIMediaTypeFromMedia(id media) {
@@ -809,11 +1193,14 @@ static BOOL SCICopyMediaLinkForCandidate(id candidate, NSString *failureDescript
     return YES;
 }
 
-static BOOL SCIDownloadToVaultMediaCandidate(id candidate, NSString *failureDescription) {
+static BOOL SCIDownloadToVaultMediaCandidate(id candidate, UIView *anchorView, NSString *failureDescription) {
     SCIInitDownloadButtonDownloaders();
+
+    SCIVaultSaveMetadata *vaultMeta = SCIVaultMetadataForMediaCandidate(candidate, anchorView);
 
     NSURL *videoURL = SCIVideoURLFromCandidate(candidate);
     if (videoURL) {
+        dlBtnVaultVideoDelegate.pendingVaultSaveMetadata = vaultMeta;
         [dlBtnVaultVideoDelegate downloadFileWithURL:videoURL
                                        fileExtension:videoURL.pathExtension
                                             hudLabel:nil];
@@ -822,6 +1209,7 @@ static BOOL SCIDownloadToVaultMediaCandidate(id candidate, NSString *failureDesc
 
     NSURL *photoURL = SCIPhotoURLFromCandidate(candidate);
     if (photoURL) {
+        dlBtnVaultImageDelegate.pendingVaultSaveMetadata = vaultMeta;
         [dlBtnVaultImageDelegate downloadFileWithURL:photoURL
                                        fileExtension:photoURL.pathExtension
                                             hudLabel:nil];
@@ -1116,7 +1504,7 @@ static void SCIPresentMediaActionSheet(UIButton *sender, id baseMedia, id curren
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Download to Vault"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
-        SCIDownloadToVaultMediaCandidate(currentMedia, failureDescription);
+        SCIDownloadToVaultMediaCandidate(currentMedia, sender, failureDescription);
     }]];
 
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Expand"
@@ -1185,7 +1573,7 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
 
         UIAction *vaultAction = [UIAction actionWithTitle:@"Download to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
-            SCIDownloadToVaultMediaCandidate(current, failureCopy);
+            SCIDownloadToVaultMediaCandidate(current, button, failureCopy);
         }];
 
         UIAction *expandAction = [UIAction actionWithTitle:@"Expand" image:expandIcon identifier:nil handler:^(__unused UIAction *action) {
@@ -1499,6 +1887,7 @@ static void SCIUpdateDirectDownloadButton(UIViewController *controller, id targe
     button.frame = CGRectIntegral(CGRectMake(x, MAX(10.0, y), side, side));
     SCISetButtonDesiredAlpha(button, 1.0);
     SCIAllowContextMenuOverflow(button);
+    objc_setAssociatedObject(button, kSCIDirectVaultHostControllerKey, controller, OBJC_ASSOCIATION_ASSIGN);
 
     __weak UIViewController *weakController = controller;
     SCIConfigureButtonContextMenu(button,

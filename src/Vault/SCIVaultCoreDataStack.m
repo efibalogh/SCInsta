@@ -80,7 +80,30 @@
     customName.attributeType = NSStringAttributeType;
     customName.optional = YES;
 
-    entity.properties = @[identifier, relativePath, mediaType, source, dateAdded, fileSize, isFavorite, folderPath, customName];
+    NSAttributeDescription *sourceUsername = [[NSAttributeDescription alloc] init];
+    sourceUsername.name = @"sourceUsername";
+    sourceUsername.attributeType = NSStringAttributeType;
+    sourceUsername.optional = YES;
+
+    NSAttributeDescription *pixelWidth = [[NSAttributeDescription alloc] init];
+    pixelWidth.name = @"pixelWidth";
+    pixelWidth.attributeType = NSInteger32AttributeType;
+    pixelWidth.optional = NO;
+    pixelWidth.defaultValue = @0;
+
+    NSAttributeDescription *pixelHeight = [[NSAttributeDescription alloc] init];
+    pixelHeight.name = @"pixelHeight";
+    pixelHeight.attributeType = NSInteger32AttributeType;
+    pixelHeight.optional = NO;
+    pixelHeight.defaultValue = @0;
+
+    NSAttributeDescription *durationSeconds = [[NSAttributeDescription alloc] init];
+    durationSeconds.name = @"durationSeconds";
+    durationSeconds.attributeType = NSDoubleAttributeType;
+    durationSeconds.optional = NO;
+    durationSeconds.defaultValue = @0.0;
+
+    entity.properties = @[identifier, relativePath, mediaType, source, dateAdded, fileSize, isFavorite, folderPath, customName, sourceUsername, pixelWidth, pixelHeight, durationSeconds];
     model.entities = @[entity];
 
     return model;

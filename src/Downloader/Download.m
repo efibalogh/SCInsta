@@ -1,5 +1,6 @@
 #import "Download.h"
 #import "../Vault/SCIVaultFile.h"
+#import "../Vault/SCIVaultSaveMetadata.h"
 #import <Photos/Photos.h>
 
 @implementation SCIDownloadDelegate
@@ -84,6 +85,7 @@
 }
 
 - (void)downloadDidCancel {
+    self.pendingVaultSaveMetadata = nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.progressView dismiss];
     });
@@ -100,6 +102,7 @@
 }
 
 - (void)downloadDidFinishWithError:(NSError *)error {
+    self.pendingVaultSaveMetadata = nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (error && error.code != NSURLErrorCancelled) {
             NSLog(@"[SCInsta] Download: Download failed with error: \"%@\"", error);
@@ -109,6 +112,9 @@
 }
 
 - (void)downloadDidFinishWithFileURL:(NSURL *)fileURL {
+    SCIVaultSaveMetadata *vaultMeta = self.pendingVaultSaveMetadata;
+    self.pendingVaultSaveMetadata = nil;
+
     dispatch_async(dispatch_get_main_queue(), ^{
         NSLog(@"[SCInsta] Download: Download finished with url: \"%@\"", [fileURL absoluteString]);
         NSLog(@"[SCInsta] Download: Completed with action %d", (int)self.action);
@@ -138,7 +144,12 @@
             BOOL isVideo = [self isVideoFileAtURL:fileURL];
             SCIVaultMediaType vaultType = isVideo ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
             NSError *error;
-            SCIVaultFile *file = [SCIVaultFile saveFileToVault:fileURL source:SCIVaultSourceOther mediaType:vaultType error:&error];
+            SCIVaultFile *file = [SCIVaultFile saveFileToVault:fileURL
+                                                        source:SCIVaultSourceOther
+                                                     mediaType:vaultType
+                                                    folderPath:nil
+                                                      metadata:vaultMeta
+                                                         error:&error];
             if (file) {
                 [self showCompletionPillAndDismissAfter:0.45 completion:^{
                     [SCIUtils showToastForDuration:2.0 title:@"Saved to Vault"];

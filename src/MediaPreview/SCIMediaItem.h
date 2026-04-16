@@ -16,6 +16,8 @@ typedef NS_ENUM(NSInteger, SCIMediaItemType) {
 @property (nonatomic, strong, nullable) UIImage *image;
 @property (nonatomic, strong, nullable) UIImage *thumbnail;
 @property (nonatomic, copy, nullable) NSString *title;
+/// When >= 0, `SCIVaultSaveMetadata.source` uses this value (`SCIVaultSource`). Default -1 = not set.
+@property (nonatomic, assign) NSInteger vaultSaveSource;
 @property (nonatomic, strong, nullable) SCIVaultFile *vaultFile;
 @property (nonatomic, assign) BOOL isFromVault;
 

@@ -524,7 +524,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     CGFloat width = cv.bounds.size.width;
     if (indexPath.section == 0) {
         if (self.viewMode == SCIVaultViewModeList) {
-            return CGSizeMake(width, 72);
+            return CGSizeMake(width, 88);
         }
         CGFloat totalSpacing = kGridSpacing * (kGridColumns - 1);
         CGFloat side = (width - totalSpacing) / kGridColumns;
@@ -535,7 +535,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         CGFloat side = (width - totalSpacing) / kGridColumns;
         return CGSizeMake(side, side);
     }
-    return CGSizeMake(width, 72);
+    return CGSizeMake(width, 88);
 }
 
 - (UIEdgeInsets)collectionView:(UICollectionView *)cv

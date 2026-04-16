@@ -30,6 +30,8 @@ fromViewController:(UIViewController *)presenter;
 
 + (void)showImage:(UIImage *)image;
 + (void)showRemoteImageURL:(NSURL *)url;
+/// Profile / avatar long-press: sets vault source + optional username for “Save to Vault”.
++ (void)showRemoteImageURL:(NSURL *)url profileUsername:(nullable NSString *)username;
 
 @end
 

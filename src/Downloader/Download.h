@@ -8,6 +8,8 @@
 #import "../MediaPreview/SCIDownloadProgressView.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 
+@class SCIVaultSaveMetadata;
+
 @interface SCIDownloadDelegate : NSObject <SCIDownloadDelegateProtocol>
 
 typedef NS_ENUM(NSUInteger, DownloadAction) {
@@ -22,6 +24,8 @@ typedef NS_ENUM(NSUInteger, DownloadAction) {
 
 @property (nonatomic, strong) SCIDownloadManager *downloadManager;
 @property (nonatomic, strong) SCIDownloadProgressView *progressView;
+/// Set immediately before `downloadFileWithURL:` when `action == saveToVault`; consumed when the download finishes.
+@property (nonatomic, strong, nullable) SCIVaultSaveMetadata *pendingVaultSaveMetadata;
 
 - (instancetype)initWithAction:(DownloadAction)action showProgress:(BOOL)showProgress;
 

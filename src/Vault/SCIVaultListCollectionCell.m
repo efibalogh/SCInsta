@@ -6,12 +6,14 @@
 @property (nonatomic, strong) SCIVaultFile *file;
 
 @property (nonatomic, strong) UIImageView *thumbnailView;
-@property (nonatomic, strong) UIImageView *typeIcon;
+@property (nonatomic, strong) UIImageView *rowTypeIcon;
 @property (nonatomic, strong) UILabel *titleLabel;
-@property (nonatomic, strong) UILabel *subtitleLabel;
-@property (nonatomic, strong) UILabel *detailLabel;
+@property (nonatomic, strong) UILabel *technicalLabel;
+@property (nonatomic, strong) UIView *pillBackground;
+@property (nonatomic, strong) UILabel *pillLabel;
+@property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UIImageView *favoriteIcon;
-@property (nonatomic, strong) UIImageView *chevronView;
+@property (nonatomic, strong) UIImageView *moreIcon;
 
 @end
 
@@ -35,38 +37,49 @@
     self.thumbnailView.backgroundColor = [UIColor secondarySystemBackgroundColor];
     [self.contentView addSubview:self.thumbnailView];
 
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightBold];
-    self.typeIcon = [[UIImageView alloc] init];
-    self.typeIcon.translatesAutoresizingMaskIntoConstraints = NO;
-    self.typeIcon.image = [UIImage systemImageNamed:@"play.fill" withConfiguration:cfg];
-    self.typeIcon.tintColor = [UIColor whiteColor];
-    self.typeIcon.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.55];
-    self.typeIcon.layer.cornerRadius = 9;
-    self.typeIcon.contentMode = UIViewContentModeCenter;
-    self.typeIcon.hidden = YES;
-    [self.contentView addSubview:self.typeIcon];
+    self.rowTypeIcon = [[UIImageView alloc] init];
+    self.rowTypeIcon.translatesAutoresizingMaskIntoConstraints = NO;
+    self.rowTypeIcon.contentMode = UIViewContentModeScaleAspectFit;
+    self.rowTypeIcon.tintColor = [UIColor secondaryLabelColor];
+    [self.contentView addSubview:self.rowTypeIcon];
 
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    self.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     self.titleLabel.textColor = [UIColor labelColor];
     self.titleLabel.numberOfLines = 1;
-    self.titleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
+    self.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentView addSubview:self.titleLabel];
 
-    self.subtitleLabel = [[UILabel alloc] init];
-    self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.subtitleLabel.font = [UIFont systemFontOfSize:12];
-    self.subtitleLabel.textColor = [UIColor secondaryLabelColor];
-    self.subtitleLabel.numberOfLines = 1;
-    [self.contentView addSubview:self.subtitleLabel];
+    self.technicalLabel = [[UILabel alloc] init];
+    self.technicalLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.technicalLabel.font = [UIFont systemFontOfSize:12];
+    self.technicalLabel.textColor = [UIColor secondaryLabelColor];
+    self.technicalLabel.numberOfLines = 1;
+    self.technicalLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    [self.contentView addSubview:self.technicalLabel];
 
-    self.detailLabel = [[UILabel alloc] init];
-    self.detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.detailLabel.font = [UIFont systemFontOfSize:11];
-    self.detailLabel.textColor = [UIColor tertiaryLabelColor];
-    self.detailLabel.numberOfLines = 1;
-    [self.contentView addSubview:self.detailLabel];
+    self.pillBackground = [[UIView alloc] init];
+    self.pillBackground.translatesAutoresizingMaskIntoConstraints = NO;
+    self.pillBackground.backgroundColor = [UIColor tertiarySystemFillColor];
+    self.pillBackground.layer.cornerRadius = 5;
+    self.pillBackground.clipsToBounds = YES;
+    [self.contentView addSubview:self.pillBackground];
+
+    self.pillLabel = [[UILabel alloc] init];
+    self.pillLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.pillLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+    self.pillLabel.textColor = [UIColor secondaryLabelColor];
+    self.pillLabel.numberOfLines = 1;
+    [self.pillBackground addSubview:self.pillLabel];
+
+    self.dateLabel = [[UILabel alloc] init];
+    self.dateLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.dateLabel.font = [UIFont systemFontOfSize:11];
+    self.dateLabel.textColor = [UIColor tertiaryLabelColor];
+    self.dateLabel.numberOfLines = 1;
+    self.dateLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    [self.contentView addSubview:self.dateLabel];
 
     UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold];
     self.favoriteIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg]];
@@ -75,11 +88,11 @@
     self.favoriteIcon.hidden = YES;
     [self.contentView addSubview:self.favoriteIcon];
 
-    UIImageSymbolConfiguration *chevCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightSemibold];
-    self.chevronView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right" withConfiguration:chevCfg]];
-    self.chevronView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.chevronView.tintColor = [UIColor tertiaryLabelColor];
-    [self.contentView addSubview:self.chevronView];
+    UIImageSymbolConfiguration *moreCfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
+    self.moreIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"ellipsis" withConfiguration:moreCfg]];
+    self.moreIcon.translatesAutoresizingMaskIntoConstraints = NO;
+    self.moreIcon.tintColor = [UIColor tertiaryLabelColor];
+    [self.contentView addSubview:self.moreIcon];
 
     UILayoutGuide *margin = self.contentView.layoutMarginsGuide;
     [NSLayoutConstraint activateConstraints:@[
@@ -88,28 +101,35 @@
         [self.thumbnailView.widthAnchor constraintEqualToConstant:56],
         [self.thumbnailView.heightAnchor constraintEqualToConstant:56],
 
-        [self.typeIcon.leadingAnchor constraintEqualToAnchor:self.thumbnailView.leadingAnchor constant:4],
-        [self.typeIcon.bottomAnchor constraintEqualToAnchor:self.thumbnailView.bottomAnchor constant:-4],
-        [self.typeIcon.widthAnchor constraintEqualToConstant:18],
-        [self.typeIcon.heightAnchor constraintEqualToConstant:18],
-
-        [self.chevronView.trailingAnchor constraintEqualToAnchor:margin.trailingAnchor constant:-4],
-        [self.chevronView.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.moreIcon.trailingAnchor constraintEqualToAnchor:margin.trailingAnchor constant:-4],
+        [self.moreIcon.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
 
         [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.thumbnailView.trailingAnchor constant:12],
-        [self.titleLabel.topAnchor constraintEqualToAnchor:self.thumbnailView.topAnchor constant:2],
+        [self.titleLabel.topAnchor constraintEqualToAnchor:self.thumbnailView.topAnchor constant:-1],
         [self.titleLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.favoriteIcon.leadingAnchor constant:-4],
 
-        [self.subtitleLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-        [self.subtitleLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:2],
-        [self.subtitleLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
+        [self.rowTypeIcon.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
+        [self.rowTypeIcon.centerYAnchor constraintEqualToAnchor:self.technicalLabel.centerYAnchor],
+        [self.rowTypeIcon.widthAnchor constraintEqualToConstant:14],
+        [self.rowTypeIcon.heightAnchor constraintEqualToConstant:14],
 
-        [self.detailLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-        [self.detailLabel.topAnchor constraintEqualToAnchor:self.subtitleLabel.bottomAnchor constant:2],
-        [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
+        [self.technicalLabel.leadingAnchor constraintEqualToAnchor:self.rowTypeIcon.trailingAnchor constant:4],
+        [self.technicalLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:3],
+        [self.technicalLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.moreIcon.leadingAnchor constant:-8],
 
-        [self.favoriteIcon.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-6],
-        [self.favoriteIcon.topAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
+        [self.pillBackground.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
+        [self.pillBackground.topAnchor constraintEqualToAnchor:self.technicalLabel.bottomAnchor constant:4],
+        [self.pillLabel.leadingAnchor constraintEqualToAnchor:self.pillBackground.leadingAnchor constant:8],
+        [self.pillLabel.trailingAnchor constraintEqualToAnchor:self.pillBackground.trailingAnchor constant:-8],
+        [self.pillLabel.topAnchor constraintEqualToAnchor:self.pillBackground.topAnchor constant:3],
+        [self.pillLabel.bottomAnchor constraintEqualToAnchor:self.pillBackground.bottomAnchor constant:-3],
+
+        [self.dateLabel.leadingAnchor constraintEqualToAnchor:self.pillBackground.trailingAnchor constant:8],
+        [self.dateLabel.centerYAnchor constraintEqualToAnchor:self.pillBackground.centerYAnchor],
+        [self.dateLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.moreIcon.leadingAnchor constant:-8],
+
+        [self.favoriteIcon.trailingAnchor constraintEqualToAnchor:self.moreIcon.leadingAnchor constant:-6],
+        [self.favoriteIcon.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
     ]];
 }
 
@@ -117,21 +137,24 @@
     [super prepareForReuse];
     self.thumbnailView.image = nil;
     self.titleLabel.text = nil;
-    self.subtitleLabel.text = nil;
-    self.detailLabel.text = nil;
-    self.typeIcon.hidden = YES;
+    self.technicalLabel.text = nil;
+    self.pillLabel.text = nil;
+    self.dateLabel.text = nil;
     self.favoriteIcon.hidden = YES;
     self.file = nil;
 }
 
 - (void)configureWithVaultFile:(SCIVaultFile *)file {
     self.file = file;
-    self.titleLabel.text = [file displayName];
-    self.subtitleLabel.text = [file sourceLabel];
-    self.detailLabel.text = [self formattedDetailForFile:file];
+    self.titleLabel.text = [file listPrimaryTitle];
+    self.technicalLabel.text = [file listTechnicalLine];
+    self.pillLabel.text = [file shortSourceLabel];
+    self.dateLabel.text = [file listDownloadDateString];
 
     BOOL isVideo = (file.mediaType == SCIVaultMediaTypeVideo);
-    self.typeIcon.hidden = !isVideo;
+    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIImageSymbolWeightMedium];
+    self.rowTypeIcon.image = [UIImage systemImageNamed:(isVideo ? @"video.fill" : @"photo.fill") withConfiguration:cfg];
+
     self.favoriteIcon.hidden = !file.isFavorite;
 
     UIImage *thumb = [SCIVaultFile loadThumbnailForFile:file];
@@ -146,24 +169,6 @@
             if (img) weakSelf.thumbnailView.image = img;
         }];
     }
-}
-
-- (NSString *)formattedDetailForFile:(SCIVaultFile *)file {
-    NSString *size = [NSByteCountFormatter stringFromByteCount:file.fileSize
-                                                   countStyle:NSByteCountFormatterCountStyleFile];
-
-    static NSDateFormatter *fmt;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        fmt = [[NSDateFormatter alloc] init];
-        fmt.dateStyle = NSDateFormatterShortStyle;
-        fmt.timeStyle = NSDateFormatterShortStyle;
-    });
-
-    NSString *dateStr = file.dateAdded ? [fmt stringFromDate:file.dateAdded] : @"";
-    if (size.length == 0) return dateStr;
-    if (dateStr.length == 0) return size;
-    return [NSString stringWithFormat:@"%@ • %@", size, dateStr];
 }
 
 @end

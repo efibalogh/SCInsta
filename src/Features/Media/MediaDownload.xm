@@ -434,7 +434,28 @@ static NSURL *SCIResolvedProfilePictureURL(UIView *profilePictureView) {
     if (!imageUrl) return;
 
     if ([SCIUtils getBoolPref:@"profile_photo_zoom"]) {
-        [SCIFullScreenMediaPlayer showRemoteImageURL:imageUrl];
+        id profileUser = nil;
+        @try {
+            profileUser = [self valueForKey:@"userGQL"];
+        } @catch (__unused NSException *e) {
+        }
+        if (!profileUser) {
+            @try {
+                profileUser = [self valueForKey:@"user"];
+            } @catch (__unused NSException *e) {
+            }
+        }
+        NSString *username = nil;
+        if (profileUser) {
+            @try {
+                id n = [profileUser valueForKey:@"username"];
+                if ([n isKindOfClass:[NSString class]] && [(NSString *)n length] > 0) {
+                    username = (NSString *)n;
+                }
+            } @catch (__unused NSException *e) {
+            }
+        }
+        [SCIFullScreenMediaPlayer showRemoteImageURL:imageUrl profileUsername:username];
         return;
     }
 
