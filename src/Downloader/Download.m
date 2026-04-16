@@ -150,7 +150,7 @@
         }
 
         [self showCompletionPillAndDismissAfter:0.25 completion:^{
-            [SCIMediaPreviewController showPreviewForFileURL:fileURL];
+            [SCIFullScreenMediaPlayer showFileURL:fileURL];
         }];
     });
 }

@@ -6,7 +6,7 @@
 
 #import "Manager.h"
 #import "../MediaPreview/SCIDownloadProgressView.h"
-#import "../MediaPreview/SCIMediaPreviewController.h"
+#import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 
 @interface SCIDownloadDelegate : NSObject <SCIDownloadDelegateProtocol>
 

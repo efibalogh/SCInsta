@@ -1,9 +1,11 @@
 #import <objc/runtime.h>
+#import <AVFoundation/AVFoundation.h>
 
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
 #import "../../Downloader/Download.h"
 #import "../../Vault/SCIVaultFile.h"
+#import "../../MediaPreview/SCIFullScreenMediaPlayer.h"
 
 @interface IGUFIButtonBarView : UIView
 @end
@@ -695,6 +697,18 @@ static NSURL *SCIPhotoURLFromCandidate(id candidate) {
     return [SCIUtils getPhotoUrl:SCIPhotoFromCandidate(candidate)];
 }
 
+static NSInteger SCIMediaTypeFromMedia(id media) {
+    if (!media) return 0;
+
+    NSArray *items = SCIItemsFromMedia(media);
+    if (items.count > 0) return 3;
+
+    if (SCIVideoFromCandidate(media)) return 2;
+    if (SCIPhotoFromCandidate(media)) return 1;
+
+    return 0;
+}
+
 static NSInteger SCIResolvedItemIndex(NSArray *items, id currentMedia, NSInteger fallbackIndex) {
     if (items.count == 0) {
         return NSNotFound;
@@ -795,7 +809,7 @@ static BOOL SCICopyMediaLinkForCandidate(id candidate, NSString *failureDescript
     return YES;
 }
 
-static BOOL SCISaveToVaultMediaCandidate(id candidate, NSString *failureDescription) {
+static BOOL SCIDownloadToVaultMediaCandidate(id candidate, NSString *failureDescription) {
     SCIInitDownloadButtonDownloaders();
 
     NSURL *videoURL = SCIVideoURLFromCandidate(candidate);
@@ -833,32 +847,32 @@ static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger cur
 
         NSURL *videoURL = SCIVideoURLFromCandidate(resolvedCurrent);
         if (videoURL) {
-            [SCIMediaPreviewController showPreviewForFileURL:videoURL];
+            [SCIFullScreenMediaPlayer showFileURL:videoURL];
             return YES;
         }
 
         NSInteger initialPhotoIndex = 0;
         NSArray<NSURL *> *photoURLs = SCIPhotoURLsFromCarouselItems(items, itemIndex, &initialPhotoIndex);
         if (photoURLs.count > 1) {
-            [SCIMediaPreviewController showPreviewForPhotoURLs:photoURLs initialIndex:initialPhotoIndex];
+            [SCIFullScreenMediaPlayer showPhotoURLs:photoURLs initialIndex:initialPhotoIndex];
             return YES;
         }
 
         if (photoURLs.count == 1) {
-            [SCIMediaPreviewController showPreviewForFileURL:photoURLs.firstObject];
+            [SCIFullScreenMediaPlayer showFileURL:photoURLs.firstObject];
             return YES;
         }
     }
 
     NSURL *videoURL = SCIVideoURLFromCandidate(resolvedCurrent);
     if (videoURL) {
-        [SCIMediaPreviewController showPreviewForFileURL:videoURL];
+        [SCIFullScreenMediaPlayer showFileURL:videoURL];
         return YES;
     }
 
     NSURL *photoURL = SCIPhotoURLFromCandidate(resolvedCurrent);
     if (photoURL) {
-        [SCIMediaPreviewController showPreviewForFileURL:photoURL];
+        [SCIFullScreenMediaPlayer showFileURL:photoURL];
         return YES;
     }
 
@@ -866,6 +880,195 @@ static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger cur
         [SCIUtils showErrorHUDWithDescription:failureDescription];
     }
 
+    return NO;
+}
+
+static BOOL SCIImageMostlyBlack(UIImage *image) {
+    CGImageRef cgImage = image.CGImage;
+    if (!cgImage) return YES;
+
+    size_t width = 8;
+    size_t height = 8;
+    size_t bytesPerPixel = 4;
+    size_t bytesPerRow = width * bytesPerPixel;
+    size_t bitsPerComponent = 8;
+    size_t totalPixels = width * height;
+
+    uint8_t *rawData = (uint8_t *)calloc(height, bytesPerRow);
+    if (!rawData) return YES;
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
+    CGContextRef context = CGBitmapContextCreate(rawData,
+                                                 width,
+                                                 height,
+                                                 bitsPerComponent,
+                                                 bytesPerRow,
+                                                 colorSpace,
+                                                 bitmapInfo);
+
+    if (!context) {
+        CGColorSpaceRelease(colorSpace);
+        free(rawData);
+        return YES;
+    }
+
+    CGContextSetInterpolationQuality(context, kCGInterpolationLow);
+    CGContextDrawImage(context, CGRectMake(0.0, 0.0, width, height), cgImage);
+
+    NSUInteger darkPixels = 0;
+    for (size_t i = 0; i < totalPixels; i++) {
+        size_t offset = i * bytesPerPixel;
+        uint8_t r = rawData[offset];
+        uint8_t g = rawData[offset + 1];
+        uint8_t b = rawData[offset + 2];
+
+        if (r < 30 && g < 30 && b < 30) {
+            darkPixels++;
+        }
+    }
+
+    CGContextRelease(context);
+    CGColorSpaceRelease(colorSpace);
+    free(rawData);
+
+    return ((double)darkPixels / (double)totalPixels) > 0.85;
+}
+
+static void SCIExtractVideoThumbnailAndShow(NSURL *videoURL) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSDictionary *assetOptions = @{ AVURLAssetPreferPreciseDurationAndTimingKey: @YES };
+        AVURLAsset *asset = [AVURLAsset URLAssetWithURL:videoURL options:assetOptions];
+        AVAssetImageGenerator *generator = [[AVAssetImageGenerator alloc] initWithAsset:asset];
+        generator.appliesPreferredTrackTransform = YES;
+        generator.requestedTimeToleranceBefore = kCMTimeZero;
+        generator.requestedTimeToleranceAfter = CMTimeMakeWithSeconds(0.5, 600);
+
+        NSArray<NSValue *> *sampleTimes = @[
+            [NSValue valueWithCMTime:CMTimeMakeWithSeconds(0.5, 600)],
+            [NSValue valueWithCMTime:CMTimeMakeWithSeconds(1.0, 600)],
+            [NSValue valueWithCMTime:CMTimeMakeWithSeconds(2.0, 600)],
+            [NSValue valueWithCMTime:CMTimeMakeWithSeconds(0.0, 600)]
+        ];
+
+        UIImage *fallbackImage = nil;
+        UIImage *selectedImage = nil;
+
+        for (NSValue *timeValue in sampleTimes) {
+            NSError *frameError = nil;
+            CGImageRef frameRef = [generator copyCGImageAtTime:timeValue.CMTimeValue actualTime:NULL error:&frameError];
+            if (!frameRef || frameError) {
+                if (frameRef) {
+                    CGImageRelease(frameRef);
+                }
+                continue;
+            }
+
+            UIImage *frameImage = [UIImage imageWithCGImage:frameRef];
+            CGImageRelease(frameRef);
+
+            if (!frameImage) {
+                continue;
+            }
+
+            if (!fallbackImage) {
+                fallbackImage = frameImage;
+            }
+
+            if (!SCIImageMostlyBlack(frameImage)) {
+                selectedImage = frameImage;
+                break;
+            }
+        }
+
+        UIImage *finalImage = selectedImage ?: fallbackImage;
+        if (!finalImage) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [SCIUtils showToastForDuration:1.5 title:@"Cover not available"];
+            });
+            return;
+        }
+
+        NSData *jpegData = UIImageJPEGRepresentation(finalImage, 0.9);
+        NSString *tempFilename = [NSString stringWithFormat:@"scinsta-cover-%@.jpg", NSUUID.UUID.UUIDString];
+        NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tempFilename];
+        NSURL *tempURL = nil;
+        if (jpegData.length > 0 && [jpegData writeToFile:tempPath atomically:YES]) {
+            tempURL = [NSURL fileURLWithPath:tempPath];
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (tempURL) {
+                [SCIFullScreenMediaPlayer showFileURL:tempURL];
+            } else {
+                [SCIFullScreenMediaPlayer showImage:finalImage];
+            }
+        });
+    });
+}
+
+static NSInteger SCICoverSafeIndex(NSInteger index, NSInteger count) {
+    if (count <= 0) return NSNotFound;
+
+    NSInteger safeIndex = index;
+    if (safeIndex == NSNotFound || safeIndex < 0) {
+        safeIndex = 0;
+    }
+    if (safeIndex >= count) {
+        safeIndex = count - 1;
+    }
+
+    return safeIndex;
+}
+
+static id SCIResolveMediaForExpandCoverFromMedia(id media, NSInteger currentIndex) {
+    NSInteger mediaType = SCIMediaTypeFromMedia(media);
+
+    if (mediaType == 3) {
+        NSArray *items = SCIItemsFromMedia(media);
+        NSInteger safeIndex = SCICoverSafeIndex(currentIndex, (NSInteger)items.count);
+        if (safeIndex == NSNotFound) return nil;
+
+        id item = items[safeIndex];
+        return SCIMediaTypeFromMedia(item) == 2 ? item : nil;
+    }
+
+    if (mediaType == 2) {
+        return media;
+    }
+
+    return nil;
+}
+
+static BOOL SCIMediaHasVideoContent(id baseMedia, id currentMedia, NSInteger currentIndex) {
+    id media = baseMedia ?: currentMedia;
+    return SCIResolveMediaForExpandCoverFromMedia(media, currentIndex) != nil;
+}
+
+static BOOL SCIExpandCoverMediaCandidate(id baseMedia, id currentMedia, NSInteger currentIndex, __unused NSString *failureDescription) {
+    id media = baseMedia ?: currentMedia;
+    id coverMedia = SCIResolveMediaForExpandCoverFromMedia(media, currentIndex);
+    if (!coverMedia) {
+        [SCIUtils showToastForDuration:1.5 title:@"Cover not available"];
+        return NO;
+    }
+
+    id coverPhoto = SCIPhotoFromCandidate(coverMedia);
+    if (coverPhoto) {
+        NSURL *photoURL = [SCIUtils getPhotoUrl:coverPhoto];
+        if (photoURL) {
+            [SCIFullScreenMediaPlayer showFileURL:photoURL];
+            return YES;
+        }
+    }
+
+    NSURL *videoURL = SCIVideoURLFromCandidate(coverMedia);
+    if (videoURL) {
+        SCIExtractVideoThumbnailAndShow(videoURL);
+        return YES;
+    }
+
+    [SCIUtils showToastForDuration:1.5 title:@"Cover not available"];
     return NO;
 }
 
@@ -910,10 +1113,10 @@ static void SCIPresentMediaActionSheet(UIButton *sender, id baseMedia, id curren
         SCICopyMediaLinkForCandidate(currentMedia, failureDescription);
     }]];
 
-    [actionSheet addAction:[UIAlertAction actionWithTitle:@"Save to Vault"
+    [actionSheet addAction:[UIAlertAction actionWithTitle:@"Download to Vault"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
-        SCISaveToVaultMediaCandidate(currentMedia, failureDescription);
+        SCIDownloadToVaultMediaCandidate(currentMedia, failureDescription);
     }]];
 
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Expand"
@@ -921,6 +1124,14 @@ static void SCIPresentMediaActionSheet(UIButton *sender, id baseMedia, id curren
                                                  handler:^(__unused UIAlertAction *action) {
         SCIExpandMediaCandidate(baseMedia ?: currentMedia, currentMedia, currentIndex, failureDescription);
     }]];
+
+    if ([SCIUtils getBoolPref:@"expand_cover"] && SCIMediaHasVideoContent(baseMedia ?: currentMedia, currentMedia, currentIndex)) {
+        [actionSheet addAction:[UIAlertAction actionWithTitle:@"Expand Cover"
+                                                       style:UIAlertActionStyleDefault
+                                                     handler:^(__unused UIAlertAction *action) {
+            SCIExpandCoverMediaCandidate(baseMedia ?: currentMedia, currentMedia, currentIndex, failureDescription);
+        }]];
+    }
 
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Cancel"
                                                    style:UIAlertActionStyleCancel
@@ -972,9 +1183,9 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
             SCICopyMediaLinkForCandidate(current, failureCopy);
         }];
 
-        UIAction *vaultAction = [UIAction actionWithTitle:@"Save to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
+        UIAction *vaultAction = [UIAction actionWithTitle:@"Download to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
-            SCISaveToVaultMediaCandidate(current, failureCopy);
+            SCIDownloadToVaultMediaCandidate(current, failureCopy);
         }];
 
         UIAction *expandAction = [UIAction actionWithTitle:@"Expand" image:expandIcon identifier:nil handler:^(__unused UIAction *action) {
@@ -984,6 +1195,24 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
             SCIExpandMediaCandidate(base ?: current, current, index, failureCopy);
         }];
 
+        NSMutableArray *menuChildren = [NSMutableArray arrayWithArray:@[downloadAction, shareAction, copyAction, vaultAction, expandAction]];
+
+        if ([SCIUtils getBoolPref:@"expand_cover"]) {
+            id currentCheck = currentMediaBlock ? currentMediaBlock() : nil;
+            id baseCheck = baseMediaBlock ? baseMediaBlock() : currentCheck;
+            NSInteger indexCheck = currentIndexBlock ? currentIndexBlock() : NSNotFound;
+            if (SCIMediaHasVideoContent(baseCheck ?: currentCheck, currentCheck, indexCheck)) {
+                UIImage *coverIcon = [UIImage systemImageNamed:@"photo"];
+                UIAction *expandCoverAction = [UIAction actionWithTitle:@"Expand Cover" image:coverIcon identifier:nil handler:^(__unused UIAction *action) {
+                    id current = currentMediaBlock ? currentMediaBlock() : nil;
+                    id base = baseMediaBlock ? baseMediaBlock() : current;
+                    NSInteger index = currentIndexBlock ? currentIndexBlock() : NSNotFound;
+                    SCIExpandCoverMediaCandidate(base ?: current, current, index, failureCopy);
+                }];
+                [menuChildren addObject:expandCoverAction];
+            }
+        }
+
         [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
         [button removeTarget:nil action:NULL forControlEvents:UIControlEventPrimaryActionTriggered];
         [button removeTarget:nil action:NULL forControlEvents:UIControlEventMenuActionTriggered];
@@ -991,7 +1220,7 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
             [button addTarget:button action:@selector(sci_menuActionTriggered:) forControlEvents:UIControlEventMenuActionTriggered];
         }
 
-        button.menu = [UIMenu menuWithChildren:@[downloadAction, shareAction, copyAction, vaultAction, expandAction]];
+        button.menu = [UIMenu menuWithChildren:menuChildren];
         button.showsMenuAsPrimaryAction = YES;
         SCISetButtonDesiredAlpha(button, button.alpha);
         return;
@@ -1049,8 +1278,8 @@ static BOOL SCIDownloadMediaCandidate(id candidate, NSString *failureDescription
     NSURL *videoURL = [SCIUtils getVideoUrl:video];
     if (videoURL) {
         [dlBtnVideoDelegate downloadFileWithURL:videoURL
-                                 fileExtension:videoURL.pathExtension
-                                      hudLabel:nil];
+                                  fileExtension:videoURL.pathExtension
+                                       hudLabel:nil];
         return YES;
     }
 

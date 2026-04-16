@@ -6,7 +6,7 @@
 #import "../modules/JGProgressHUD/JGProgressHUD.h"
 
 #import "InstagramHeaders.h"
-#import "MediaPreview/SCIMediaPreviewController.h"
+#import "MediaPreview/SCIFullScreenMediaPlayer.h"
 
 #import "Settings/SCISettingsViewController.h"
 
@@ -53,6 +53,7 @@
 // Media
 + (NSURL *)getPhotoUrl:(IGPhoto *)photo;
 + (NSURL *)getPhotoUrlForMedia:(IGMedia *)media;
++ (NSURL *)getBestProfilePictureURLForUser:(id)user;
 
 + (NSURL *)getVideoUrl:(IGVideo *)video;
 + (NSURL *)getVideoUrlForMedia:(IGMedia *)media;

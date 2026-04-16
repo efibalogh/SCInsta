@@ -1,5 +1,334 @@
 #import "Utils.h"
 
+static NSNumber *SCINumericValueForSelector(id target, NSString *selectorName) {
+    if (!target || !selectorName.length) return nil;
+
+    SEL selector = NSSelectorFromString(selectorName);
+    if (![target respondsToSelector:selector]) return nil;
+
+    NSMethodSignature *signature = [target methodSignatureForSelector:selector];
+    const char *returnType = signature.methodReturnType;
+    if (!returnType || !returnType[0]) return nil;
+
+    switch (returnType[0]) {
+        case '@': {
+            id value = ((id (*)(id, SEL))objc_msgSend)(target, selector);
+            if ([value respondsToSelector:@selector(doubleValue)]) {
+                return @([value doubleValue]);
+            }
+            return nil;
+        }
+        case 'd':
+            return @(((double (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'f':
+            return @((double)((float (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'q':
+            return @((double)((long long (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'Q':
+            return @((double)((unsigned long long (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'i':
+            return @((double)((int (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'I':
+            return @((double)((unsigned int (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'l':
+            return @((double)((long (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'L':
+            return @((double)((unsigned long (*)(id, SEL))objc_msgSend)(target, selector));
+        case 's':
+            return @((double)((short (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'S':
+            return @((double)((unsigned short (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'c':
+            return @((double)((char (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'C':
+            return @((double)((unsigned char (*)(id, SEL))objc_msgSend)(target, selector));
+        case 'B':
+            return @((double)((BOOL (*)(id, SEL))objc_msgSend)(target, selector));
+        default:
+            return nil;
+    }
+}
+
+static id SCIObjectForSelector(id target, NSString *selectorName) {
+    if (!target || !selectorName.length) return nil;
+
+    SEL selector = NSSelectorFromString(selectorName);
+    if (![target respondsToSelector:selector]) return nil;
+
+    return ((id (*)(id, SEL))objc_msgSend)(target, selector);
+}
+
+static id SCIKVCObject(id target, NSString *key) {
+    if (!target || !key.length) return nil;
+
+    @try {
+        return [target valueForKey:key];
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+}
+
+static NSURL *SCIURLFromStringOrURL(id value) {
+    if (!value) return nil;
+
+    if ([value isKindOfClass:[NSURL class]]) {
+        return value;
+    }
+
+    if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
+        return [NSURL URLWithString:(NSString *)value];
+    }
+
+    return nil;
+}
+
+static double SCIDoubleValue(id value) {
+    if (!value) return 0.0;
+
+    if ([value respondsToSelector:@selector(doubleValue)]) {
+        return [value doubleValue];
+    }
+
+    return 0.0;
+}
+
+static NSInteger SCIIntegerValue(id value) {
+    if (!value) return 0;
+
+    if ([value respondsToSelector:@selector(integerValue)]) {
+        return [value integerValue];
+    }
+
+    return 0;
+}
+
+static NSArray *SCIArrayFromCollection(id collection) {
+    if (!collection ||
+        [collection isKindOfClass:[NSDictionary class]] ||
+        [collection isKindOfClass:[NSString class]] ||
+        [collection isKindOfClass:[NSURL class]]) {
+        return nil;
+    }
+
+    if ([collection isKindOfClass:[NSArray class]]) {
+        return collection;
+    }
+
+    if ([collection isKindOfClass:[NSOrderedSet class]]) {
+        return [(NSOrderedSet *)collection array];
+    }
+
+    if ([collection isKindOfClass:[NSSet class]]) {
+        return [(NSSet *)collection allObjects];
+    }
+
+    if ([collection conformsToProtocol:@protocol(NSFastEnumeration)]) {
+        NSMutableArray *items = [NSMutableArray array];
+        for (id item in collection) {
+            [items addObject:item];
+        }
+        return items;
+    }
+
+    return nil;
+}
+
+static NSArray *SCIImageVersionsFromPhoto(IGPhoto *photo) {
+    if (!photo) return nil;
+
+    NSArray *versions = SCIArrayFromCollection(SCIObjectForSelector(photo, @"imageVersions"));
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection([SCIUtils getIvarForObj:photo name:"_originalImageVersions"]);
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection(SCIObjectForSelector(photo, @"imageVersionDictionaries"));
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection([SCIUtils getIvarForObj:photo name:"_imageVersions"]);
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection([SCIUtils getIvarForObj:photo name:"_imageVersionDictionaries"]);
+    return versions.count > 0 ? versions : nil;
+}
+
+static NSArray *SCIVideoVersionsFromVideo(IGVideo *video) {
+    if (!video) return nil;
+
+    NSArray *versions = SCIArrayFromCollection(SCIObjectForSelector(video, @"videoVersions"));
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection(SCIObjectForSelector(video, @"videoVersionDictionaries"));
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection([SCIUtils getIvarForObj:video name:"_videoVersions"]);
+    if (versions.count > 0) return versions;
+
+    versions = SCIArrayFromCollection([SCIUtils getIvarForObj:video name:"_videoVersionDictionaries"]);
+    return versions.count > 0 ? versions : nil;
+}
+
+static NSArray<NSDictionary *> *SCISortedMediaVariantsFromVersions(NSArray *versions) {
+    if (![versions isKindOfClass:[NSArray class]] || versions.count == 0) {
+        return @[];
+    }
+
+    NSMutableArray<NSDictionary *> *variants = [NSMutableArray array];
+    NSMutableSet<NSString *> *seenURLs = [NSMutableSet set];
+
+    for (id version in versions) {
+        id rawURL = nil;
+        id widthValue = nil;
+        id heightValue = nil;
+        id bandwidthValue = nil;
+
+        if ([version isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *dict = (NSDictionary *)version;
+            rawURL = dict[@"url"] ?: dict[@"urlString"];
+            widthValue = dict[@"width"];
+            heightValue = dict[@"height"];
+            bandwidthValue = dict[@"bandwidth"];
+        } else {
+            rawURL = SCIObjectForSelector(version, @"url");
+            if (!rawURL) {
+                rawURL = SCIObjectForSelector(version, @"urlString");
+            }
+            widthValue = SCINumericValueForSelector(version, @"width");
+            heightValue = SCINumericValueForSelector(version, @"height");
+            bandwidthValue = SCINumericValueForSelector(version, @"bandwidth");
+        }
+
+        NSURL *url = SCIURLFromStringOrURL(rawURL);
+        if (!url) continue;
+
+        NSString *absolute = url.absoluteString;
+        if (absolute.length == 0 || [seenURLs containsObject:absolute]) {
+            continue;
+        }
+        [seenURLs addObject:absolute];
+
+        [variants addObject:@{
+            @"url": url,
+            @"width": @(SCIDoubleValue(widthValue)),
+            @"height": @(SCIDoubleValue(heightValue)),
+            @"bandwidth": @(SCIIntegerValue(bandwidthValue))
+        }];
+    }
+
+    [variants sortUsingComparator:^NSComparisonResult(NSDictionary *lhs, NSDictionary *rhs) {
+        double lhsArea = [lhs[@"width"] doubleValue] * [lhs[@"height"] doubleValue];
+        double rhsArea = [rhs[@"width"] doubleValue] * [rhs[@"height"] doubleValue];
+
+        if (lhsArea > rhsArea) return NSOrderedAscending;
+        if (lhsArea < rhsArea) return NSOrderedDescending;
+
+        NSInteger lhsBandwidth = [lhs[@"bandwidth"] integerValue];
+        NSInteger rhsBandwidth = [rhs[@"bandwidth"] integerValue];
+        if (lhsBandwidth > rhsBandwidth) return NSOrderedAscending;
+        if (lhsBandwidth < rhsBandwidth) return NSOrderedDescending;
+
+        return NSOrderedSame;
+    }];
+
+    return variants;
+}
+
+static NSURL *SCIHighestQualityURLFromVersions(NSArray *versions) {
+    NSArray<NSDictionary *> *variants = SCISortedMediaVariantsFromVersions(versions);
+    if (variants.count == 0) return nil;
+
+    id value = variants.firstObject[@"url"];
+    return [value isKindOfClass:[NSURL class]] ? value : nil;
+}
+
+static NSURL *SCIURLFromVideoURLCollection(id collection) {
+    if (!collection) return nil;
+
+    NSArray *items = SCIArrayFromCollection(collection);
+
+    if (!items) {
+        return SCIURLFromStringOrURL(collection);
+    }
+
+    for (id item in items) {
+        NSURL *url = nil;
+
+        if ([item isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *dict = (NSDictionary *)item;
+            url = SCIURLFromStringOrURL(dict[@"url"] ?: dict[@"urlString"]);
+        } else {
+            url = SCIURLFromStringOrURL(item);
+        }
+
+        if (url) return url;
+    }
+
+    return nil;
+}
+
+static NSURL *SCIProfilePictureURLFromInfo(id info) {
+    if (!info) return nil;
+
+    NSURL *url = SCIURLFromStringOrURL(SCIObjectForSelector(info, @"url"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(info, @"urlString"));
+    if (url) return url;
+
+    if ([info isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *infoDictionary = (NSDictionary *)info;
+        url = SCIURLFromStringOrURL(infoDictionary[@"url"] ?: infoDictionary[@"urlString"]);
+        if (url) return url;
+    }
+
+    return nil;
+}
+
+static NSURL *SCIHDProfilePicURL(id user) {
+    if (!user) return nil;
+
+    NSURL *url = SCIProfilePictureURLFromInfo(SCIObjectForSelector(user, @"hdProfilePicUrlInfo"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"HDProfilePicURL"));
+    if (url) return url;
+
+    url = SCIProfilePictureURLFromInfo(SCIObjectForSelector(user, @"_private_hdProfilePicUrlInfo"));
+    if (url) return url;
+
+    url = SCIProfilePictureURLFromInfo(SCIObjectForSelector(user, @"HDProfilePicURLInfo"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"profile_pic_url_hd"));
+    if (url) return url;
+
+    return SCIURLFromStringOrURL(SCIKVCObject(user, @"profile_pic_url_hd"));
+}
+
+static NSURL *SCIThumbProfilePicURL(id user) {
+    if (!user) return nil;
+
+    NSURL *url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"derivedProfilePicURL"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"profilePicURLString"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"profilePicURL"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"_private_profilePicURLString"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"_private_profilePicUrl"));
+    if (url) return url;
+
+    url = SCIURLFromStringOrURL(SCIObjectForSelector(user, @"profile_pic_url"));
+    if (url) return url;
+
+    return SCIURLFromStringOrURL(SCIKVCObject(user, @"profile_pic_url"));
+}
+
 @implementation SCIUtils
 
 + (BOOL)getBoolPref:(NSString *)key {
@@ -95,7 +424,7 @@
 
 // MARK: Display View Controllers
 + (void)showMediaPreview:(NSURL *)fileURL {
-    [SCIMediaPreviewController showPreviewForFileURL:fileURL];
+    [SCIFullScreenMediaPlayer showFileURL:fileURL];
 }
 + (void)showShareVC:(id)item {
     UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[item] applicationActivities:nil];
@@ -145,8 +474,15 @@
 + (NSURL *)getPhotoUrl:(IGPhoto *)photo {
     if (!photo) return nil;
 
-    // Get highest quality photo link
-    NSURL *photoUrl = [photo imageURLForWidth:100000.00];
+    NSURL *photoUrl = SCIHighestQualityURLFromVersions(SCIImageVersionsFromPhoto(photo));
+    if (photoUrl) return photoUrl;
+
+    if ([photo respondsToSelector:@selector(imageURLForWidth:)]) {
+        photoUrl = [photo imageURLForWidth:100000.00];
+        if (photoUrl) return photoUrl;
+    }
+
+    photoUrl = SCIURLFromStringOrURL(SCIObjectForSelector(photo, @"thumbnailURL"));
 
     return photoUrl;
 }
@@ -157,19 +493,26 @@
 
     return [SCIUtils getPhotoUrl:photo];
 }
++ (NSURL *)getBestProfilePictureURLForUser:(id)user {
+    return SCIHDProfilePicURL(user) ?: SCIThumbProfilePicURL(user);
+}
 + (NSURL *)getVideoUrl:(IGVideo *)video {
     if (!video) return nil;
 
+    NSURL *videoURL = SCIHighestQualityURLFromVersions(SCIVideoVersionsFromVideo(video));
+    if (videoURL) return videoURL;
+
     // The past (pre v398)
     if ([video respondsToSelector:@selector(sortedVideoURLsBySize)]) {
-        NSArray<NSDictionary *> *sorted = [video sortedVideoURLsBySize];
-        NSString *urlString = sorted.firstObject[@"url"];
-        return urlString.length ? [NSURL URLWithString:urlString] : nil;
+        id sorted = [video sortedVideoURLsBySize];
+        videoURL = SCIURLFromVideoURLCollection(sorted);
+        if (videoURL) return videoURL;
     }
 
     // The present (post v398)
     if ([video respondsToSelector:@selector(allVideoURLs)]) {
-        return [[video allVideoURLs] anyObject];
+        videoURL = SCIURLFromVideoURLCollection([video allVideoURLs]);
+        if (videoURL) return videoURL;
     }
 
     return nil;
