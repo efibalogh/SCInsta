@@ -42,6 +42,8 @@ BOOL dmVisualMsgsViewedButtonEnabled = false;
         @"swipe_nav_tabs": @"default",
         @"enable_notes_customization": @(YES),
         @"custom_note_themes": @(YES),
+        @"disable_disappearing_swipe_up": @(NO),
+        @"hide_vanish_screenshot": @(NO),
         @"disable_auto_unmuting_reels": @(YES),
         @"doom_scrolling_reel_count": @(1)
     };
