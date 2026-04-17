@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@class SCIMediaItem, SCIVaultFile;
+@class SCIMediaItem, SCIVaultFile, SCIVaultSaveMetadata;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 fromViewController:(UIViewController *)presenter;
 
 + (void)showFileURL:(NSURL *)fileURL;
++ (void)showFileURL:(NSURL *)fileURL metadata:(nullable SCIVaultSaveMetadata *)metadata;
 + (void)showFileURL:(NSURL *)fileURL fromVault:(BOOL)fromVault;
 
 + (void)showVaultFiles:(NSArray<SCIVaultFile *> *)files
@@ -27,6 +28,7 @@ fromViewController:(UIViewController *)presenter;
     fromViewController:(UIViewController *)presenter;
 
 + (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index;
++ (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(nullable SCIVaultSaveMetadata *)metadata;
 
 + (void)showImage:(UIImage *)image;
 + (void)showRemoteImageURL:(NSURL *)url;

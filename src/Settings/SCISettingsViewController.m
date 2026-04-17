@@ -140,6 +140,10 @@ static char rowStaticRef[] = "row";
             UISwitch *toggle = [UISwitch new];
             toggle.on = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
             toggle.onTintColor = [SCIUtils SCIColor_Primary];
+            if (row.mutuallyExclusiveDefaultsKey.length) {
+                BOOL otherOn = [[NSUserDefaults standardUserDefaults] boolForKey:row.mutuallyExclusiveDefaultsKey];
+                toggle.enabled = toggle.isOn || !otherOn;
+            }
             
             objc_setAssociatedObject(toggle, rowStaticRef, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             
@@ -257,8 +261,15 @@ static char rowStaticRef[] = "row";
 - (void)switchChanged:(UISwitch *)sender {
     SCISetting *row = objc_getAssociatedObject(sender, rowStaticRef);
     [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:row.defaultsKey];
+    if (sender.isOn && row.mutuallyExclusiveDefaultsKey.length) {
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:row.mutuallyExclusiveDefaultsKey];
+    }
     
     NSLog(@"Switch changed: %@", sender.isOn ? @"ON" : @"OFF");
+    
+    if (row.mutuallyExclusiveDefaultsKey.length) {
+        [self.tableView reloadData];
+    }
     
     if (row.requiresRestart) {
         [SCIUtils showRestartConfirmation];

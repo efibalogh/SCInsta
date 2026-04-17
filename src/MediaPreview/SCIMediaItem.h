@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@class SCIVaultFile;
+@class SCIVaultFile, SCIVaultSaveMetadata;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -18,6 +18,7 @@ typedef NS_ENUM(NSInteger, SCIMediaItemType) {
 @property (nonatomic, copy, nullable) NSString *title;
 /// When >= 0, `SCIVaultSaveMetadata.source` uses this value (`SCIVaultSource`). Default -1 = not set.
 @property (nonatomic, assign) NSInteger vaultSaveSource;
+@property (nonatomic, strong, nullable) SCIVaultSaveMetadata *vaultMetadata;
 @property (nonatomic, strong, nullable) SCIVaultFile *vaultFile;
 @property (nonatomic, assign) BOOL isFromVault;
 

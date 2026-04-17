@@ -10,6 +10,9 @@ typedef NS_ENUM(int16_t, SCIVaultMediaType) {
     SCIVaultMediaTypeVideo = 1
 };
 
+FOUNDATION_EXPORT NSString *SCIFileNameForMedia(NSURL *originalURL, SCIVaultMediaType mediaType, SCIVaultSaveMetadata * _Nullable metadata);
+
+
 typedef NS_ENUM(int16_t, SCIVaultSource) {
     SCIVaultSourceOther   = 0,
     SCIVaultSourceFeed    = 1,

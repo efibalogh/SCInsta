@@ -7,7 +7,35 @@
 #import "../Vault/SCIVaultFile.h"
 #import "../Vault/SCIVaultSaveMetadata.h"
 #import "../Vault/SCIVaultCoreDataStack.h"
+#import "../Downloader/Download.h"
 #import <Photos/Photos.h>
+
+static SCIDownloadDelegate *SCIMediaPlayerShareDelegate(void) {
+    static SCIDownloadDelegate *delegate = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
+    });
+    return delegate;
+}
+
+static SCIDownloadDelegate *SCIMediaPlayerSavePhotosDelegate(void) {
+    static SCIDownloadDelegate *delegate = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:YES];
+    });
+    return delegate;
+}
+
+static SCIDownloadDelegate *SCIMediaPlayerSaveVaultDelegate(void) {
+    static SCIDownloadDelegate *delegate = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:YES];
+    });
+    return delegate;
+}
 
 static CGFloat const kTopBarContentHeight = 44.0;
 static CGFloat const kBottomBarHeight = 44.0;
@@ -54,6 +82,18 @@ static CGFloat const kDismissCancelSpringDamping = 0.82;
     [self showFileURL:fileURL fromVault:NO];
 }
 
++ (void)showFileURL:(NSURL *)fileURL metadata:(SCIVaultSaveMetadata *)metadata {
+    SCIMediaItem *item = [SCIMediaItem itemWithFileURL:fileURL];
+    item.isFromVault = NO;
+    item.vaultMetadata = metadata;
+
+    SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
+    player.isFromVault = NO;
+
+    UIViewController *presenter = topMostController();
+    [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
+}
+
 + (void)showFileURL:(NSURL *)fileURL fromVault:(BOOL)fromVault {
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:fileURL];
     item.isFromVault = fromVault;
@@ -90,11 +130,17 @@ static CGFloat const kDismissCancelSpringDamping = 0.82;
 }
 
 + (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index {
+    [self showPhotoURLs:urls initialIndex:index metadata:nil];
+}
+
++ (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(SCIVaultSaveMetadata *)metadata {
     if (urls.count == 0) return;
 
     NSMutableArray<SCIMediaItem *> *items = [NSMutableArray arrayWithCapacity:urls.count];
     for (NSURL *url in urls) {
-        [items addObject:[SCIMediaItem itemWithFileURL:url]];
+        SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
+        item.vaultMetadata = metadata;
+        [items addObject:item];
     }
 
     NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
@@ -534,27 +580,37 @@ fromViewController:(UIViewController *)presenter {
 
     SCIMediaItem *item = [self currentItem];
 
-    if (item.mediaType == SCIMediaItemTypeImage) {
-        NSData *imageData = [NSData dataWithContentsOfURL:url];
-        UIImage *image = item.image ?: [UIImage imageWithData:imageData];
-        if (image) {
+    if (url.isFileURL) {
+        if (item.mediaType == SCIMediaItemTypeImage) {
+            NSData *imageData = [NSData dataWithContentsOfURL:url];
+            UIImage *image = item.image ?: [UIImage imageWithData:imageData];
+            if (image) {
+                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                    [PHAssetChangeRequest creationRequestForAssetFromImage:image];
+                } completionHandler:^(BOOL success, NSError *error) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self showSaveResult:success error:error];
+                    });
+                }];
+            }
+        } else {
             [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-                [PHAssetChangeRequest creationRequestForAssetFromImage:image];
+                [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:url];
             } completionHandler:^(BOOL success, NSError *error) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [self showSaveResult:success error:error];
                 });
             }];
         }
-    } else {
-        [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:url];
-        } completionHandler:^(BOOL success, NSError *error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self showSaveResult:success error:error];
-            });
-        }];
+        return;
     }
+
+    NSString *ext = url.pathExtension;
+    if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
+    
+    SCIDownloadDelegate *delegate = SCIMediaPlayerSavePhotosDelegate();
+    delegate.pendingVaultSaveMetadata = item.vaultMetadata;
+    [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
 - (void)showSaveResult:(BOOL)success error:(NSError *)error {
@@ -583,36 +639,32 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    [SCIUtils showToastForDuration:1.0 title:@"Downloading..."];
+    NSString *ext = targetURL.pathExtension;
+    if (ext.length == 0) ext = vaultType == SCIVaultMediaTypeVideo ? @"mp4" : @"jpg";
 
-    __weak typeof(self) weakSelf = self;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSData *data = [NSData dataWithContentsOfURL:targetURL];
-        if (!data.length) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [SCIUtils showToastForDuration:2.0 title:@"Download failed"];
-            });
-            return;
+    SCIVaultSaveMetadata *meta = item.vaultMetadata;
+    if (!meta && (item.title.length > 0 || item.vaultSaveSource >= 0)) {
+        meta = [[SCIVaultSaveMetadata alloc] init];
+        if (item.title.length) {
+            meta.sourceUsername = item.title;
         }
-
-        NSString *ext = targetURL.pathExtension.length > 0 ? targetURL.pathExtension : (vaultType == SCIVaultMediaTypeVideo ? @"mp4" : @"jpg");
-        NSString *tmpName = [NSString stringWithFormat:@"%@.%@", NSUUID.UUID.UUIDString, ext];
-        NSString *tmpPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
-        [data writeToFile:tmpPath atomically:YES];
-
-        NSURL *localURL = [NSURL fileURLWithPath:tmpPath];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf vaultSaveLocalFile:localURL mediaType:vaultType];
-            [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
-        });
-    });
+        if (item.vaultSaveSource >= 0) {
+            meta.source = (int16_t)item.vaultSaveSource;
+        } else {
+            meta.source = (int16_t)SCIVaultSourceOther;
+        }
+    }
+    
+    SCIDownloadDelegate *delegate = SCIMediaPlayerSaveVaultDelegate();
+    delegate.pendingVaultSaveMetadata = meta;
+    [delegate downloadFileWithURL:targetURL fileExtension:ext hudLabel:nil];
 }
 
 - (void)vaultSaveLocalFile:(NSURL *)localURL mediaType:(SCIVaultMediaType)vaultType {
     NSError *error;
     SCIMediaItem *item = [self currentItem];
-    SCIVaultSaveMetadata *meta = nil;
-    if (item.title.length > 0 || item.vaultSaveSource >= 0) {
+    SCIVaultSaveMetadata *meta = item.vaultMetadata;
+    if (!meta && (item.title.length > 0 || item.vaultSaveSource >= 0)) {
         meta = [[SCIVaultSaveMetadata alloc] init];
         if (item.title.length) {
             meta.sourceUsername = item.title;
@@ -644,13 +696,24 @@ fromViewController:(UIViewController *)presenter {
 - (void)shareMedia {
     NSURL *url = [self currentFileURL];
     if (!url) return;
+    SCIMediaItem *item = [self currentItem];
 
-    UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
-    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && _shareButton) {
-        acVC.popoverPresentationController.sourceView = _shareButton;
-        acVC.popoverPresentationController.sourceRect = _shareButton.bounds;
+    if (url.isFileURL) {
+        UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
+        if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && _shareButton) {
+            acVC.popoverPresentationController.sourceView = _shareButton;
+            acVC.popoverPresentationController.sourceRect = _shareButton.bounds;
+        }
+        [self presentViewController:acVC animated:YES completion:nil];
+        return;
     }
-    [self presentViewController:acVC animated:YES completion:nil];
+
+    NSString *ext = url.pathExtension;
+    if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
+    
+    SCIDownloadDelegate *delegate = SCIMediaPlayerShareDelegate();
+    delegate.pendingVaultSaveMetadata = item.vaultMetadata;
+    [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
 - (void)copyMedia {

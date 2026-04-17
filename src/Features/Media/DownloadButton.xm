@@ -904,7 +904,7 @@ static NSString *SCIUsernameFromDirectMessage(id message, UIViewController *view
     return nil;
 }
 
-static BOOL SCIDownloadMediaCandidate(id candidate, NSString *failureDescription);
+static BOOL SCIDownloadMediaCandidate(id baseMedia, id currentMedia, UIView *anchorView, NSString *failureDescription);
 
 static id SCIVideoFromCandidate(id candidate) {
     if (!candidate) return nil;
@@ -1046,9 +1046,12 @@ static void SCIApplyPhotoMetricsFromCandidate(id candidate, SCIVaultSaveMetadata
     }
 }
 
-static SCIVaultSaveMetadata *SCIVaultMetadataForMediaCandidate(id candidate, UIView *anchorView) {
+static SCIVaultSaveMetadata *SCIVaultMetadataForMediaCandidate(id baseMedia, id currentMedia, UIView *anchorView) {
     SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
-    meta.sourceUsername = SCIUsernameFromMediaCandidate(candidate);
+    meta.sourceUsername = SCIUsernameFromMediaCandidate(baseMedia);
+    if (!meta.sourceUsername.length) {
+        meta.sourceUsername = SCIUsernameFromMediaCandidate(currentMedia);
+    }
 
     UIViewController *dmHost = SCIDirectVisualMessageHostForAnchor(anchorView);
     if (dmHost) {
@@ -1072,10 +1075,10 @@ static SCIVaultSaveMetadata *SCIVaultMetadataForMediaCandidate(id candidate, UIV
         }
     }
 
-    if (SCIVideoURLFromCandidate(candidate)) {
-        SCIApplyVideoMetricsFromCandidate(candidate, meta);
+    if (SCIVideoURLFromCandidate(currentMedia)) {
+        SCIApplyVideoMetricsFromCandidate(currentMedia, meta);
     } else {
-        SCIApplyPhotoMetricsFromCandidate(candidate, meta);
+        SCIApplyPhotoMetricsFromCandidate(currentMedia, meta);
     }
 
     return meta;
@@ -1153,19 +1156,23 @@ static NSArray<NSURL *> *SCIPhotoURLsFromCarouselItems(NSArray *items, NSInteger
     return photoURLs;
 }
 
-static BOOL SCIShareMediaCandidate(id candidate, NSString *failureDescription) {
+static BOOL SCIShareMediaCandidate(id baseMedia, id currentMedia, UIView *anchorView, NSString *failureDescription) {
     SCIInitDownloadButtonDownloaders();
 
-    NSURL *videoURL = SCIVideoURLFromCandidate(candidate);
+    SCIVaultSaveMetadata *meta = SCIVaultMetadataForMediaCandidate(baseMedia, currentMedia, anchorView);
+
+    NSURL *videoURL = SCIVideoURLFromCandidate(currentMedia);
     if (videoURL) {
+        dlBtnShareVideoDelegate.pendingVaultSaveMetadata = meta;
         [dlBtnShareVideoDelegate downloadFileWithURL:videoURL
                                       fileExtension:videoURL.pathExtension
                                            hudLabel:nil];
         return YES;
     }
 
-    NSURL *photoURL = SCIPhotoURLFromCandidate(candidate);
+    NSURL *photoURL = SCIPhotoURLFromCandidate(currentMedia);
     if (photoURL) {
+        dlBtnShareImageDelegate.pendingVaultSaveMetadata = meta;
         [dlBtnShareImageDelegate downloadFileWithURL:photoURL
                                       fileExtension:photoURL.pathExtension
                                            hudLabel:nil];
@@ -1193,12 +1200,12 @@ static BOOL SCICopyMediaLinkForCandidate(id candidate, NSString *failureDescript
     return YES;
 }
 
-static BOOL SCIDownloadToVaultMediaCandidate(id candidate, UIView *anchorView, NSString *failureDescription) {
+static BOOL SCIDownloadToVaultMediaCandidate(id baseMedia, id currentMedia, UIView *anchorView, NSString *failureDescription) {
     SCIInitDownloadButtonDownloaders();
 
-    SCIVaultSaveMetadata *vaultMeta = SCIVaultMetadataForMediaCandidate(candidate, anchorView);
+    SCIVaultSaveMetadata *vaultMeta = SCIVaultMetadataForMediaCandidate(baseMedia, currentMedia, anchorView);
 
-    NSURL *videoURL = SCIVideoURLFromCandidate(candidate);
+    NSURL *videoURL = SCIVideoURLFromCandidate(currentMedia);
     if (videoURL) {
         dlBtnVaultVideoDelegate.pendingVaultSaveMetadata = vaultMeta;
         [dlBtnVaultVideoDelegate downloadFileWithURL:videoURL
@@ -1207,7 +1214,7 @@ static BOOL SCIDownloadToVaultMediaCandidate(id candidate, UIView *anchorView, N
         return YES;
     }
 
-    NSURL *photoURL = SCIPhotoURLFromCandidate(candidate);
+    NSURL *photoURL = SCIPhotoURLFromCandidate(currentMedia);
     if (photoURL) {
         dlBtnVaultImageDelegate.pendingVaultSaveMetadata = vaultMeta;
         [dlBtnVaultImageDelegate downloadFileWithURL:photoURL
@@ -1223,7 +1230,8 @@ static BOOL SCIDownloadToVaultMediaCandidate(id candidate, UIView *anchorView, N
     return NO;
 }
 
-static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger currentIndex, NSString *failureDescription) {
+static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger currentIndex, UIView *anchorView, NSString *failureDescription) {
+    SCIVaultSaveMetadata *meta = SCIVaultMetadataForMediaCandidate(baseMedia, currentMedia, anchorView);
     id resolvedCurrent = currentMedia;
     NSArray *items = SCIItemsFromMedia(baseMedia);
 
@@ -1235,32 +1243,32 @@ static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger cur
 
         NSURL *videoURL = SCIVideoURLFromCandidate(resolvedCurrent);
         if (videoURL) {
-            [SCIFullScreenMediaPlayer showFileURL:videoURL];
+            [SCIFullScreenMediaPlayer showFileURL:videoURL metadata:meta];
             return YES;
         }
 
         NSInteger initialPhotoIndex = 0;
         NSArray<NSURL *> *photoURLs = SCIPhotoURLsFromCarouselItems(items, itemIndex, &initialPhotoIndex);
         if (photoURLs.count > 1) {
-            [SCIFullScreenMediaPlayer showPhotoURLs:photoURLs initialIndex:initialPhotoIndex];
+            [SCIFullScreenMediaPlayer showPhotoURLs:photoURLs initialIndex:initialPhotoIndex metadata:meta];
             return YES;
         }
 
         if (photoURLs.count == 1) {
-            [SCIFullScreenMediaPlayer showFileURL:photoURLs.firstObject];
+            [SCIFullScreenMediaPlayer showFileURL:photoURLs.firstObject metadata:meta];
             return YES;
         }
     }
 
     NSURL *videoURL = SCIVideoURLFromCandidate(resolvedCurrent);
     if (videoURL) {
-        [SCIFullScreenMediaPlayer showFileURL:videoURL];
+        [SCIFullScreenMediaPlayer showFileURL:videoURL metadata:meta];
         return YES;
     }
 
     NSURL *photoURL = SCIPhotoURLFromCandidate(resolvedCurrent);
     if (photoURL) {
-        [SCIFullScreenMediaPlayer showFileURL:photoURL];
+        [SCIFullScreenMediaPlayer showFileURL:photoURL metadata:meta];
         return YES;
     }
 
@@ -1387,7 +1395,7 @@ static void SCIExtractVideoThumbnailAndShow(NSURL *videoURL) {
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (tempURL) {
-                [SCIFullScreenMediaPlayer showFileURL:tempURL];
+                [SCIFullScreenMediaPlayer showFileURL:tempURL metadata:nil];
             } else {
                 [SCIFullScreenMediaPlayer showImage:finalImage];
             }
@@ -1433,7 +1441,8 @@ static BOOL SCIMediaHasVideoContent(id baseMedia, id currentMedia, NSInteger cur
     return SCIResolveMediaForExpandCoverFromMedia(media, currentIndex) != nil;
 }
 
-static BOOL SCIExpandCoverMediaCandidate(id baseMedia, id currentMedia, NSInteger currentIndex, __unused NSString *failureDescription) {
+static BOOL SCIExpandCoverMediaCandidate(id baseMedia, id currentMedia, NSInteger currentIndex, UIView *anchorView, NSString *failureDescription) {
+    SCIVaultSaveMetadata *meta = SCIVaultMetadataForMediaCandidate(baseMedia, currentMedia, anchorView);
     id media = baseMedia ?: currentMedia;
     id coverMedia = SCIResolveMediaForExpandCoverFromMedia(media, currentIndex);
     if (!coverMedia) {
@@ -1445,7 +1454,7 @@ static BOOL SCIExpandCoverMediaCandidate(id baseMedia, id currentMedia, NSIntege
     if (coverPhoto) {
         NSURL *photoURL = [SCIUtils getPhotoUrl:coverPhoto];
         if (photoURL) {
-            [SCIFullScreenMediaPlayer showFileURL:photoURL];
+            [SCIFullScreenMediaPlayer showFileURL:photoURL metadata:meta];
             return YES;
         }
     }
@@ -1486,13 +1495,13 @@ static void SCIPresentMediaActionSheet(UIButton *sender, id baseMedia, id curren
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Download"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
-        SCIDownloadMediaCandidate(currentMedia, failureDescription);
+        SCIDownloadMediaCandidate(baseMedia, currentMedia, sender, failureDescription);
     }]];
 
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Share"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
-        SCIShareMediaCandidate(currentMedia, failureDescription);
+        SCIShareMediaCandidate(baseMedia, currentMedia, sender, failureDescription);
     }]];
 
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Copy Link"
@@ -1504,20 +1513,20 @@ static void SCIPresentMediaActionSheet(UIButton *sender, id baseMedia, id curren
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Download to Vault"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
-        SCIDownloadToVaultMediaCandidate(currentMedia, sender, failureDescription);
+        SCIDownloadToVaultMediaCandidate(baseMedia, currentMedia, sender, failureDescription);
     }]];
 
     [actionSheet addAction:[UIAlertAction actionWithTitle:@"Expand"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(__unused UIAlertAction *action) {
-        SCIExpandMediaCandidate(baseMedia ?: currentMedia, currentMedia, currentIndex, failureDescription);
+        SCIExpandMediaCandidate(baseMedia ?: currentMedia, currentMedia, currentIndex, sender, failureDescription);
     }]];
 
     if ([SCIUtils getBoolPref:@"expand_cover"] && SCIMediaHasVideoContent(baseMedia ?: currentMedia, currentMedia, currentIndex)) {
         [actionSheet addAction:[UIAlertAction actionWithTitle:@"Expand Cover"
                                                        style:UIAlertActionStyleDefault
                                                      handler:^(__unused UIAlertAction *action) {
-            SCIExpandCoverMediaCandidate(baseMedia ?: currentMedia, currentMedia, currentIndex, failureDescription);
+            SCIExpandCoverMediaCandidate(baseMedia ?: currentMedia, currentMedia, currentIndex, sender, failureDescription);
         }]];
     }
 
@@ -1558,12 +1567,14 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
 
         UIAction *downloadAction = [UIAction actionWithTitle:@"Download" image:downloadIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
-            SCIDownloadMediaCandidate(current, failureCopy);
+            id base = baseMediaBlock ? baseMediaBlock() : current;
+            SCIDownloadMediaCandidate(base, current, button, failureCopy);
         }];
 
         UIAction *shareAction = [UIAction actionWithTitle:@"Share" image:shareIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
-            SCIShareMediaCandidate(current, failureCopy);
+            id base = baseMediaBlock ? baseMediaBlock() : current;
+            SCIShareMediaCandidate(base, current, button, failureCopy);
         }];
 
         UIAction *copyAction = [UIAction actionWithTitle:@"Copy Link" image:copyIcon identifier:nil handler:^(__unused UIAction *action) {
@@ -1573,14 +1584,15 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
 
         UIAction *vaultAction = [UIAction actionWithTitle:@"Download to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
-            SCIDownloadToVaultMediaCandidate(current, button, failureCopy);
+            id base = baseMediaBlock ? baseMediaBlock() : current;
+            SCIDownloadToVaultMediaCandidate(base, current, button, failureCopy);
         }];
 
         UIAction *expandAction = [UIAction actionWithTitle:@"Expand" image:expandIcon identifier:nil handler:^(__unused UIAction *action) {
             id current = currentMediaBlock ? currentMediaBlock() : nil;
             id base = baseMediaBlock ? baseMediaBlock() : current;
-            NSInteger index = currentIndexBlock ? currentIndexBlock() : NSNotFound;
-            SCIExpandMediaCandidate(base ?: current, current, index, failureCopy);
+            NSInteger index = currentIndexBlock ? currentIndexBlock() : 0;
+            SCIExpandMediaCandidate(base ?: current, current, index, button, failureCopy);
         }];
 
         NSMutableArray *menuChildren = [NSMutableArray arrayWithArray:@[downloadAction, shareAction, copyAction, vaultAction, expandAction]];
@@ -1592,10 +1604,12 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
             if (SCIMediaHasVideoContent(baseCheck ?: currentCheck, currentCheck, indexCheck)) {
                 UIImage *coverIcon = [UIImage systemImageNamed:@"photo"];
                 UIAction *expandCoverAction = [UIAction actionWithTitle:@"Expand Cover" image:coverIcon identifier:nil handler:^(__unused UIAction *action) {
-                    id current = currentMediaBlock ? currentMediaBlock() : nil;
-                    id base = baseMediaBlock ? baseMediaBlock() : current;
-                    NSInteger index = currentIndexBlock ? currentIndexBlock() : NSNotFound;
-                    SCIExpandCoverMediaCandidate(base ?: current, current, index, failureCopy);
+                    if (currentMediaBlock) {
+                        id current = currentMediaBlock() ?: nil;
+                        id base = baseMediaBlock ? baseMediaBlock() : current;
+                        NSInteger index = currentIndexBlock ? currentIndexBlock() : 0;
+                        SCIExpandCoverMediaCandidate(base ?: current, current, index, button, failureCopy);
+                    }
                 }];
                 [menuChildren addObject:expandCoverAction];
             }
@@ -1648,23 +1662,26 @@ static id SCIResolvedDirectMediaCandidate(id message) {
     return nil;
 }
 
-static BOOL SCIDownloadMediaCandidate(id candidate, NSString *failureDescription) {
+static BOOL SCIDownloadMediaCandidate(id baseMedia, id currentMedia, UIView *anchorView, NSString *failureDescription) {
     SCIInitDownloadButtonDownloaders();
+
+    SCIVaultSaveMetadata *meta = SCIVaultMetadataForMediaCandidate(baseMedia, currentMedia, anchorView);
 
     id video = nil;
     id photo = nil;
 
-    if ([candidate isKindOfClass:%c(IGVideo)]) {
-        video = candidate;
-    } else if ([candidate isKindOfClass:%c(IGPhoto)]) {
-        photo = candidate;
+    if ([currentMedia isKindOfClass:%c(IGVideo)]) {
+        video = currentMedia;
+    } else if ([currentMedia isKindOfClass:%c(IGPhoto)]) {
+        photo = currentMedia;
     } else {
-        video = SCIObjectForSelector(candidate, @"video");
-        photo = SCIObjectForSelector(candidate, @"photo");
+        video = SCIObjectForSelector(currentMedia, @"video");
+        photo = SCIObjectForSelector(currentMedia, @"photo");
     }
 
     NSURL *videoURL = [SCIUtils getVideoUrl:video];
     if (videoURL) {
+        dlBtnVideoDelegate.pendingVaultSaveMetadata = meta;
         [dlBtnVideoDelegate downloadFileWithURL:videoURL
                                   fileExtension:videoURL.pathExtension
                                        hudLabel:nil];
@@ -1673,6 +1690,7 @@ static BOOL SCIDownloadMediaCandidate(id candidate, NSString *failureDescription
 
     NSURL *photoURL = [SCIUtils getPhotoUrl:photo];
     if (photoURL) {
+        dlBtnImageDelegate.pendingVaultSaveMetadata = meta;
         [dlBtnImageDelegate downloadFileWithURL:photoURL
                                  fileExtension:photoURL.pathExtension
                                       hudLabel:nil];
@@ -1689,9 +1707,12 @@ static BOOL SCIDownloadMediaCandidate(id candidate, NSString *failureDescription
 static BOOL SCIDownloadDirectMessage(id message) {
     SCIInitDownloadButtonDownloaders();
 
+    SCIVaultSaveMetadata *meta = SCIVaultMetadataForMediaCandidate(message, message, nil);
+
     id rawVideo = SCIObjectForSelector(message, @"rawVideo") ?: [SCIUtils getIvarForObj:message name:"_rawVideo"];
     NSURL *videoURL = [SCIUtils getVideoUrl:rawVideo];
     if (videoURL) {
+        dlBtnVideoDelegate.pendingVaultSaveMetadata = meta;
         [dlBtnVideoDelegate downloadFileWithURL:videoURL
                                  fileExtension:videoURL.pathExtension
                                       hudLabel:nil];
@@ -1701,23 +1722,24 @@ static BOOL SCIDownloadDirectMessage(id message) {
     id rawPhoto = SCIObjectForSelector(message, @"rawPhoto") ?: [SCIUtils getIvarForObj:message name:"_rawPhoto"];
     NSURL *photoURL = [SCIUtils getPhotoUrl:rawPhoto];
     if (photoURL) {
+        dlBtnImageDelegate.pendingVaultSaveMetadata = meta;
         [dlBtnImageDelegate downloadFileWithURL:photoURL
                                  fileExtension:photoURL.pathExtension
                                       hudLabel:nil];
         return YES;
     }
 
-    if (SCIDownloadMediaCandidate(message, nil)) {
+    if (SCIDownloadMediaCandidate(message, message, nil, nil)) {
         return YES;
     }
 
     id media = SCIObjectForSelector(message, @"media");
-    if (SCIDownloadMediaCandidate(media, nil)) {
+    if (SCIDownloadMediaCandidate(media, media, nil, nil)) {
         return YES;
     }
 
     id visualMessage = SCIObjectForSelector(message, @"visualMessage");
-    if (SCIDownloadMediaCandidate(visualMessage, nil)) {
+    if (SCIDownloadMediaCandidate(visualMessage, visualMessage, nil, nil)) {
         return YES;
     }
 

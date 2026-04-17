@@ -115,19 +115,32 @@
     SCIVaultSaveMetadata *vaultMeta = self.pendingVaultSaveMetadata;
     self.pendingVaultSaveMetadata = nil;
 
+    BOOL isVideo = [self isVideoFileAtURL:fileURL];
+    SCIVaultMediaType vaultType = isVideo ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
+    NSString *fileName = SCIFileNameForMedia(fileURL, vaultType, vaultMeta);
+    NSString *newPath = [[fileURL.path stringByDeletingLastPathComponent] stringByAppendingPathComponent:fileName];
+    NSURL *newURL = [NSURL fileURLWithPath:newPath];
+
+    if (![newURL isEqual:fileURL]) {
+        [[NSFileManager defaultManager] removeItemAtURL:newURL error:nil];
+        [[NSFileManager defaultManager] moveItemAtURL:fileURL toURL:newURL error:nil];
+    } else {
+        newURL = fileURL;
+    }
+
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSLog(@"[SCInsta] Download: Download finished with url: \"%@\"", [fileURL absoluteString]);
+        NSLog(@"[SCInsta] Download: Download finished with url: \"%@\"", [newURL absoluteString]);
         NSLog(@"[SCInsta] Download: Completed with action %d", (int)self.action);
 
         if (self.action == share) {
             [self showCompletionPillAndDismissAfter:0.25 completion:^{
-                [SCIUtils showShareVC:fileURL];
+                [SCIUtils showShareVC:newURL];
             }];
             return;
         }
 
         if (self.action == saveToPhotos) {
-            [self saveDownloadedFileToPhotos:fileURL completion:^(BOOL success, NSError *error) {
+            [self saveDownloadedFileToPhotos:newURL completion:^(BOOL success, NSError *error) {
                 if (success) {
                     [self showCompletionPillAndDismissAfter:0.45 completion:^{
                         [SCIUtils showToastForDuration:2.0 title:@"Saved to Photos"];
@@ -141,10 +154,8 @@
         }
 
         if (self.action == saveToVault) {
-            BOOL isVideo = [self isVideoFileAtURL:fileURL];
-            SCIVaultMediaType vaultType = isVideo ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
             NSError *error;
-            SCIVaultFile *file = [SCIVaultFile saveFileToVault:fileURL
+            SCIVaultFile *file = [SCIVaultFile saveFileToVault:newURL
                                                         source:SCIVaultSourceOther
                                                      mediaType:vaultType
                                                     folderPath:nil
@@ -161,7 +172,7 @@
         }
 
         [self showCompletionPillAndDismissAfter:0.25 completion:^{
-            [SCIFullScreenMediaPlayer showFileURL:fileURL];
+            [SCIFullScreenMediaPlayer showFileURL:newURL];
         }];
     });
 }

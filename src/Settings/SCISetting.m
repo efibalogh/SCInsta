@@ -94,12 +94,26 @@
                         defaultsKey:(NSString *)defaultsKey
                     requiresRestart:(BOOL)requiresRestart
 {
+    return [self switchCellWithTitle:title
+                            subtitle:subtitle
+                         defaultsKey:defaultsKey
+                     requiresRestart:requiresRestart
+          mutuallyExclusiveDefaultsKey:nil];
+}
+
++ (instancetype)switchCellWithTitle:(NSString *)title
+                           subtitle:(NSString *)subtitle
+                        defaultsKey:(NSString *)defaultsKey
+                    requiresRestart:(BOOL)requiresRestart
+         mutuallyExclusiveDefaultsKey:(NSString *)exclusiveDefaultsKey
+{
     SCISetting *setting = [[self alloc] initWithType:SCITableCellSwitch];
     
     setting.title = title;
     setting.subtitle = subtitle;
     setting.defaultsKey = defaultsKey;
     setting.requiresRestart = requiresRestart;
+    setting.mutuallyExclusiveDefaultsKey = [exclusiveDefaultsKey copy];
     
     return setting;
 }

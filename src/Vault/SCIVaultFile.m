@@ -76,14 +76,12 @@ static BOOL SCIStringLooksLikeUUIDFilename(NSString *baseName) {
     return u != nil;
 }
 
-static NSString *SCIVaultRelativeFileName(NSURL *fileURL,
-                                         long long epochMs,
-                                         SCIVaultMediaType mediaType,
-                                         SCIVaultSaveMetadata * _Nullable metadata) {
+NSString *SCIFileNameForMedia(NSURL *fileURL,
+                              SCIVaultMediaType mediaType,
+                              SCIVaultSaveMetadata * _Nullable metadata) {
     NSString *orig = fileURL.lastPathComponent ?: @"";
     NSString *origExt = orig.pathExtension;
     NSString *ext = SCIVaultNormalizedExtension(origExt, mediaType);
-    NSString *base = [orig stringByDeletingPathExtension];
 
     static NSDateFormatter *compactDateFmt;
     static dispatch_once_t onceToken;
@@ -100,14 +98,15 @@ static NSString *SCIVaultRelativeFileName(NSURL *fileURL,
 
     if (metadata.sourceUsername.length > 0) {
         NSString *user = SCISanitizedVaultUsername(metadata.sourceUsername);
-        return [NSString stringWithFormat:@"%lld_%@_%@_%@.%@", epochMs, user, slug, dateCompact, ext];
+        return [NSString stringWithFormat:@"%@_%@_%@.%@", user, slug, dateCompact, ext];
     }
 
+    NSString *base = [orig stringByDeletingPathExtension];
     if (SCIStringLooksLikeUUIDFilename(base) || base.length == 0) {
-        return [NSString stringWithFormat:@"%lld_%@_%@.%@", epochMs, slug, dateCompact, ext];
+        return [NSString stringWithFormat:@"media_%@_%@.%@", slug, dateCompact, ext];
     }
 
-    return [NSString stringWithFormat:@"%lld_%@", epochMs, orig];
+    return [NSString stringWithFormat:@"%@_%@.%@", orig, dateCompact, ext];
 }
 
 @implementation SCIVaultFile
@@ -225,8 +224,7 @@ static NSString *SCIVaultRelativeFileName(NSURL *fileURL,
         return nil;
     }
 
-    long long epochMs = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
-    NSString *fileName = SCIVaultRelativeFileName(fileURL, epochMs, mediaType, metadata);
+    NSString *fileName = SCIFileNameForMedia(fileURL, mediaType, metadata);
     NSString *destPath = [[SCIVaultPaths vaultMediaDirectory] stringByAppendingPathComponent:fileName];
 
     if ([fm fileExistsAtPath:destPath]) {

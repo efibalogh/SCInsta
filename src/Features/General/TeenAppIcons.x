@@ -1,5 +1,6 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
+#import "../../Vault/SCIVaultViewController.h"
 
 %hook IGImageWithAccessoryButton
 
@@ -17,7 +18,7 @@
     ].count > 0;
 
     if (!hasLongPress) {
-        NSLog(@"[SCInsta] Adding teen app icons long press gesture recognizer");
+        NSLog(@"[SCInsta] Adding feed header logo long press gesture recognizer");
 
         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
         [self addGestureRecognizer:longPress];
@@ -32,6 +33,8 @@
         if (homeFeedHeaderVC != nil) {
             [homeFeedHeaderVC headerDidLongPressLogo:nil];
         }
+    } else if ([SCIUtils getBoolPref:@"header_long_press_vault"]) {
+        [SCIVaultViewController presentVault];
     }
 }
 
