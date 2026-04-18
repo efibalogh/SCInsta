@@ -30,8 +30,9 @@ BOOL dmVisualMsgsViewedButtonEnabled = false;
         @"call_confirm": @(YES),
         @"keep_deleted_message": @(YES),
         @"profile_photo_zoom": @(YES),
+        @"show_action_button": @(NO),
         @"view_thumbnail": @(NO),
-        @"download_button_default_action": @"none",
+        @"action_button_default_action": @"none",
         @"reels_tap_control": @"default",
         @"nav_icon_ordering": @"default",
         @"swipe_nav_tabs": @"default",
@@ -42,7 +43,19 @@ BOOL dmVisualMsgsViewedButtonEnabled = false;
         @"disable_auto_unmuting_reels": @(YES),
         @"doom_scrolling_reel_count": @(1)
     };
-    [[NSUserDefaults standardUserDefaults] registerDefaults:sciDefaults];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults registerDefaults:sciDefaults];
+
+    // Migrate old download-button preference keys to action-button keys.
+    id legacyShowActionButton = [defaults objectForKey:@"show_download_button"];
+    if ([defaults objectForKey:@"show_action_button"] == nil && legacyShowActionButton != nil) {
+        [defaults setObject:legacyShowActionButton forKey:@"show_action_button"];
+    }
+
+    id legacyDefaultAction = [defaults objectForKey:@"download_button_default_action"];
+    if ([defaults objectForKey:@"action_button_default_action"] == nil && legacyDefaultAction != nil) {
+        [defaults setObject:legacyDefaultAction forKey:@"action_button_default_action"];
+    }
     
     // Override instagram defaults
     if ([SCIUtils getBoolPref:@"liquid_glass_buttons"]) {

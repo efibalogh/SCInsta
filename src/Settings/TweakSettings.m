@@ -123,9 +123,9 @@
                                         @{
                                             @"header": @"",
                                             @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Show download button" subtitle:@"Adds a download button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_download_button"],
-                                                [SCISetting menuCellWithTitle:@"Default tap action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:[self menus][@"download_button_default_action"]],
-                                                [SCISetting switchCellWithTitle:@"View thumbnail" subtitle:@"Adds a view thumbnail action to the download menu that shows the cover image or video thumbnail" defaultsKey:@"view_thumbnail"]
+                                                                [SCISetting switchCellWithTitle:@"Show action button" subtitle:@"Adds an action button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_action_button"],
+                                                                [SCISetting menuCellWithTitle:@"Default tap action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:[self menus][@"action_button_default_action"]],
+                                                                [SCISetting switchCellWithTitle:@"View thumbnail" subtitle:@"Adds a view thumbnail action to the action menu that shows the cover image or video thumbnail" defaultsKey:@"view_thumbnail"]
                                             ]
                                         }]
                 ],
@@ -319,12 +319,12 @@
 
 + (NSDictionary *)menus {
     return @{
-        @"download_button_default_action": [UIMenu menuWithChildren:@[
+        @"action_button_default_action": [UIMenu menuWithChildren:@[
             [UICommand commandWithTitle:@"None"
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"none"
                            }
             ],
@@ -332,7 +332,7 @@
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"download_library"
                            }
             ],
@@ -340,7 +340,7 @@
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"download_share"
                            }
             ],
@@ -348,7 +348,7 @@
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"copy_download_link"
                            }
             ],
@@ -356,7 +356,7 @@
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"download_vault"
                            }
             ],
@@ -364,7 +364,7 @@
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"expand"
                            }
             ],
@@ -372,7 +372,7 @@
                                   image:nil
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"download_button_default_action",
+                               @"defaultsKey": @"action_button_default_action",
                                @"value": @"view_thumbnail"
                            }
             ],
