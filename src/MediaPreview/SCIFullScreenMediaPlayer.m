@@ -9,6 +9,7 @@
 #import "../Vault/SCIVaultCoreDataStack.h"
 #import "../Downloader/Download.h"
 #import <Photos/Photos.h>
+#import <AVFoundation/AVFoundation.h>
 
 static SCIDownloadDelegate *SCIMediaPlayerShareDelegate(void) {
     static SCIDownloadDelegate *delegate = nil;
@@ -55,6 +56,56 @@ static UIImage *SCIFullScreenResourceOrSystem(NSString *resourceName, NSString *
     return img;
 }
 
+static void SCICollectAVPlayersFromLayer(CALayer *layer, NSMutableSet<AVPlayer *> *players) {
+    if (!layer || !players) return;
+
+    if ([layer isKindOfClass:[AVPlayerLayer class]]) {
+        AVPlayer *player = ((AVPlayerLayer *)layer).player;
+        if (player) {
+            [players addObject:player];
+        }
+    }
+
+    for (CALayer *sublayer in layer.sublayers) {
+        SCICollectAVPlayersFromLayer(sublayer, players);
+    }
+}
+
+static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
+    UIApplication *app = [UIApplication sharedApplication];
+    NSMutableArray<UIWindow *> *windows = [NSMutableArray array];
+
+    if (@available(iOS 13.0, *)) {
+        for (UIScene *scene in app.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+            UIWindowScene *windowScene = (UIWindowScene *)scene;
+            [windows addObjectsFromArray:windowScene.windows];
+        }
+    }
+
+    if (windows.count == 0) {
+        [windows addObjectsFromArray:app.windows];
+    }
+
+    NSMutableSet<AVPlayer *> *players = [NSMutableSet set];
+    for (UIWindow *window in windows) {
+        SCICollectAVPlayersFromLayer(window.layer, players);
+    }
+
+    NSMutableArray<AVPlayer *> *playingPlayers = [NSMutableArray array];
+    for (AVPlayer *player in players) {
+        BOOL isPlaying = player.rate > 0.0;
+        if (@available(iOS 10.0, *)) {
+            isPlaying = isPlaying || (player.timeControlStatus == AVPlayerTimeControlStatusPlaying);
+        }
+        if (isPlaying) {
+            [playingPlayers addObject:player];
+        }
+    }
+
+    return playingPlayers;
+}
+
 @interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
 
 @property (nonatomic, strong) NSArray<SCIMediaItem *> *items;
@@ -79,6 +130,8 @@ static UIImage *SCIFullScreenResourceOrSystem(NSString *resourceName, NSString *
 
 @property (nonatomic, assign) BOOL dismissPanDecided;
 @property (nonatomic, assign) BOOL dismissPanIsVertical;
+
+@property (nonatomic, copy) NSArray<AVPlayer *> *pausedUnderlyingPlayers;
 
 @end
 
@@ -228,6 +281,7 @@ fromViewController:(UIViewController *)presenter {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor blackColor];
 
+    [self pauseUnderlyingPlaybackIfNeeded];
     [self setupTopToolbar];
     [self setupBottomBar];
     [self setupPageViewController];
@@ -432,8 +486,8 @@ fromViewController:(UIViewController *)presenter {
     [_pageViewController didMoveToParentViewController:self];
 
     [NSLayoutConstraint activateConstraints:@[
-        [_pageViewController.view.topAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [_pageViewController.view.bottomAnchor constraintEqualToAnchor:_bottomBar.topAnchor],
+        [_pageViewController.view.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_pageViewController.view.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [_pageViewController.view.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_pageViewController.view.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];
@@ -540,8 +594,9 @@ fromViewController:(UIViewController *)presenter {
     SCIMediaItem *item = [self currentItem];
     BOOL isFav = item.vaultFile.isFavorite;
     UIImageSymbolConfiguration *sym = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
-    NSString *imageName = isFav ? @"heart.fill" : @"heart";
-    UIImage *img = [UIImage systemImageNamed:imageName withConfiguration:sym];
+    UIImage *img = isFav
+        ? SCIFullScreenResourceOrSystem(@"heart_filled", @"heart.fill", sym)
+        : SCIFullScreenResourceOrSystem(@"heart", @"heart", sym);
 
     if (!item.vaultFile) {
         _topFavoriteButton.hidden = YES;
@@ -580,9 +635,31 @@ fromViewController:(UIViewController *)presenter {
 
 #pragma mark - Actions
 
+- (void)pauseUnderlyingPlaybackIfNeeded {
+    if (self.pausedUnderlyingPlayers.count > 0) return;
+
+    NSArray<AVPlayer *> *playing = SCIPlayingPlayersInAppWindows();
+    if (playing.count == 0) return;
+
+    for (AVPlayer *player in playing) {
+        [player pause];
+    }
+    self.pausedUnderlyingPlayers = playing;
+}
+
+- (void)resumeUnderlyingPlaybackIfNeeded {
+    if (self.pausedUnderlyingPlayers.count == 0) return;
+
+    for (AVPlayer *player in self.pausedUnderlyingPlayers) {
+        [player play];
+    }
+    self.pausedUnderlyingPlayers = nil;
+}
+
 - (void)closeTapped {
     [self cleanupAll];
     [self dismissViewControllerAnimated:YES completion:^{
+        [self resumeUnderlyingPlaybackIfNeeded];
         if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
             [self.delegate fullScreenMediaPlayerDidDismiss];
         }
@@ -903,6 +980,7 @@ fromViewController:(UIViewController *)presenter {
                 } completion:^(BOOL finished) {
                     [self cleanupAll];
                     [self dismissViewControllerAnimated:NO completion:^{
+                        [self resumeUnderlyingPlaybackIfNeeded];
                         if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
                             [self.delegate fullScreenMediaPlayerDidDismiss];
                         }

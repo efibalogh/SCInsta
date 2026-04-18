@@ -50,7 +50,8 @@
 
 @property (nonatomic, strong) NSMutableArray<SCIVaultFilterChip *> *typeChips;
 @property (nonatomic, strong) NSMutableArray<SCIVaultFilterChip *> *sourceChips;
-@property (nonatomic, strong) UISwitch *favoritesSwitch;
+@property (nonatomic, strong) UIControl *favoritesRow;
+@property (nonatomic, strong) UIImageView *favoritesStateIcon;
 
 @end
 
@@ -118,9 +119,20 @@
 - (void)configureSheetPresentation {
     UISheetPresentationController *sheet = self.sheetPresentationController;
     if (sheet) {
-        sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent,
-                          UISheetPresentationControllerDetent.largeDetent];
+        if (@available(iOS 16.0, *)) {
+            UISheetPresentationControllerDetent *compact = [UISheetPresentationControllerDetent
+                customDetentWithIdentifier:@"scinsta.vault.filter.local.compact"
+                                   resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
+                CGFloat target = MIN(430.0, context.maximumDetentValue * 0.58);
+                return MAX(330.0, target);
+            }];
+            sheet.detents = @[compact, UISheetPresentationControllerDetent.mediumDetent];
+            sheet.selectedDetentIdentifier = compact.identifier;
+        } else {
+            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
+        }
         sheet.prefersGrabberVisible = YES;
+        sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
         sheet.preferredCornerRadius = 20;
     }
 }
@@ -142,15 +154,17 @@
 - (void)setupContent {
     self.contentStack = [[UIStackView alloc] init];
     self.contentStack.axis = UILayoutConstraintAxisVertical;
-    self.contentStack.spacing = 24;
+    self.contentStack.spacing = 18;
     self.contentStack.translatesAutoresizingMaskIntoConstraints = NO;
     [self.scrollView addSubview:self.contentStack];
 
+    UILayoutGuide *content = self.scrollView.contentLayoutGuide;
+    UILayoutGuide *frame = self.scrollView.frameLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
-        [self.contentStack.topAnchor constraintEqualToAnchor:self.scrollView.topAnchor constant:20],
-        [self.contentStack.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
-        [self.contentStack.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
-        [self.contentStack.bottomAnchor constraintEqualToAnchor:self.scrollView.bottomAnchor constant:-20],
+        [self.contentStack.topAnchor constraintEqualToAnchor:content.topAnchor constant:16],
+        [self.contentStack.leadingAnchor constraintEqualToAnchor:frame.leadingAnchor constant:16],
+        [self.contentStack.trailingAnchor constraintEqualToAnchor:frame.trailingAnchor constant:-16],
+        [self.contentStack.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-16],
     ]];
 
     [self.contentStack addArrangedSubview:[self sectionTitle:@"Type"]];
@@ -239,12 +253,15 @@
 }
 
 - (UIView *)createFavoritesRow {
-    UIView *row = [[UIView alloc] init];
+    UIControl *row = [[UIControl alloc] init];
     row.backgroundColor = [UIColor secondarySystemBackgroundColor];
     row.layer.cornerRadius = 10;
-    [row.heightAnchor constraintEqualToConstant:52].active = YES;
+    row.layer.borderWidth = 1.0;
+    row.layer.borderColor = [UIColor separatorColor].CGColor;
+    [row.heightAnchor constraintEqualToConstant:50].active = YES;
+    [row addTarget:self action:@selector(favoritesRowTapped) forControlEvents:UIControlEventTouchUpInside];
 
-    UIImage *favRowIcon = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:20] ?: [UIImage systemImageNamed:@"heart.fill"];
+    UIImage *favRowIcon = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:18] ?: [UIImage systemImageNamed:@"heart.fill"];
     UIImageView *icon = [[UIImageView alloc] initWithImage:favRowIcon];
     icon.tintColor = [UIColor systemPinkColor];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
@@ -257,19 +274,26 @@
     label.translatesAutoresizingMaskIntoConstraints = NO;
     [row addSubview:label];
 
-    self.favoritesSwitch = [[UISwitch alloc] init];
-    self.favoritesSwitch.on = self.filterFavoritesOnly;
-    self.favoritesSwitch.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.favoritesSwitch addTarget:self action:@selector(favoritesSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-    [row addSubview:self.favoritesSwitch];
+    UIImageView *stateIcon = [[UIImageView alloc] initWithFrame:CGRectZero];
+    stateIcon.translatesAutoresizingMaskIntoConstraints = NO;
+    stateIcon.contentMode = UIViewContentModeScaleAspectFit;
+    [row addSubview:stateIcon];
+
+    self.favoritesRow = row;
+    self.favoritesStateIcon = stateIcon;
+    [self updateFavoritesRowAppearance];
 
     [NSLayoutConstraint activateConstraints:@[
         [icon.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:12],
         [icon.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [icon.widthAnchor constraintEqualToConstant:18],
+        [icon.heightAnchor constraintEqualToConstant:18],
         [label.leadingAnchor constraintEqualToAnchor:icon.trailingAnchor constant:10],
         [label.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-        [self.favoritesSwitch.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-12],
-        [self.favoritesSwitch.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [stateIcon.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-12],
+        [stateIcon.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [stateIcon.widthAnchor constraintEqualToConstant:20],
+        [stateIcon.heightAnchor constraintEqualToConstant:20],
     ]];
     return row;
 }
@@ -300,9 +324,28 @@
     [self updateClearButton];
 }
 
-- (void)favoritesSwitchChanged:(UISwitch *)sw {
-    self.filterFavoritesOnly = sw.on;
+- (void)favoritesRowTapped {
+    self.filterFavoritesOnly = !self.filterFavoritesOnly;
+    [self updateFavoritesRowAppearance];
     [self updateClearButton];
+}
+
+- (void)updateFavoritesRowAppearance {
+    if (!self.favoritesRow || !self.favoritesStateIcon) return;
+
+    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+    if (self.filterFavoritesOnly) {
+        UIColor *accent = [UIColor systemPinkColor];
+        self.favoritesRow.backgroundColor = [accent colorWithAlphaComponent:0.12];
+        self.favoritesRow.layer.borderColor = [accent colorWithAlphaComponent:0.45].CGColor;
+        self.favoritesStateIcon.image = [UIImage systemImageNamed:@"checkmark.circle.fill" withConfiguration:cfg];
+        self.favoritesStateIcon.tintColor = accent;
+    } else {
+        self.favoritesRow.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        self.favoritesRow.layer.borderColor = [UIColor separatorColor].CGColor;
+        self.favoritesStateIcon.image = [UIImage systemImageNamed:@"circle" withConfiguration:cfg];
+        self.favoritesStateIcon.tintColor = [UIColor tertiaryLabelColor];
+    }
 }
 
 - (void)updateClearButton {
@@ -327,7 +370,7 @@
     [self.filterTypes removeAllObjects];
     [self.filterSources removeAllObjects];
     self.filterFavoritesOnly = NO;
-    self.favoritesSwitch.on = NO;
+    [self updateFavoritesRowAppearance];
     for (SCIVaultFilterChip *c in self.typeChips) c.selectedChip = NO;
     for (SCIVaultFilterChip *c in self.sourceChips) c.selectedChip = NO;
     if ([self.delegate respondsToSelector:@selector(filterControllerDidClear:)]) {

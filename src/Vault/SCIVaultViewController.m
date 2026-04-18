@@ -25,10 +25,22 @@ static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
 /// Matches `SCIFullScreenMediaPlayer` bottom bar row height (tab-style actions).
 static CGFloat const kVaultBottomBarHeight = 44.0;
+static CGFloat const kVaultMenuIconPointSize = 18.0;
 
 /// Adaptive material: follows light/dark automatically.
 static UIBlurEffect *SCIVaultAdaptiveChromeBlurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+}
+
+static UIImage *SCIVaultMenuActionIcon(NSString *resourceName, NSString *systemName) {
+    UIImage *img = resourceName.length > 0
+        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kVaultMenuIconPointSize]
+        : nil;
+    if (!img) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:kVaultMenuIconPointSize weight:UIImageSymbolWeightRegular];
+        img = [UIImage systemImageNamed:systemName withConfiguration:cfg];
+    }
+    return img;
 }
 
 typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
@@ -376,6 +388,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self.collectionView setCollectionViewLayout:newLayout animated:NO];
     [self.collectionView.collectionViewLayout invalidateLayout];
     [self.collectionView reloadData];
+    [self updateEmptyState];
     [self refreshBottomToolbarItems];
 }
 
@@ -543,7 +556,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 }
 
 - (NSInteger)collectionView:(UICollectionView *)cv numberOfItemsInSection:(NSInteger)section {
-    if (section == 0) return self.subfolders.count;
+    if (section == 0) return self.viewMode == SCIVaultViewModeList ? self.subfolders.count : 0;
     NSArray *sections = self.fetchedResultsController.sections;
     if (sections.count == 0) return 0;
     return ((id<NSFetchedResultsSectionInfo>)sections[0]).numberOfObjects;
@@ -598,11 +611,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (UIEdgeInsets)collectionView:(UICollectionView *)cv
                         layout:(UICollectionViewLayout *)layout
         insetForSectionAtIndex:(NSInteger)section {
-    if (section == 0 && self.subfolders.count > 0) {
-        if (self.viewMode == SCIVaultViewModeList) {
-            return UIEdgeInsetsMake(10, 0, 6, 0);
-        }
-        return UIEdgeInsetsMake(kGridSpacing, 0, kGridSpacing, 0);
+    if (section == 0 && self.subfolders.count > 0 && self.viewMode == SCIVaultViewModeList) {
+        return UIEdgeInsetsMake(10, 0, 6, 0);
     }
     return UIEdgeInsetsZero;
 }
@@ -664,8 +674,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     NSString *favTitle = file.isFavorite ? @"Unfavorite" : @"Favorite";
     UIImage *favImg = file.isFavorite
-        ? ([SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES] ?: [UIImage systemImageNamed:@"heart.fill"])
-        : ([SCIUtils sci_resourceImageNamed:@"heart" template:YES] ?: [UIImage systemImageNamed:@"heart"]);
+        ? SCIVaultMenuActionIcon(@"heart_filled", @"heart.fill")
+        : SCIVaultMenuActionIcon(@"heart", @"heart");
 
     UIAction *favoriteAction = [UIAction actionWithTitle:favTitle
                                                    image:favImg
@@ -675,19 +685,19 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [[SCIVaultCoreDataStack shared] saveContext];
     }];
 
-    UIImage *renameImg = [SCIUtils sci_resourceImageNamed:@"edit" template:YES] ?: [UIImage systemImageNamed:@"pencil"];
+     UIImage *renameImg = SCIVaultMenuActionIcon(@"edit", @"pencil");
     UIAction *renameAction = [UIAction actionWithTitle:@"Rename"
                                                  image:renameImg
                                             identifier:nil
                                                handler:^(UIAction *a) { [weakSelf renameFile:file]; }];
 
-    UIImage *moveImg = [SCIUtils sci_resourceImageNamed:@"folder_move" template:YES] ?: [UIImage systemImageNamed:@"folder"];
+     UIImage *moveImg = SCIVaultMenuActionIcon(@"folder_move", @"folder");
     UIAction *moveAction = [UIAction actionWithTitle:@"Move to folder"
                                                image:moveImg
                                           identifier:nil
                                              handler:^(UIAction *a) { [weakSelf moveFile:file]; }];
 
-    UIImage *shareImg = [SCIUtils sci_resourceImageNamed:@"share" template:YES] ?: [UIImage systemImageNamed:@"square.and.arrow.up"];
+     UIImage *shareImg = SCIVaultMenuActionIcon(@"share", @"square.and.arrow.up");
     UIAction *shareAction = [UIAction actionWithTitle:@"Share"
                                                 image:shareImg
                                            identifier:nil
@@ -697,7 +707,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [weakSelf presentViewController:acVC animated:YES completion:nil];
     }];
 
-    UIImage *deleteImg = [SCIUtils sci_resourceImageNamed:@"delete" template:YES] ?: [UIImage systemImageNamed:@"trash"];
+    UIImage *deleteImg = SCIVaultMenuActionIcon(@"delete", @"trash");
     UIAction *deleteAction = [UIAction actionWithTitle:@"Delete"
                                                  image:deleteImg
                                             identifier:nil
@@ -735,13 +745,13 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     return [UIContextMenuConfiguration configurationWithIdentifier:nil
                                                    previewProvider:nil
                                                     actionProvider:^UIMenu *(NSArray<UIMenuElement *> *suggested) {
-        UIImage *folderRenameImg = [SCIUtils sci_resourceImageNamed:@"edit" template:YES] ?: [UIImage systemImageNamed:@"pencil"];
+    UIImage *folderRenameImg = SCIVaultMenuActionIcon(@"edit", @"pencil");
         UIAction *renameAction = [UIAction actionWithTitle:@"Rename folder"
                                                      image:folderRenameImg
                                                 identifier:nil
                                                    handler:^(UIAction *a) { [weakSelf renameFolder:folderPath]; }];
 
-        UIImage *folderDeleteImg = [SCIUtils sci_resourceImageNamed:@"delete" template:YES] ?: [UIImage systemImageNamed:@"trash"];
+    UIImage *folderDeleteImg = SCIVaultMenuActionIcon(@"delete", @"trash");
         UIAction *deleteAction = [UIAction actionWithTitle:@"Delete folder"
                                                      image:folderDeleteImg
                                                 identifier:nil
@@ -1046,6 +1056,24 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     vc.filterFavoritesOnly = self.filterFavoritesOnly;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
     [self configureVaultSheetForNavigation:nav];
+
+    UISheetPresentationController *sheet = nav.sheetPresentationController;
+    if (sheet) {
+        if (@available(iOS 16.0, *)) {
+            UISheetPresentationControllerDetent *compact = [UISheetPresentationControllerDetent
+                customDetentWithIdentifier:@"scinsta.vault.filter.compact"
+                                   resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
+                CGFloat target = MIN(430.0, context.maximumDetentValue * 0.58);
+                return MAX(330.0, target);
+            }];
+            sheet.detents = @[compact, UISheetPresentationControllerDetent.mediumDetent];
+            sheet.selectedDetentIdentifier = compact.identifier;
+        } else {
+            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
+        }
+        sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
+    }
+
     [self presentViewController:nav animated:YES completion:nil];
 }
 

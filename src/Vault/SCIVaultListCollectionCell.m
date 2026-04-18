@@ -102,7 +102,7 @@
     self.moreButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.moreButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.moreButton setImage:moreImg forState:UIControlStateNormal];
-    self.moreButton.tintColor = [UIColor tertiaryLabelColor];
+    self.moreButton.tintColor = [UIColor secondaryLabelColor];
     self.moreButton.accessibilityLabel = @"More";
     self.moreButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
     self.moreButton.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;

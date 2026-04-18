@@ -844,22 +844,28 @@ static BOOL SCIViewMatchesAnyClassName(UIView *view, NSArray<NSString *> *classN
 	return NO;
 }
 
-static UIView *SCIRecursiveSubviewMatchingClassNames(UIView *root, NSArray<NSString *> *classNames) {
+static UIView *SCIRecursiveSubviewMatchingClassNames(UIView *root, NSArray<NSString *> *classNames, id targetMedia) {
 	if (!root) return nil;
 
 	if (SCIViewMatchesAnyClassName(root, classNames)) {
-		return root;
+		if (!targetMedia) return root;
+		id media = SCIFeedMediaFromBarView(root);
+		if (!media || media == targetMedia) return root;
+		
+		NSString *mediaPk = SCIStringFromValue(SCIKVCObject(media, @"pk"));
+		NSString *targetPk = SCIStringFromValue(SCIKVCObject(targetMedia, @"pk"));
+		if (mediaPk && [mediaPk isEqualToString:targetPk]) return root;
 	}
 
 	for (UIView *subview in root.subviews) {
-		UIView *match = SCIRecursiveSubviewMatchingClassNames(subview, classNames);
+		UIView *match = SCIRecursiveSubviewMatchingClassNames(subview, classNames, targetMedia);
 		if (match) return match;
 	}
 
 	return nil;
 }
 
-static UIView *SCIFeedActionContextViewFromMediaView(UIView *view) {
+static UIView *SCIFeedActionContextViewFromMediaView(UIView *view, id targetMedia) {
 	if (!view) return nil;
 
 	NSArray<NSString *> *candidateClassNames = @[
@@ -871,7 +877,7 @@ static UIView *SCIFeedActionContextViewFromMediaView(UIView *view) {
 	UIView *walker = view;
 	NSInteger depth = 0;
 	while (walker && depth < 8) {
-		UIView *match = SCIRecursiveSubviewMatchingClassNames(walker, candidateClassNames);
+		UIView *match = SCIRecursiveSubviewMatchingClassNames(walker, candidateClassNames, targetMedia);
 		if (match) return match;
 
 		walker = walker.superview;
@@ -884,25 +890,25 @@ static UIView *SCIFeedActionContextViewFromMediaView(UIView *view) {
 void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecognizer *sender) {
 	if (!view || !sender || sender.state != UIGestureRecognizerStateBegan) return;
 
-	UIView *contextView = SCIFeedActionContextViewFromMediaView(view);
+	id directMedia = nil;
+	UIView *mediaWalker = view;
+	while (mediaWalker && !directMedia) {
+		directMedia = [SCIUtils getIvarForObj:mediaWalker name:"_media"];
+		if (!directMedia) directMedia = SCIObjectForSelector(mediaWalker, @"media");
+		if (!directMedia) directMedia = SCIKVCObject(mediaWalker, @"media");
+		mediaWalker = mediaWalker.superview;
+	}
+
+	UIView *contextView = SCIFeedActionContextViewFromMediaView(view, directMedia);
 
 	SCIActionButtonContext *context = [[SCIActionButtonContext alloc] init];
 	context.source = SCIActionButtonSourceFeed;
 	context.view = contextView ?: view;
 
 	id media = SCIResolveMediaForContext(context);
+	if (!media) media = directMedia;
+
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
-
-	if (entries.count == 0) {
-		id directMedia = [SCIUtils getIvarForObj:view name:"_media"];
-		if (!directMedia) {
-			directMedia = SCIObjectForSelector(view, @"media");
-		}
-
-		if (directMedia) {
-			entries = SCIEntriesFromMedia(directMedia);
-		}
-	}
 
 	if (entries.count == 0) return;
 

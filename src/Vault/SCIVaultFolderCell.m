@@ -7,6 +7,7 @@
 @property (nonatomic, strong) UIStackView *gridStack;
 @property (nonatomic, strong) UIStackView *listStack;
 
+@property (nonatomic, strong) UIView *gridIconBubble;
 @property (nonatomic, strong) UIImageView *gridIcon;
 @property (nonatomic, strong) UILabel *gridTitle;
 
@@ -21,31 +22,39 @@
 - (instancetype)initWithFrame:(CGRect)frame {
     if ((self = [super initWithFrame:frame])) {
         self.contentView.clipsToBounds = YES;
-        self.contentView.layer.cornerRadius = 6.0;
-        self.contentView.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        self.contentView.layer.cornerRadius = 10.0;
+        self.contentView.backgroundColor = [UIColor tertiarySystemGroupedBackgroundColor];
 
-        UIImageSymbolConfiguration *gridSym = [UIImageSymbolConfiguration configurationWithPointSize:28 weight:UIImageSymbolWeightMedium];
+        UIImageSymbolConfiguration *gridSym = [UIImageSymbolConfiguration configurationWithPointSize:24 weight:UIImageSymbolWeightSemibold];
         _gridIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"folder.fill" withConfiguration:gridSym]];
         _gridIcon.translatesAutoresizingMaskIntoConstraints = NO;
-        _gridIcon.tintColor = [UIColor secondaryLabelColor];
+        _gridIcon.tintColor = [UIColor systemYellowColor];
         _gridIcon.contentMode = UIViewContentModeScaleAspectFit;
+
+        _gridIconBubble = [[UIView alloc] initWithFrame:CGRectZero];
+        _gridIconBubble.translatesAutoresizingMaskIntoConstraints = NO;
+        _gridIconBubble.backgroundColor = [UIColor systemBackgroundColor];
+        _gridIconBubble.layer.cornerRadius = 19.0;
+        _gridIconBubble.layer.borderColor = [[UIColor separatorColor] colorWithAlphaComponent:0.35].CGColor;
+        _gridIconBubble.layer.borderWidth = 1.0 / UIScreen.mainScreen.scale;
+        [_gridIconBubble addSubview:_gridIcon];
 
         _gridTitle = [[UILabel alloc] init];
         _gridTitle.translatesAutoresizingMaskIntoConstraints = NO;
-        _gridTitle.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        _gridTitle.textColor = [UIColor labelColor];
+        _gridTitle.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+        _gridTitle.textColor = [UIColor secondaryLabelColor];
         _gridTitle.textAlignment = NSTextAlignmentCenter;
         _gridTitle.numberOfLines = 2;
         _gridTitle.lineBreakMode = NSLineBreakByTruncatingTail;
         _gridTitle.adjustsFontSizeToFitWidth = YES;
         _gridTitle.minimumScaleFactor = 0.85;
 
-        _gridStack = [[UIStackView alloc] initWithArrangedSubviews:@[_gridIcon, _gridTitle]];
+        _gridStack = [[UIStackView alloc] initWithArrangedSubviews:@[_gridIconBubble, _gridTitle]];
         _gridStack.translatesAutoresizingMaskIntoConstraints = NO;
         _gridStack.axis = UILayoutConstraintAxisVertical;
         _gridStack.alignment = UIStackViewAlignmentCenter;
-        _gridStack.spacing = 6;
-        _gridStack.layoutMargins = UIEdgeInsetsMake(8, 6, 8, 6);
+        _gridStack.spacing = 8;
+        _gridStack.layoutMargins = UIEdgeInsetsMake(10, 8, 10, 8);
         _gridStack.layoutMarginsRelativeArrangement = YES;
         [self.contentView addSubview:_gridStack];
 
@@ -91,7 +100,12 @@
             [_gridStack.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
             [_gridStack.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor],
             [_gridStack.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
-            [_gridIcon.heightAnchor constraintEqualToConstant:36],
+            [_gridIconBubble.widthAnchor constraintEqualToConstant:38],
+            [_gridIconBubble.heightAnchor constraintEqualToConstant:38],
+            [_gridIcon.centerXAnchor constraintEqualToAnchor:_gridIconBubble.centerXAnchor],
+            [_gridIcon.centerYAnchor constraintEqualToAnchor:_gridIconBubble.centerYAnchor],
+            [_gridIcon.widthAnchor constraintEqualToConstant:24],
+            [_gridIcon.heightAnchor constraintEqualToConstant:24],
 
             [_listStack.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
             [_listStack.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
@@ -124,11 +138,14 @@
 
     if (listStyle) {
         self.contentView.layer.cornerRadius = 0;
+        self.contentView.layer.borderWidth = 0;
         self.contentView.backgroundColor = [UIColor clearColor];
         self.listSeparator.hidden = NO;
     } else {
-        self.contentView.layer.cornerRadius = 6.0;
-        self.contentView.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        self.contentView.layer.cornerRadius = 10.0;
+        self.contentView.layer.borderWidth = 1.0 / UIScreen.mainScreen.scale;
+        self.contentView.layer.borderColor = [[UIColor separatorColor] colorWithAlphaComponent:0.35].CGColor;
+        self.contentView.backgroundColor = [UIColor tertiarySystemGroupedBackgroundColor];
         self.listSeparator.hidden = YES;
     }
 }

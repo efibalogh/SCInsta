@@ -66,8 +66,8 @@
     [_playerViewController didMoveToParentViewController:self];
 
     [NSLayoutConstraint activateConstraints:@[
-        [_playerViewController.view.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [_playerViewController.view.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [_playerViewController.view.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:44.0],
+        [_playerViewController.view.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-44.0],
         [_playerViewController.view.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_playerViewController.view.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];
@@ -175,7 +175,7 @@
 
     NSError *audioErr = nil;
     AVAudioSession *session = [AVAudioSession sharedInstance];
-    [session setCategory:AVAudioSessionCategoryPlayback error:&audioErr];
+    [session setCategory:AVAudioSessionCategoryAmbient error:&audioErr];
     [session setActive:YES error:&audioErr];
 
     _playerViewController.player = _player;

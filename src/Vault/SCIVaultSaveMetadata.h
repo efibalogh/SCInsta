@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// Optional context when saving to the vault (e.g. from the action button). Drives list UI like Regram.
+/// Optional context when saving to the vault (e.g. from the action button).
 /// `source` uses the same values as `SCIVaultSource` in SCIVaultFile.
 @interface SCIVaultSaveMetadata : NSObject
 
