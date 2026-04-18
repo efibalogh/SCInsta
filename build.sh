@@ -72,10 +72,17 @@ then
         SCINSTAPATH=""
     fi
 
+    # Create resource bundle for sideloaded IPA
+    echo -e '\033[1m\033[32mAssembling SCInsta.bundle...\033[0m'
+    BUNDLE_DIR=".theos/obj/debug/SCInsta.bundle"
+    rm -rf "$BUNDLE_DIR"
+    mkdir -p "$BUNDLE_DIR"
+    cp -f resources/*.png "$BUNDLE_DIR/" 2>/dev/null || true
+
     # Create IPA File
     echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
     rm -f packages/SCInsta-sideloaded.ipa
-    cyan -i "packages/${ipaFile}" -o packages/SCInsta-sideloaded.ipa -f $SCINSTAPATH $FLEXPATH -c $COMPRESSION -m 15.0 -du
+    cyan -i "packages/${ipaFile}" -o packages/SCInsta-sideloaded.ipa -f $SCINSTAPATH $FLEXPATH "$BUNDLE_DIR" -c $COMPRESSION -m 15.0 -du
     
     # Patch IPA for sideloading
     ipapatch --input "packages/SCInsta-sideloaded.ipa" --inplace --noconfirm

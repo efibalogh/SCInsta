@@ -651,18 +651,30 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSFileManager *fileManager = [NSFileManager defaultManager];
-        NSMutableArray<NSString *> *candidatePaths = [NSMutableArray arrayWithArray:@[
+        NSMutableArray<NSString *> *candidatePaths = [NSMutableArray array];
+
+        // 1. Sideloaded IPA: cyan injects SCInsta.bundle into the .app root
+        NSString *appBundlePath = [[NSBundle mainBundle] pathForResource:@"SCInsta" ofType:@"bundle"];
+        if (appBundlePath.length) {
+            [candidatePaths addObject:appBundlePath];
+        }
+        // Also check Frameworks/ (some injectors place bundles there)
+        NSString *frameworksBundlePath = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"Frameworks/SCInsta.bundle"];
+        [candidatePaths addObject:frameworksBundlePath];
+
+        // 2. LiveContainer: Documents/Tweaks/SCInsta/SCInsta.bundle
+        NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        if (documentsPath.length) {
+            [candidatePaths addObject:[documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta/SCInsta.bundle"]];
+        }
+
+        // 3. Jailbroken paths
+        [candidatePaths addObjectsFromArray:@[
             @"/var/jb/Library/Application Support/SCInsta.bundle",
             @"/Library/Application Support/SCInsta.bundle",
             @"/var/jb/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
             @"/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
         ]];
-
-        NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-        if (documentsPath.length) {
-            NSString *liveBundle = [documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta/SCInsta.bundle"];
-            [candidatePaths addObject:liveBundle];
-        }
 
         for (NSString *path in candidatePaths) {
             if ([fileManager fileExistsAtPath:path]) {
