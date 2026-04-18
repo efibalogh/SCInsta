@@ -124,7 +124,8 @@
                                             @"header": @"",
                                             @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Show download button" subtitle:@"Adds a download button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_download_button"],
-                                                [SCISetting switchCellWithTitle:@"Expand cover" subtitle:@"Adds an expand cover action to the download menu that shows the cover image or video thumbnail" defaultsKey:@"expand_cover"]
+                                                [SCISetting menuCellWithTitle:@"Default tap action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:[self menus][@"download_button_default_action"]],
+                                                [SCISetting switchCellWithTitle:@"View thumbnail" subtitle:@"Adds a view thumbnail action to the download menu that shows the cover image or video thumbnail" defaultsKey:@"view_thumbnail"]
                                             ]
                                         }]
                 ],
@@ -318,6 +319,65 @@
 
 + (NSDictionary *)menus {
     return @{
+        @"download_button_default_action": [UIMenu menuWithChildren:@[
+            [UICommand commandWithTitle:@"None"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"none"
+                           }
+            ],
+            [UICommand commandWithTitle:@"Download to Photos"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"download_library"
+                           }
+            ],
+            [UICommand commandWithTitle:@"Share"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"download_share"
+                           }
+            ],
+            [UICommand commandWithTitle:@"Copy link"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"copy_download_link"
+                           }
+            ],
+            [UICommand commandWithTitle:@"Download to Vault"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"download_vault"
+                           }
+            ],
+            [UICommand commandWithTitle:@"Expand"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"expand"
+                           }
+            ],
+            [UICommand commandWithTitle:@"View Thumbnail"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"download_button_default_action",
+                               @"value": @"view_thumbnail"
+                           }
+            ],
+        ]],
+
         @"reels_tap_control": [UIMenu menuWithChildren:@[
             [UICommand commandWithTitle:@"Default"
                                     image:nil
