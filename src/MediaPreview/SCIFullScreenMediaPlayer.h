@@ -30,6 +30,11 @@ fromViewController:(UIViewController *)presenter;
 + (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index;
 + (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(nullable SCIVaultSaveMetadata *)metadata;
 
+/// Ordered carousel / album: images and videos as `SCIMediaItem` (matches vault `playItems` behavior).
++ (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
+       startingAtIndex:(NSInteger)index
+              metadata:(nullable SCIVaultSaveMetadata *)metadata;
+
 + (void)showImage:(UIImage *)image;
 + (void)showRemoteImageURL:(NSURL *)url;
 /// Profile / avatar long-press: sets vault source + optional username for “Save to Vault”.

@@ -141,19 +141,18 @@
 
 @interface IGFeedPhotoView : UIView
 @property (nonatomic, strong) id delegate;
+@end
 
-- (void)addLongPressGestureRecognizer; // new
+@interface IGFeedItemVideoView : UIView
+@property (nonatomic, strong) id delegate;
 @end
 
 @interface IGModernFeedVideoCell : UIView
 - (id)mediaCellFeedItem;
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGSundialViewerVideoCell : UIView
 @property(readonly, nonatomic) IGMedia *video;
-
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGSundialViewerPhotoCell : UIView
@@ -163,7 +162,6 @@
 @end
 
 @interface IGSundialViewerPhotoView : UIView
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGImageProgressView : UIView
@@ -175,8 +173,6 @@
 
 @interface IGStoryPhotoView : UIView
 - (id)item;
-
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGStoryFullscreenSectionController : NSObject
@@ -185,20 +181,15 @@
 
 @interface IGStoryVideoView : UIView
 @property (nonatomic, weak, readwrite) IGStoryFullscreenSectionController *captionDelegate;
-
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGStoryModernVideoView : UIView
 @property (nonatomic, readonly) IGMedia *item;
-
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGStoryFullscreenOverlayView : UIView
 @property (nonatomic, weak, readwrite) id gestureDelegate;
 - (id)gestureDelegate;
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGDirectVisualMessageViewerController : UIViewController
@@ -373,8 +364,6 @@
 
 @interface IGProfilePictureImageView : UIView
 @property (nonatomic, readonly) IGUser *userGQL;
-
-- (void)addLongPressGestureRecognizer; // new
 @end
 
 @interface IGImageRequest : NSObject

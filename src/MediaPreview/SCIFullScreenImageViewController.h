@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithMediaItem:(SCIMediaItem *)item;
 - (void)cleanup;
 - (void)resetZoomIfNeeded;
+- (void)forceResetZoom;
 
 @end
 

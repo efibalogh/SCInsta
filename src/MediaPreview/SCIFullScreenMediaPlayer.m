@@ -158,6 +158,25 @@ static UIImage *SCIFullScreenResourceOrSystem(NSString *resourceName, NSString *
     [player playItems:items startingAtIndex:adjustedIndex fromViewController:presenter];
 }
 
++ (void)showMediaItems:(NSArray<SCIMediaItem *> *)items startingAtIndex:(NSInteger)index metadata:(SCIVaultSaveMetadata *)metadata {
+    if (items.count == 0) return;
+
+    if (metadata) {
+        for (SCIMediaItem *item in items) {
+            if (item && !item.vaultMetadata) {
+                item.vaultMetadata = metadata;
+            }
+        }
+    }
+
+    NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
+
+    SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
+    player.isFromVault = NO;
+    UIViewController *presenter = topMostController();
+    [player playItems:items startingAtIndex:adjustedIndex fromViewController:presenter];
+}
+
 + (void)showImage:(UIImage *)image {
     if (!image) return;
     SCIMediaItem *item = [SCIMediaItem itemWithImage:image];

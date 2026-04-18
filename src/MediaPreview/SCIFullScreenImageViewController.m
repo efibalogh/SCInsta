@@ -3,6 +3,7 @@
 
 static CGFloat const kMaxZoom = 5.0;
 static CGFloat const kMinZoom = 1.0;
+static CGFloat const kZoomEpsilon = 0.02;
 
 @interface SCIFullScreenImageViewController () <UIScrollViewDelegate>
 
@@ -198,6 +199,17 @@ static CGFloat const kMinZoom = 1.0;
 
 #pragma mark - Frame Management
 
+/// Centers the zoomed image inside the scroll view using frame origin (stable with `UIScrollView` zoom).
+- (void)sci_recenterZoomedImage {
+    CGSize boundsSize = _scrollView.bounds.size;
+    CGRect frame = _imageView.frame;
+
+    CGFloat horizontal = frame.size.width < boundsSize.width ? (boundsSize.width - frame.size.width) * 0.5 : 0.0;
+    CGFloat vertical = frame.size.height < boundsSize.height ? (boundsSize.height - frame.size.height) * 0.5 : 0.0;
+
+    _imageView.frame = CGRectMake(horizontal, vertical, frame.size.width, frame.size.height);
+}
+
 - (void)updateImageViewFrame {
     UIImage *image = _imageView.image;
     if (!image) return;
@@ -205,28 +217,23 @@ static CGFloat const kMinZoom = 1.0;
     CGSize boundsSize = _scrollView.bounds.size;
     if (boundsSize.width <= 0 || boundsSize.height <= 0) return;
 
-    CGSize imageSize = image.size;
-    CGFloat widthRatio = boundsSize.width / imageSize.width;
-    CGFloat heightRatio = boundsSize.height / imageSize.height;
-    CGFloat ratio = MIN(widthRatio, heightRatio);
+    BOOL atMinimumZoom = (_scrollView.zoomScale <= kMinZoom + kZoomEpsilon);
 
-    CGFloat newWidth = imageSize.width * ratio;
-    CGFloat newHeight = imageSize.height * ratio;
+    if (atMinimumZoom) {
+        CGSize imageSize = image.size;
+        CGFloat widthRatio = boundsSize.width / imageSize.width;
+        CGFloat heightRatio = boundsSize.height / imageSize.height;
+        CGFloat ratio = MIN(widthRatio, heightRatio);
 
-    _imageView.frame = CGRectMake(0, 0, newWidth, newHeight);
-    _scrollView.contentSize = CGSizeMake(newWidth, newHeight);
+        CGFloat newWidth = imageSize.width * ratio;
+        CGFloat newHeight = imageSize.height * ratio;
 
-    [self centerImageView];
-}
-
-- (void)centerImageView {
-    CGSize boundsSize = _scrollView.bounds.size;
-    CGRect frameToCenter = _imageView.frame;
-
-    CGFloat x = (boundsSize.width > frameToCenter.size.width) ? (boundsSize.width - frameToCenter.size.width) / 2.0 : 0;
-    CGFloat y = (boundsSize.height > frameToCenter.size.height) ? (boundsSize.height - frameToCenter.size.height) / 2.0 : 0;
-
-    _imageView.center = CGPointMake(x + frameToCenter.size.width / 2.0, y + frameToCenter.size.height / 2.0);
+        _imageView.frame = CGRectMake(0, 0, newWidth, newHeight);
+        _scrollView.contentSize = CGSizeMake(newWidth, newHeight);
+        [self sci_recenterZoomedImage];
+    } else {
+        [self sci_recenterZoomedImage];
+    }
 }
 
 #pragma mark - UIScrollViewDelegate
@@ -236,13 +243,13 @@ static CGFloat const kMinZoom = 1.0;
 }
 
 - (void)scrollViewDidZoom:(UIScrollView *)scrollView {
-    [self centerImageView];
+    [self sci_recenterZoomedImage];
 }
 
 #pragma mark - Gestures
 
 - (BOOL)isZoomed {
-    return _scrollView.zoomScale > kMinZoom + 0.01;
+    return _scrollView.zoomScale > kMinZoom + kZoomEpsilon;
 }
 
 - (void)handleDoubleTap:(UITapGestureRecognizer *)recognizer {
@@ -268,8 +275,13 @@ static CGFloat const kMinZoom = 1.0;
 - (void)resetZoomIfNeeded {
     if (!self.isZoomed) {
         [_scrollView setZoomScale:kMinZoom animated:NO];
-        [self centerImageView];
+        [self sci_recenterZoomedImage];
     }
+}
+
+- (void)forceResetZoom {
+    [_scrollView setZoomScale:kMinZoom animated:NO];
+    [self updateImageViewFrame];
 }
 
 #pragma mark - Cleanup

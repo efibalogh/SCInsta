@@ -7,6 +7,7 @@
 #import "../../Vault/SCIVaultFile.h"
 #import "../../Vault/SCIVaultSaveMetadata.h"
 #import "../../MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "../../MediaPreview/SCIMediaItem.h"
 
 @interface IGUFIButtonBarView : UIView
 @end
@@ -388,6 +389,50 @@ static UIView *SCIFirstRightFeedButton(UIView *view) {
     return bestCandidate;
 }
 
+/// Walks up from `view` to find `IGMedia` — `post` on media cells, `mediaCellFeedItem` on modern/clips reel surfaces, then delegate-style `media`.
+static id SCIFeedPostMediaFromAncestors(UIView *view) {
+    UIView *walker = view;
+    for (NSUInteger depth = 0; depth < 36 && walker; depth++) {
+        if ([walker respondsToSelector:@selector(post)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            id post = [walker performSelector:@selector(post)];
+#pragma clang diagnostic pop
+            if (post) return post;
+        }
+
+        id post = [SCIUtils getIvarForObj:walker name:"_post"];
+        if (!post) {
+            post = SCIKVCObject(walker, @"post");
+        }
+        if (post) return post;
+
+        if ([walker respondsToSelector:@selector(mediaCellFeedItem)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            id feedItem = [walker performSelector:@selector(mediaCellFeedItem)];
+#pragma clang diagnostic pop
+            if (feedItem) {
+                id media = SCIObjectForSelector(feedItem, @"media");
+                if (!media) {
+                    media = [SCIUtils getIvarForObj:feedItem name:"_media"];
+                }
+                if (media) return media;
+            }
+        }
+
+        id media = [SCIUtils getIvarForObj:walker name:"_media"];
+        if (!media) {
+            media = SCIObjectForSelector(walker, @"media");
+        }
+        if (media) return media;
+
+        walker = walker.superview;
+    }
+
+    return nil;
+}
+
 static id SCIBaseFeedMediaFromView(id view) {
     id delegate = SCIObjectForSelector(view, @"delegate");
     id owner = SCIObjectForSelector(delegate, @"delegate");
@@ -405,6 +450,11 @@ static id SCIBaseFeedMediaFromView(id view) {
 
         media = SCIObjectForSelector(candidate, @"media");
         if (media) return media;
+    }
+
+    if ([view isKindOfClass:[UIView class]]) {
+        id postMedia = SCIFeedPostMediaFromAncestors((UIView *)view);
+        if (postMedia) return postMedia;
     }
 
     return nil;
@@ -1066,28 +1116,6 @@ static NSInteger SCIResolvedItemIndex(NSArray *items, id currentMedia, NSInteger
     return 0;
 }
 
-static NSArray<NSURL *> *SCIPhotoURLsFromCarouselItems(NSArray *items, NSInteger currentItemIndex, NSInteger *initialPhotoIndex) {
-    NSMutableArray<NSURL *> *photoURLs = [NSMutableArray array];
-    NSInteger currentPhotoIndex = NSNotFound;
-
-    for (NSInteger i = 0; i < (NSInteger)items.count; i++) {
-        NSURL *photoURL = SCIPhotoURLFromCandidate(items[i]);
-        if (!photoURL) continue;
-
-        if (i == currentItemIndex) {
-            currentPhotoIndex = (NSInteger)photoURLs.count;
-        }
-
-        [photoURLs addObject:photoURL];
-    }
-
-    if (initialPhotoIndex) {
-        *initialPhotoIndex = currentPhotoIndex == NSNotFound ? 0 : currentPhotoIndex;
-    }
-
-    return photoURLs;
-}
-
 static BOOL SCIShareMediaCandidate(id baseMedia, id currentMedia, UIView *anchorView, NSString *failureDescription) {
     SCIInitDownloadButtonDownloaders();
 
@@ -1173,21 +1201,34 @@ static BOOL SCIExpandMediaCandidate(id baseMedia, id currentMedia, NSInteger cur
             resolvedCurrent = items[itemIndex];
         }
 
-        NSURL *videoURL = SCIVideoURLFromCandidate(resolvedCurrent);
-        if (videoURL) {
-            [SCIFullScreenMediaPlayer showFileURL:videoURL metadata:meta];
-            return YES;
+        NSMutableArray<SCIMediaItem *> *mediaItems = [NSMutableArray arrayWithCapacity:items.count];
+        NSInteger startPagerIndex = NSNotFound;
+
+        for (NSInteger i = 0; i < (NSInteger)items.count; i++) {
+            id raw = items[i];
+            NSURL *url = SCIVideoURLFromCandidate(raw) ?: SCIPhotoURLFromCandidate(raw);
+            if (!url) {
+                continue;
+            }
+
+            if (itemIndex != NSNotFound && i == itemIndex) {
+                startPagerIndex = (NSInteger)mediaItems.count;
+            }
+
+            SCIMediaItem *mi = [SCIMediaItem itemWithFileURL:url];
+            mi.vaultMetadata = meta;
+            [mediaItems addObject:mi];
         }
 
-        NSInteger initialPhotoIndex = 0;
-        NSArray<NSURL *> *photoURLs = SCIPhotoURLsFromCarouselItems(items, itemIndex, &initialPhotoIndex);
-        if (photoURLs.count > 1) {
-            [SCIFullScreenMediaPlayer showPhotoURLs:photoURLs initialIndex:initialPhotoIndex metadata:meta];
-            return YES;
-        }
+        if (mediaItems.count > 0) {
+            NSInteger adj = startPagerIndex == NSNotFound ? 0 : startPagerIndex;
+            adj = MAX(0, MIN(adj, (NSInteger)mediaItems.count - 1));
 
-        if (photoURLs.count == 1) {
-            [SCIFullScreenMediaPlayer showFileURL:photoURLs.firstObject metadata:meta];
+            if (mediaItems.count == 1) {
+                [SCIFullScreenMediaPlayer showFileURL:mediaItems.firstObject.fileURL metadata:meta];
+            } else {
+                [SCIFullScreenMediaPlayer showMediaItems:mediaItems startingAtIndex:adj metadata:meta];
+            }
             return YES;
         }
     }
@@ -1867,6 +1908,109 @@ static void SCIHookedSocialUFILayoutSubviews(id self, SEL _cmd) {
     SCIUpdateFeedDownloadButton((UIView *)self, self, @selector(sciDownloadButtonTapped:));
 }
 
+#pragma mark - Long Press to Expand (Feed)
+
+static NSInteger const kSCIExpandGestureTag = 8315932;
+
+static void SCIAddExpandLongPressIfNeeded(UIView *view, SEL action) {
+    for (UIGestureRecognizer *gr in view.gestureRecognizers) {
+        if ([gr isKindOfClass:[UILongPressGestureRecognizer class]] && gr.view.tag == kSCIExpandGestureTag) {
+            return;
+        }
+    }
+
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:view action:action];
+    longPress.minimumPressDuration = 0.3;
+    view.tag = kSCIExpandGestureTag;
+    [view addGestureRecognizer:longPress];
+}
+
+static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecognizer *sender) {
+    if (sender.state != UIGestureRecognizerStateBegan) return;
+
+    id baseMedia = SCIBaseFeedMediaFromView(view);
+    id currentMedia = SCIResolvedFeedMediaFromView(view);
+    NSInteger index = SCIPageIndexForFeedView(view);
+
+    if (!currentMedia && !baseMedia) {
+        return;
+    }
+
+    SCIExpandMediaCandidate(baseMedia ?: currentMedia, currentMedia ?: baseMedia, index, view, nil);
+}
+
+%hook IGFeedPhotoView
+- (void)didMoveToSuperview {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_handleExpandLongPress:));
+}
+
+%new - (void)sci_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+    SCIHandleFeedExpandLongPress(self, sender);
+}
+%end
+
+%hook IGFeedItemVideoView
+- (void)didMoveToSuperview {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_handleExpandLongPress:));
+}
+
+%new - (void)sci_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+    SCIHandleFeedExpandLongPress(self, sender);
+}
+%end
+
+%hook IGFeedItemMediaCell
+- (void)didMoveToSuperview {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_mediaCell_handleExpandLongPress:));
+}
+
+- (void)layoutSubviews {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_mediaCell_handleExpandLongPress:));
+}
+
+%new - (void)sci_mediaCell_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+    SCIHandleFeedExpandLongPress(self, sender);
+}
+%end
+
+%hook IGModernFeedVideoCell
+- (void)didMoveToSuperview {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_handleExpandLongPress:));
+}
+
+- (void)layoutSubviews {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_handleExpandLongPress:));
+}
+
+%new - (void)sci_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+    SCIHandleFeedExpandLongPress(self, sender);
+}
+%end
+
+%hook IGPageMediaView
+- (void)didMoveToSuperview {
+    %orig;
+
+    SCIAddExpandLongPressIfNeeded(self, @selector(sci_handleExpandLongPress:));
+}
+
+%new - (void)sci_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+    SCIHandleFeedExpandLongPress(self, sender);
+}
+%end
+
 %hook IGUFIButtonBarView
 - (void)layoutSubviews {
     %orig;
@@ -1963,10 +2107,41 @@ static void SCIHookedSocialUFILayoutSubviews(id self, SEL _cmd) {
 }
 %end
 
+static void SCIExpandFeedLongPressAction(id self, SEL _cmd, UILongPressGestureRecognizer *sender) {
+    SCIHandleFeedExpandLongPress((UIView *)self, sender);
+}
+
+static void (*orig_swiftModernFeedVideo_didMove)(id, SEL);
+static void (*orig_swiftModernFeedVideo_layout)(id, SEL);
+
+static void SCIHookSwiftModernFeedVideoDidMove(id self, SEL _cmd) {
+    if (orig_swiftModernFeedVideo_didMove) {
+        orig_swiftModernFeedVideo_didMove(self, _cmd);
+    }
+
+    SCIAddExpandLongPressIfNeeded((UIView *)self, @selector(sci_handleExpandLongPress:));
+}
+
+static void SCIHookSwiftModernFeedVideoLayout(id self, SEL _cmd) {
+    if (orig_swiftModernFeedVideo_layout) {
+        orig_swiftModernFeedVideo_layout(self, _cmd);
+    }
+
+    SCIAddExpandLongPressIfNeeded((UIView *)self, @selector(sci_handleExpandLongPress:));
+}
+
 %ctor {
     Class socialUFIClass = objc_getClass("IGSocialUFIView.IGSocialUFIView");
-    if (!socialUFIClass) return;
+    if (socialUFIClass) {
+        class_addMethod(socialUFIClass, @selector(sciDownloadButtonTapped:), (IMP)SCIHandleSocialUFIDownloadTap, "v@:@");
+        MSHookMessageEx(socialUFIClass, @selector(layoutSubviews), (IMP)SCIHookedSocialUFILayoutSubviews, (IMP *)&orig_socialUFI_layoutSubviews);
+    }
 
-    class_addMethod(socialUFIClass, @selector(sciDownloadButtonTapped:), (IMP)SCIHandleSocialUFIDownloadTap, "v@:@");
-    MSHookMessageEx(socialUFIClass, @selector(layoutSubviews), (IMP)SCIHookedSocialUFILayoutSubviews, (IMP *)&orig_socialUFI_layoutSubviews);
+    Class modernObjCName = objc_getClass("IGModernFeedVideoCell");
+    Class modernSwiftRuntime = objc_getClass("IGModernFeedVideoCell.IGModernFeedVideoCell");
+    if (modernSwiftRuntime && modernSwiftRuntime != modernObjCName) {
+        class_addMethod(modernSwiftRuntime, @selector(sci_handleExpandLongPress:), (IMP)SCIExpandFeedLongPressAction, "v@:@");
+        MSHookMessageEx(modernSwiftRuntime, @selector(didMoveToSuperview), (IMP)SCIHookSwiftModernFeedVideoDidMove, (IMP *)&orig_swiftModernFeedVideo_didMove);
+        MSHookMessageEx(modernSwiftRuntime, @selector(layoutSubviews), (IMP)SCIHookSwiftModernFeedVideoLayout, (IMP *)&orig_swiftModernFeedVideo_layout);
+    }
 }
