@@ -110,14 +110,12 @@
 }
 
 - (void)configureSheetPresentation {
-    if (@available(iOS 15.0, *)) {
-        UISheetPresentationController *sheet = self.sheetPresentationController;
-        if (sheet) {
-            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent,
-                              UISheetPresentationControllerDetent.largeDetent];
-            sheet.prefersGrabberVisible = YES;
-            sheet.preferredCornerRadius = 20;
-        }
+    UISheetPresentationController *sheet = self.sheetPresentationController;
+    if (sheet) {
+        sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent,
+                          UISheetPresentationControllerDetent.largeDetent];
+        sheet.prefersGrabberVisible = YES;
+        sheet.preferredCornerRadius = 20;
     }
 }
 

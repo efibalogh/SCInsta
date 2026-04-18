@@ -1,5 +1,6 @@
 #import "SCIVaultGridCell.h"
 #import "SCIVaultFile.h"
+#import "../Utils.h"
 
 @interface SCIVaultGridCell ()
 
@@ -43,7 +44,12 @@
         _favoriteBadge = [[UIImageView alloc] initWithFrame:CGRectZero];
         _favoriteBadge.translatesAutoresizingMaskIntoConstraints = NO;
         UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightBold];
-        _favoriteBadge.image = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
+        UIImage *favImg = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:16];
+        if (!favImg) {
+            favImg = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
+        }
+        _favoriteBadge.image = favImg;
+        _favoriteBadge.contentMode = UIViewContentModeScaleAspectFit;
         _favoriteBadge.tintColor = [UIColor systemPinkColor];
         _favoriteBadge.hidden = YES;
         [self.contentView addSubview:_favoriteBadge];
@@ -64,6 +70,8 @@
 
             [_favoriteBadge.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:6],
             [_favoriteBadge.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-6],
+            [_favoriteBadge.widthAnchor constraintEqualToConstant:16],
+            [_favoriteBadge.heightAnchor constraintEqualToConstant:16],
         ]];
     }
     return self;

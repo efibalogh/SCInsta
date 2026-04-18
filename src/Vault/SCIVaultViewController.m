@@ -26,6 +26,11 @@ static NSInteger const kGridColumns = 3;
 /// Matches `SCIFullScreenMediaPlayer` bottom bar row height (tab-style actions).
 static CGFloat const kVaultBottomBarHeight = 44.0;
 
+/// Adaptive material: follows light/dark automatically.
+static UIBlurEffect *SCIVaultAdaptiveChromeBlurEffect(void) {
+    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+}
+
 typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     SCIVaultViewModeGrid = 0,
     SCIVaultViewModeList = 1,
@@ -135,6 +140,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self applyVaultNavigationChrome];
     [self refreshBottomToolbarItems];
 }
 
@@ -161,6 +167,47 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 #pragma mark - Navigation & chrome
 
+/// Blurred bar + semantic colors (`labelColor` / `separatorColor`) — materials and dynamic colors track appearance automatically.
+- (void)applyVaultNavigationChrome {
+    UINavigationController *nav = self.navigationController;
+    if (!nav) {
+        return;
+    }
+
+    UINavigationBar *bar = nav.navigationBar;
+    UIBlurEffect *blur = SCIVaultAdaptiveChromeBlurEffect();
+    UIColor *fg = [UIColor labelColor];
+    UIColor *hairline = [UIColor separatorColor];
+
+    UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+    [appearance configureWithTransparentBackground];
+    appearance.backgroundEffect = blur;
+    appearance.shadowColor = hairline;
+    NSDictionary *titleAttrs = @{
+        NSForegroundColorAttributeName: fg,
+        NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold],
+    };
+    appearance.titleTextAttributes = titleAttrs;
+    appearance.largeTitleTextAttributes = titleAttrs;
+
+    UIBarButtonItemAppearance *itemAppearance = [[UIBarButtonItemAppearance alloc] init];
+    itemAppearance.normal.titleTextAttributes = @{NSForegroundColorAttributeName: fg};
+    appearance.buttonAppearance = itemAppearance;
+    appearance.doneButtonAppearance = itemAppearance;
+
+    bar.standardAppearance = appearance;
+    bar.scrollEdgeAppearance = appearance;
+    bar.compactAppearance = appearance;
+    bar.compactScrollEdgeAppearance = appearance;
+
+    bar.translucent = YES;
+    bar.tintColor = fg;
+
+    if ([self.navigationItem.titleView isKindOfClass:[UILabel class]]) {
+        ((UILabel *)self.navigationItem.titleView).textColor = fg;
+    }
+}
+
 - (void)setupCenteredTitle {
     NSString *text = self.currentFolderPath.length > 0 ? [self.currentFolderPath lastPathComponent] : @"Media Vault";
     UILabel *label = [[UILabel alloc] init];
@@ -180,8 +227,12 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                  action:@selector(dismissSelf)];
     }
 
+    UIImage *settingsImg = [SCIUtils sci_resourceImageNamed:@"settings" template:YES];
+    if (!settingsImg) {
+        settingsImg = [UIImage systemImageNamed:@"gear"];
+    }
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-        initWithImage:[UIImage systemImageNamed:@"gearshape"]
+        initWithImage:settingsImg
                 style:UIBarButtonItemStylePlain
                target:self
                action:@selector(pushSettings)];
@@ -192,8 +243,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     self.bottomBar.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.bottomBar];
 
-    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:SCIVaultAdaptiveChromeBlurEffect()];
     blurView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.bottomBar addSubview:blurView];
     [NSLayoutConstraint activateConstraints:@[
@@ -205,7 +255,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     UIView *topBorder = [[UIView alloc] initWithFrame:CGRectZero];
     topBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    topBorder.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
+    topBorder.backgroundColor = [UIColor separatorColor];
     [self.bottomBar addSubview:topBorder];
     [NSLayoutConstraint activateConstraints:@[
         [topBorder.topAnchor constraintEqualToAnchor:self.bottomBar.topAnchor],
@@ -224,40 +274,44 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self refreshBottomToolbarItems];
 }
 
-- (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName accessibility:(NSString *)label {
+- (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName resource:(NSString *)resourceName accessibility:(NSString *)label {
     UIImageSymbolConfiguration *sym = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     btn.translatesAutoresizingMaskIntoConstraints = NO;
-    [btn setImage:[UIImage systemImageNamed:symbolName withConfiguration:sym] forState:UIControlStateNormal];
-    btn.tintColor = [UIColor whiteColor];
+    UIImage *img = resourceName.length ? [SCIUtils sci_resourceImageNamed:resourceName template:YES] : nil;
+    if (!img) {
+        img = [UIImage systemImageNamed:symbolName withConfiguration:sym];
+    }
+    [btn setImage:img forState:UIControlStateNormal];
+    btn.tintColor = [UIColor labelColor];
     btn.accessibilityLabel = label;
     return btn;
+}
+
+- (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName accessibility:(NSString *)label {
+    return [self vaultBottomBarButtonWithSymbol:symbolName resource:nil accessibility:label];
 }
 
 - (void)refreshBottomToolbarItems {
     [self.bottomBarStack removeFromSuperview];
     self.bottomBarStack = nil;
 
-    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease.circle" accessibility:@"Filter"];
+    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease.circle" resource:@"filter" accessibility:@"Filter"];
     [filterBtn addTarget:self action:@selector(presentFilter) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down.circle" accessibility:@"Sort"];
+    UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down.circle" resource:@"sort" accessibility:@"Sort"];
     [sortBtn addTarget:self action:@selector(presentSort) forControlEvents:UIControlEventTouchUpInside];
 
     NSString *toggleSymbol = self.viewMode == SCIVaultViewModeGrid ? @"list.bullet" : @"square.grid.2x2";
+    NSString *toggleResource = self.viewMode == SCIVaultViewModeGrid ? @"list" : @"grid";
     NSString *toggleAX = self.viewMode == SCIVaultViewModeGrid ? @"List view" : @"Grid view";
-    UIButton *toggleBtn = [self vaultBottomBarButtonWithSymbol:toggleSymbol accessibility:toggleAX];
+    UIButton *toggleBtn = [self vaultBottomBarButtonWithSymbol:toggleSymbol resource:toggleResource accessibility:toggleAX];
     [toggleBtn addTarget:self action:@selector(toggleViewMode) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *folderBtn = [self vaultBottomBarButtonWithSymbol:@"folder.badge.plus" accessibility:@"New folder"];
+    UIButton *folderBtn = [self vaultBottomBarButtonWithSymbol:@"folder.badge.plus" resource:@"folder" accessibility:@"New folder"];
     [folderBtn addTarget:self action:@selector(presentCreateFolder) forControlEvents:UIControlEventTouchUpInside];
 
-    NSMutableArray<UIView *> *row = [NSMutableArray arrayWithObjects:filterBtn, sortBtn, toggleBtn, folderBtn, nil];
-    if ([SCIVaultManager sharedManager].isLockEnabled) {
-        UIButton *lockBtn = [self vaultBottomBarButtonWithSymbol:@"lock" accessibility:@"Lock vault"];
-        [lockBtn addTarget:self action:@selector(lockAndDismiss) forControlEvents:UIControlEventTouchUpInside];
-        [row addObject:lockBtn];
-    }
+    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn];
 
     UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:row];
     stack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -276,11 +330,6 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     for (UIView *v in row) {
         [v.heightAnchor constraintEqualToConstant:kVaultBottomBarHeight].active = YES;
     }
-}
-
-- (void)lockAndDismiss {
-    [[SCIVaultManager sharedManager] lockVault];
-    [self.navigationController dismissViewControllerAnimated:YES completion:nil];
 }
 
 #pragma mark - Collection View
@@ -338,9 +387,14 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     _emptyStateView.hidden = YES;
     [self.view addSubview:_emptyStateView];
 
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:48 weight:UIImageSymbolWeightLight];
-    UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"tray" withConfiguration:cfg]];
+    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"media" template:YES];
+    if (!emptyIconImage) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:56 weight:UIImageSymbolWeightLight];
+        emptyIconImage = [UIImage systemImageNamed:@"tray" withConfiguration:cfg];
+    }
+    UIImageView *icon = [[UIImageView alloc] initWithImage:emptyIconImage];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
+    icon.contentMode = UIViewContentModeScaleAspectFit;
     icon.tintColor = [UIColor tertiaryLabelColor];
     [_emptyStateView addSubview:icon];
 
@@ -370,8 +424,10 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
         [icon.topAnchor constraintEqualToAnchor:_emptyStateView.topAnchor],
         [icon.centerXAnchor constraintEqualToAnchor:_emptyStateView.centerXAnchor],
+        [icon.widthAnchor constraintEqualToConstant:64],
+        [icon.heightAnchor constraintEqualToConstant:64],
 
-        [label.topAnchor constraintEqualToAnchor:icon.bottomAnchor constant:16],
+        [label.topAnchor constraintEqualToAnchor:icon.bottomAnchor constant:20],
         [label.leadingAnchor constraintEqualToAnchor:_emptyStateView.leadingAnchor],
         [label.trailingAnchor constraintEqualToAnchor:_emptyStateView.trailingAnchor],
 
@@ -513,6 +569,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     SCIVaultListCollectionCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kListCellID forIndexPath:indexPath];
     [cell configureWithVaultFile:file];
+    [cell setMoreActionsMenu:[self fileActionsMenuForFile:file]];
     return cell;
 }
 
@@ -602,61 +659,74 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     return [self contextMenuForFile:file];
 }
 
+- (UIMenu *)fileActionsMenuForFile:(SCIVaultFile *)file {
+    __weak typeof(self) weakSelf = self;
+
+    NSString *favTitle = file.isFavorite ? @"Unfavorite" : @"Favorite";
+    UIImage *favImg = file.isFavorite
+        ? ([SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES] ?: [UIImage systemImageNamed:@"heart.fill"])
+        : ([SCIUtils sci_resourceImageNamed:@"heart" template:YES] ?: [UIImage systemImageNamed:@"heart"]);
+
+    UIAction *favoriteAction = [UIAction actionWithTitle:favTitle
+                                                   image:favImg
+                                              identifier:nil
+                                                 handler:^(UIAction *a) {
+        file.isFavorite = !file.isFavorite;
+        [[SCIVaultCoreDataStack shared] saveContext];
+    }];
+
+    UIImage *renameImg = [SCIUtils sci_resourceImageNamed:@"edit" template:YES] ?: [UIImage systemImageNamed:@"pencil"];
+    UIAction *renameAction = [UIAction actionWithTitle:@"Rename"
+                                                 image:renameImg
+                                            identifier:nil
+                                               handler:^(UIAction *a) { [weakSelf renameFile:file]; }];
+
+    UIImage *moveImg = [SCIUtils sci_resourceImageNamed:@"folder_move" template:YES] ?: [UIImage systemImageNamed:@"folder"];
+    UIAction *moveAction = [UIAction actionWithTitle:@"Move to folder"
+                                               image:moveImg
+                                          identifier:nil
+                                             handler:^(UIAction *a) { [weakSelf moveFile:file]; }];
+
+    UIImage *shareImg = [SCIUtils sci_resourceImageNamed:@"share" template:YES] ?: [UIImage systemImageNamed:@"square.and.arrow.up"];
+    UIAction *shareAction = [UIAction actionWithTitle:@"Share"
+                                                image:shareImg
+                                           identifier:nil
+                                              handler:^(UIAction *a) {
+        NSURL *url = [file fileURL];
+        UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
+        [weakSelf presentViewController:acVC animated:YES completion:nil];
+    }];
+
+    UIImage *deleteImg = [SCIUtils sci_resourceImageNamed:@"delete" template:YES] ?: [UIImage systemImageNamed:@"trash"];
+    UIAction *deleteAction = [UIAction actionWithTitle:@"Delete"
+                                                 image:deleteImg
+                                            identifier:nil
+                                               handler:^(UIAction *a) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete from Vault?"
+                                                                      message:@"This will permanently remove this file from the vault."
+                                                               preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *x) {
+            NSError *err;
+            [file removeWithError:&err];
+            if (err) {
+                [SCIUtils showToastForDuration:2.0 title:@"Failed to delete" subtitle:err.localizedDescription];
+            }
+        }]];
+        [weakSelf presentViewController:alert animated:YES completion:nil];
+    }];
+    deleteAction.attributes = UIMenuElementAttributesDestructive;
+
+    return [UIMenu menuWithTitle:@"" children:@[favoriteAction, renameAction, moveAction, shareAction, deleteAction]];
+}
+
 - (UIContextMenuConfiguration *)contextMenuForFile:(SCIVaultFile *)file {
     __weak typeof(self) weakSelf = self;
     return [UIContextMenuConfiguration configurationWithIdentifier:nil
                                                    previewProvider:nil
                                                     actionProvider:^UIMenu *(NSArray<UIMenuElement *> *suggested) {
-        NSString *favTitle = file.isFavorite ? @"Unfavorite" : @"Favorite";
-        NSString *favImage = file.isFavorite ? @"heart.slash" : @"heart";
-
-        UIAction *favoriteAction = [UIAction actionWithTitle:favTitle
-                                                       image:[UIImage systemImageNamed:favImage]
-                                                  identifier:nil
-                                                     handler:^(UIAction *a) {
-            file.isFavorite = !file.isFavorite;
-            [[SCIVaultCoreDataStack shared] saveContext];
-        }];
-
-        UIAction *renameAction = [UIAction actionWithTitle:@"Rename"
-                                                     image:[UIImage systemImageNamed:@"pencil"]
-                                                identifier:nil
-                                                   handler:^(UIAction *a) { [weakSelf renameFile:file]; }];
-
-        UIAction *moveAction = [UIAction actionWithTitle:@"Move to folder"
-                                                   image:[UIImage systemImageNamed:@"folder"]
-                                              identifier:nil
-                                                 handler:^(UIAction *a) { [weakSelf moveFile:file]; }];
-
-        UIAction *shareAction = [UIAction actionWithTitle:@"Share"
-                                                    image:[UIImage systemImageNamed:@"square.and.arrow.up"]
-                                               identifier:nil
-                                                  handler:^(UIAction *a) {
-            NSURL *url = [file fileURL];
-            UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
-            [weakSelf presentViewController:acVC animated:YES completion:nil];
-        }];
-
-        UIAction *deleteAction = [UIAction actionWithTitle:@"Delete"
-                                                     image:[UIImage systemImageNamed:@"trash"]
-                                                identifier:nil
-                                                   handler:^(UIAction *a) {
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete from Vault?"
-                                                                          message:@"This will permanently remove this file from the vault."
-                                                                   preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-            [alert addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *x) {
-                NSError *err;
-                [file removeWithError:&err];
-                if (err) {
-                    [SCIUtils showToastForDuration:2.0 title:@"Failed to delete" subtitle:err.localizedDescription];
-                }
-            }]];
-            [weakSelf presentViewController:alert animated:YES completion:nil];
-        }];
-        deleteAction.attributes = UIMenuElementAttributesDestructive;
-
-        return [UIMenu menuWithTitle:@"" children:@[favoriteAction, renameAction, moveAction, shareAction, deleteAction]];
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        return strongSelf ? [strongSelf fileActionsMenuForFile:file] : nil;
     }];
 }
 
@@ -665,13 +735,15 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     return [UIContextMenuConfiguration configurationWithIdentifier:nil
                                                    previewProvider:nil
                                                     actionProvider:^UIMenu *(NSArray<UIMenuElement *> *suggested) {
+        UIImage *folderRenameImg = [SCIUtils sci_resourceImageNamed:@"edit" template:YES] ?: [UIImage systemImageNamed:@"pencil"];
         UIAction *renameAction = [UIAction actionWithTitle:@"Rename folder"
-                                                     image:[UIImage systemImageNamed:@"pencil"]
+                                                     image:folderRenameImg
                                                 identifier:nil
                                                    handler:^(UIAction *a) { [weakSelf renameFolder:folderPath]; }];
 
+        UIImage *folderDeleteImg = [SCIUtils sci_resourceImageNamed:@"delete" template:YES] ?: [UIImage systemImageNamed:@"trash"];
         UIAction *deleteAction = [UIAction actionWithTitle:@"Delete folder"
-                                                     image:[UIImage systemImageNamed:@"trash"]
+                                                     image:folderDeleteImg
                                                 identifier:nil
                                                    handler:^(UIAction *a) { [weakSelf deleteFolder:folderPath]; }];
         deleteAction.attributes = UIMenuElementAttributesDestructive;
@@ -947,15 +1019,13 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 - (void)configureVaultSheetForNavigation:(UINavigationController *)nav {
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
-    if (@available(iOS 15.0, *)) {
-        UISheetPresentationController *sheet = nav.sheetPresentationController;
-        if (sheet) {
-            sheet.detents = @[
-                UISheetPresentationControllerDetent.mediumDetent,
-                UISheetPresentationControllerDetent.largeDetent
-            ];
-            sheet.prefersGrabberVisible = YES;
-        }
+    UISheetPresentationController *sheet = nav.sheetPresentationController;
+    if (sheet) {
+        sheet.detents = @[
+            UISheetPresentationControllerDetent.mediumDetent,
+            UISheetPresentationControllerDetent.largeDetent
+        ];
+        sheet.prefersGrabberVisible = YES;
     }
 }
 

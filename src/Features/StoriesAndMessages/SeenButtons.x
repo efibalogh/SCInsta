@@ -2,6 +2,9 @@
 #import "../../Tweak.h"
 #import "../../Utils.h"
 
+static NSString * const kSCISeenMessagesBarIconResource = @"eye";
+static NSString * const kSCIDMVisualReplayBarIconResource = @"circle_check";
+
 // Seen buttons (in DMs)
 // - Enables no seen for messages
 // - Enables unlimited views of DM visual messages
@@ -19,13 +22,15 @@
 
     // Messages seen
     if ([SCIUtils getBoolPref:@"remove_lastseen"]) {
-        UIBarButtonItem *seenButton = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"checkmark.message"] style:UIBarButtonItemStylePlain target:self action:@selector(seenButtonHandler:)];
+        UIImage *seenImg = [SCIUtils sci_resourceImageNamed:kSCISeenMessagesBarIconResource template:YES] ?: [UIImage systemImageNamed:@"checkmark.message"];
+        UIBarButtonItem *seenButton = [[UIBarButtonItem alloc] initWithImage:seenImg style:UIBarButtonItemStylePlain target:self action:@selector(seenButtonHandler:)];
         [new_items addObject:seenButton];
     }
 
     // DM visual messages viewed
     if ([SCIUtils getBoolPref:@"unlimited_replay"]) {
-        UIBarButtonItem *dmVisualMsgsViewedButton = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"photo.badge.checkmark"] style:UIBarButtonItemStylePlain target:self action:@selector(dmVisualMsgsViewedButtonHandler:)];
+        UIImage *replayImg = [SCIUtils sci_resourceImageNamed:kSCIDMVisualReplayBarIconResource template:YES] ?: [UIImage systemImageNamed:@"photo.badge.checkmark"];
+        UIBarButtonItem *dmVisualMsgsViewedButton = [[UIBarButtonItem alloc] initWithImage:replayImg style:UIBarButtonItemStylePlain target:self action:@selector(dmVisualMsgsViewedButtonHandler:)];
         [new_items addObject:dmVisualMsgsViewedButton];
 
         if (dmVisualMsgsViewedButtonEnabled) {

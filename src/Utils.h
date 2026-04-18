@@ -81,4 +81,10 @@
 + (id)getIvarForObj:(id)obj name:(const char *)name;
 + (void)setIvarForObj:(id)obj name:(const char *)name value:(id)value;
 
+// PNGs in SCInsta.bundle (jailbreak paths, embedded bundle) and LiveContainer Documents/Tweaks/SCInsta/
++ (NSBundle *)sci_resourcesBundle;
++ (nullable UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate;
+/// When `maxPointSize` > 0, scales the image so its larger side is at most that many points (matches SF Symbol sizing).
++ (nullable UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate maxPointSize:(CGFloat)maxPointSize;
+
 @end

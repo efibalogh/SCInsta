@@ -221,82 +221,14 @@ static UIView *SCIAncestorOfClass(UIView *view, Class cls) {
     return nil;
 }
 
-static NSBundle *SCIResourcesBundle(void) {
-    static NSBundle *bundle;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        NSArray<NSString *> *candidatePaths = @[
-            @"/var/jb/Library/Application Support/SCInsta.bundle",
-            @"/Library/Application Support/SCInsta.bundle",
-            @"/var/jb/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
-            @"/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle"
-        ];
-
-        for (NSString *path in candidatePaths) {
-            if ([fileManager fileExistsAtPath:path]) {
-                bundle = [NSBundle bundleWithPath:path];
-                if (bundle) break;
-            }
-        }
-
-        if (!bundle) {
-            bundle = [NSBundle bundleForClass:[SCIUtils class]];
-        }
-    });
-
-    return bundle;
-}
-
-static UIImage *SCIShareButtonImage(void) {
-    static UIImage *image;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSBundle *bundle = SCIResourcesBundle();
-        image = [UIImage imageNamed:@"share_button" inBundle:bundle compatibleWithTraitCollection:nil];
-
-        if (!image) {
-            NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-            NSArray<NSString *> *liveContainerPaths = @[
-                [documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta/share_button@3x.png"],
-                [documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta/share_button@2x.png"]
-            ];
-
-            for (NSString *path in liveContainerPaths) {
-                if (!path.length) continue;
-
-                image = [UIImage imageWithContentsOfFile:path];
-                if (image) break;
-            }
-        }
-
-        if (!image) {
-            NSArray<NSString *> *candidateNames = @[@"share_button@3x", @"share_button@2x", @"share_button"];
-            for (NSString *name in candidateNames) {
-                NSString *path = [bundle pathForResource:name ofType:@"png"];
-                if (!path.length) continue;
-
-                image = [UIImage imageWithContentsOfFile:path];
-                if (image) break;
-            }
-        }
-
-        if (!image) {
-            image = [UIImage imageNamed:@"share_button"];
-        }
-
-        if (image) {
-            image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        }
-    });
-
-    return image;
-}
-
 static UIImage *SCIDownloadButtonGlyph(CGFloat pointSize) {
+    UIImage *image = [SCIUtils sci_resourceImageNamed:@"action" template:YES];
+    if (image) {
+        return image;
+    }
+
     UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:UIImageSymbolWeightMedium];
 
-    UIImage *image = nil;
     if (@available(iOS 17.0, *)) {
         image = [UIImage systemImageNamed:@"option" withConfiguration:configuration];
     }
@@ -1552,84 +1484,78 @@ static void SCIConfigureButtonContextMenu(UIButton *button,
         return;
     }
 
-    if (@available(iOS 14.0, *)) {
-        if (button.menu && button.showsMenuAsPrimaryAction) {
-            return;
-        }
-
-        NSString *failureCopy = [failureDescription copy] ?: @"";
-
-        UIImage *downloadIcon = [UIImage systemImageNamed:@"arrow.down"];
-        UIImage *shareIcon = [UIImage systemImageNamed:@"square.and.arrow.up"];
-        UIImage *copyIcon = [UIImage systemImageNamed:@"link"];
-        UIImage *vaultIcon = [UIImage systemImageNamed:@"tray.full"];
-        UIImage *expandIcon = [UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"];
-
-        UIAction *downloadAction = [UIAction actionWithTitle:@"Download" image:downloadIcon identifier:nil handler:^(__unused UIAction *action) {
-            id current = currentMediaBlock ? currentMediaBlock() : nil;
-            id base = baseMediaBlock ? baseMediaBlock() : current;
-            SCIDownloadMediaCandidate(base, current, button, failureCopy);
-        }];
-
-        UIAction *shareAction = [UIAction actionWithTitle:@"Share" image:shareIcon identifier:nil handler:^(__unused UIAction *action) {
-            id current = currentMediaBlock ? currentMediaBlock() : nil;
-            id base = baseMediaBlock ? baseMediaBlock() : current;
-            SCIShareMediaCandidate(base, current, button, failureCopy);
-        }];
-
-        UIAction *copyAction = [UIAction actionWithTitle:@"Copy Link" image:copyIcon identifier:nil handler:^(__unused UIAction *action) {
-            id current = currentMediaBlock ? currentMediaBlock() : nil;
-            SCICopyMediaLinkForCandidate(current, failureCopy);
-        }];
-
-        UIAction *vaultAction = [UIAction actionWithTitle:@"Download to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
-            id current = currentMediaBlock ? currentMediaBlock() : nil;
-            id base = baseMediaBlock ? baseMediaBlock() : current;
-            SCIDownloadToVaultMediaCandidate(base, current, button, failureCopy);
-        }];
-
-        UIAction *expandAction = [UIAction actionWithTitle:@"Expand" image:expandIcon identifier:nil handler:^(__unused UIAction *action) {
-            id current = currentMediaBlock ? currentMediaBlock() : nil;
-            id base = baseMediaBlock ? baseMediaBlock() : current;
-            NSInteger index = currentIndexBlock ? currentIndexBlock() : 0;
-            SCIExpandMediaCandidate(base ?: current, current, index, button, failureCopy);
-        }];
-
-        NSMutableArray *menuChildren = [NSMutableArray arrayWithArray:@[downloadAction, shareAction, copyAction, vaultAction, expandAction]];
-
-        if ([SCIUtils getBoolPref:@"expand_cover"]) {
-            id currentCheck = currentMediaBlock ? currentMediaBlock() : nil;
-            id baseCheck = baseMediaBlock ? baseMediaBlock() : currentCheck;
-            NSInteger indexCheck = currentIndexBlock ? currentIndexBlock() : NSNotFound;
-            if (SCIMediaHasVideoContent(baseCheck ?: currentCheck, currentCheck, indexCheck)) {
-                UIImage *coverIcon = [UIImage systemImageNamed:@"photo"];
-                UIAction *expandCoverAction = [UIAction actionWithTitle:@"Expand Cover" image:coverIcon identifier:nil handler:^(__unused UIAction *action) {
-                    if (currentMediaBlock) {
-                        id current = currentMediaBlock() ?: nil;
-                        id base = baseMediaBlock ? baseMediaBlock() : current;
-                        NSInteger index = currentIndexBlock ? currentIndexBlock() : 0;
-                        SCIExpandCoverMediaCandidate(base ?: current, current, index, button, failureCopy);
-                    }
-                }];
-                [menuChildren addObject:expandCoverAction];
-            }
-        }
-
-        [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
-        [button removeTarget:nil action:NULL forControlEvents:UIControlEventPrimaryActionTriggered];
-        [button removeTarget:nil action:NULL forControlEvents:UIControlEventMenuActionTriggered];
-        if ([button respondsToSelector:@selector(sci_menuActionTriggered:)]) {
-            [button addTarget:button action:@selector(sci_menuActionTriggered:) forControlEvents:UIControlEventMenuActionTriggered];
-        }
-
-        button.menu = [UIMenu menuWithChildren:menuChildren];
-        button.showsMenuAsPrimaryAction = YES;
-        SCISetButtonDesiredAlpha(button, button.alpha);
+    if (button.menu && button.showsMenuAsPrimaryAction) {
         return;
     }
 
-    button.menu = nil;
-    button.showsMenuAsPrimaryAction = NO;
+    NSString *failureCopy = [failureDescription copy] ?: @"";
+
+    UIImage *downloadIcon = [SCIUtils sci_resourceImageNamed:@"download" template:YES] ?: [UIImage systemImageNamed:@"arrow.down"];
+    UIImage *shareIcon = [SCIUtils sci_resourceImageNamed:@"share" template:YES] ?: [UIImage systemImageNamed:@"square.and.arrow.up"];
+    UIImage *copyIcon = [SCIUtils sci_resourceImageNamed:@"link" template:YES] ?: [UIImage systemImageNamed:@"link"];
+    UIImage *vaultIcon = [SCIUtils sci_resourceImageNamed:@"photo_gallery" template:YES] ?: [UIImage systemImageNamed:@"tray.full"];
+    UIImage *expandIcon = [SCIUtils sci_resourceImageNamed:@"fullscreen" template:YES] ?: [UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"];
+
+    UIAction *downloadAction = [UIAction actionWithTitle:@"Download" image:downloadIcon identifier:nil handler:^(__unused UIAction *action) {
+        id current = currentMediaBlock ? currentMediaBlock() : nil;
+        id base = baseMediaBlock ? baseMediaBlock() : current;
+        SCIDownloadMediaCandidate(base, current, button, failureCopy);
+    }];
+
+    UIAction *shareAction = [UIAction actionWithTitle:@"Share" image:shareIcon identifier:nil handler:^(__unused UIAction *action) {
+        id current = currentMediaBlock ? currentMediaBlock() : nil;
+        id base = baseMediaBlock ? baseMediaBlock() : current;
+        SCIShareMediaCandidate(base, current, button, failureCopy);
+    }];
+
+    UIAction *copyAction = [UIAction actionWithTitle:@"Copy Link" image:copyIcon identifier:nil handler:^(__unused UIAction *action) {
+        id current = currentMediaBlock ? currentMediaBlock() : nil;
+        SCICopyMediaLinkForCandidate(current, failureCopy);
+    }];
+
+    UIAction *vaultAction = [UIAction actionWithTitle:@"Download to Vault" image:vaultIcon identifier:nil handler:^(__unused UIAction *action) {
+        id current = currentMediaBlock ? currentMediaBlock() : nil;
+        id base = baseMediaBlock ? baseMediaBlock() : current;
+        SCIDownloadToVaultMediaCandidate(base, current, button, failureCopy);
+    }];
+
+    UIAction *expandAction = [UIAction actionWithTitle:@"Expand" image:expandIcon identifier:nil handler:^(__unused UIAction *action) {
+        id current = currentMediaBlock ? currentMediaBlock() : nil;
+        id base = baseMediaBlock ? baseMediaBlock() : current;
+        NSInteger index = currentIndexBlock ? currentIndexBlock() : 0;
+        SCIExpandMediaCandidate(base ?: current, current, index, button, failureCopy);
+    }];
+
+    NSMutableArray *menuChildren = [NSMutableArray arrayWithArray:@[downloadAction, shareAction, copyAction, vaultAction, expandAction]];
+
+    if ([SCIUtils getBoolPref:@"expand_cover"]) {
+        id currentCheck = currentMediaBlock ? currentMediaBlock() : nil;
+        id baseCheck = baseMediaBlock ? baseMediaBlock() : currentCheck;
+        NSInteger indexCheck = currentIndexBlock ? currentIndexBlock() : NSNotFound;
+        if (SCIMediaHasVideoContent(baseCheck ?: currentCheck, currentCheck, indexCheck)) {
+            UIImage *coverIcon = [SCIUtils sci_resourceImageNamed:@"photo_filled" template:YES] ?: [UIImage systemImageNamed:@"photo"];
+            UIAction *expandCoverAction = [UIAction actionWithTitle:@"Expand Cover" image:coverIcon identifier:nil handler:^(__unused UIAction *action) {
+                if (currentMediaBlock) {
+                    id current = currentMediaBlock() ?: nil;
+                    id base = baseMediaBlock ? baseMediaBlock() : current;
+                    NSInteger index = currentIndexBlock ? currentIndexBlock() : 0;
+                    SCIExpandCoverMediaCandidate(base ?: current, current, index, button, failureCopy);
+                }
+            }];
+            [menuChildren addObject:expandCoverAction];
+        }
+    }
+
+    [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+    [button removeTarget:nil action:NULL forControlEvents:UIControlEventPrimaryActionTriggered];
+    [button removeTarget:nil action:NULL forControlEvents:UIControlEventMenuActionTriggered];
+    if ([button respondsToSelector:@selector(sci_menuActionTriggered:)]) {
+        [button addTarget:button action:@selector(sci_menuActionTriggered:) forControlEvents:UIControlEventMenuActionTriggered];
+    }
+
+    button.menu = [UIMenu menuWithChildren:menuChildren];
+    button.showsMenuAsPrimaryAction = YES;
+    SCISetButtonDesiredAlpha(button, button.alpha);
 }
 
 static id SCIResolvedDirectMediaCandidate(id message) {

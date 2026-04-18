@@ -1,4 +1,5 @@
 #import "SCIVaultFilterViewController.h"
+#import "../Utils.h"
 
 @interface SCIVaultFilterChip : UIButton
 @property (nonatomic, assign) NSInteger itemTag;
@@ -115,14 +116,12 @@
 }
 
 - (void)configureSheetPresentation {
-    if (@available(iOS 15.0, *)) {
-        UISheetPresentationController *sheet = self.sheetPresentationController;
-        if (sheet) {
-            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent,
-                              UISheetPresentationControllerDetent.largeDetent];
-            sheet.prefersGrabberVisible = YES;
-            sheet.preferredCornerRadius = 20;
-        }
+    UISheetPresentationController *sheet = self.sheetPresentationController;
+    if (sheet) {
+        sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent,
+                          UISheetPresentationControllerDetent.largeDetent];
+        sheet.prefersGrabberVisible = YES;
+        sheet.preferredCornerRadius = 20;
     }
 }
 
@@ -245,8 +244,8 @@
     row.layer.cornerRadius = 10;
     [row.heightAnchor constraintEqualToConstant:52].active = YES;
 
-    UIImageView *icon = [[UIImageView alloc]
-        initWithImage:[UIImage systemImageNamed:@"heart.fill"]];
+    UIImage *favRowIcon = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:20] ?: [UIImage systemImageNamed:@"heart.fill"];
+    UIImageView *icon = [[UIImageView alloc] initWithImage:favRowIcon];
     icon.tintColor = [UIColor systemPinkColor];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
     [row addSubview:icon];

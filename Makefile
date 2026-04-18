@@ -1,4 +1,4 @@
-TARGET := iphone:clang:16.2
+TARGET := iphone:clang:16.2:15.0
 INSTALL_TARGET_PROCESSES = Instagram
 ARCHS = arm64
 

@@ -16,6 +16,9 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)symbolWithName:(NSString *)name color:(UIColor *)color size:(CGFloat)size;
 + (instancetype)symbolWithName:(NSString *)name color:(UIColor *)color size:(CGFloat)size weight:(UIImageSymbolWeight)weight;
 
+/// Bundle PNG (same lookup as `SCIUtils sci_resourceImageNamed`) scaled to `size` in points; tinted via settings cell `imageProperties`.
++ (instancetype)resourceSymbolWithName:(NSString *)resourceName color:(nullable UIColor *)color size:(CGFloat)size;
+
 @end
 
 NS_ASSUME_NONNULL_END

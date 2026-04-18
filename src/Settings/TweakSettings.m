@@ -108,16 +108,16 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Saving"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"tray.and.arrow.down"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"download" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
                                                 [SCISetting buttonCellWithTitle:@"Media Vault"
                                                                       subtitle:@"View your saved media"
-                                                                          icon:[SCISymbol symbolWithName:@"tray.full"]
+                                                                          icon:[SCISymbol resourceSymbolWithName:@"media" color:[UIColor labelColor] size:26]
                                                                         action:^(void) { [SCIVaultViewController presentVault]; }
                                                 ],
-                                                [SCISetting switchCellWithTitle:@"Enable quick media vault access" subtitle:@"When enabled, hold down on the Instagram logo to open Media Vault." defaultsKey:@"header_long_press_vault" requiresRestart:YES mutuallyExclusiveDefaultsKey:@"teen_app_icons"],
+                                                [SCISetting switchCellWithTitle:@"Enable quick media vault access" subtitle:@"Hold down on the Instagram logo to open" defaultsKey:@"header_long_press_vault" requiresRestart:YES mutuallyExclusiveDefaultsKey:@"teen_app_icons"],
                                             ]
                                         },
                                         @{

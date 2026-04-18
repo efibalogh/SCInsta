@@ -1,5 +1,6 @@
 #import "SCIVaultListCell.h"
 #import "SCIVaultFile.h"
+#import "../Utils.h"
 
 @interface SCIVaultListCell ()
 
@@ -69,7 +70,12 @@
     [self.contentView addSubview:self.detailLabel];
 
     UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold];
-    self.favoriteIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg]];
+    UIImage *favImg = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:14];
+    if (!favImg) {
+        favImg = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
+    }
+    self.favoriteIcon = [[UIImageView alloc] initWithImage:favImg];
+    self.favoriteIcon.contentMode = UIViewContentModeScaleAspectFit;
     self.favoriteIcon.translatesAutoresizingMaskIntoConstraints = NO;
     self.favoriteIcon.tintColor = [UIColor systemPinkColor];
     self.favoriteIcon.hidden = YES;
@@ -101,7 +107,9 @@
         [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentView.layoutMarginsGuide.trailingAnchor],
 
         [self.favoriteIcon.trailingAnchor constraintEqualToAnchor:self.contentView.layoutMarginsGuide.trailingAnchor],
-        [self.favoriteIcon.topAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
+        [self.favoriteIcon.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
+        [self.favoriteIcon.widthAnchor constraintEqualToConstant:14],
+        [self.favoriteIcon.heightAnchor constraintEqualToConstant:14],
     ]];
 }
 

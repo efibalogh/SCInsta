@@ -1,4 +1,5 @@
 #import "SCISymbol.h"
+#import "../Utils.h"
 
 @interface SCISymbol ()
 
@@ -6,6 +7,7 @@
 @property (nonatomic, copy, readwrite) UIColor *color;
 @property (nonatomic, readwrite) CGFloat size;
 @property (nonatomic, readwrite) UIImageSymbolWeight weight;
+@property (nonatomic, assign) BOOL usesResourceImage;
 
 - (instancetype)init;
 
@@ -31,6 +33,12 @@
 }
 
 - (UIImage *)image {
+    if (self.usesResourceImage) {
+        CGFloat maxPt = self.size > 0 ? self.size : 22.0;
+        UIImage *img = [SCIUtils sci_resourceImageNamed:self.name template:YES maxPointSize:maxPt];
+        return img ?: [UIImage systemImageNamed:@"photo"];
+    }
+
     UIImage *symbol = [UIImage systemImageNamed:self.name];
     
     if (self.size || (self.size && self.weight)) {
@@ -81,6 +89,15 @@
     symbol.size = size;
     symbol.weight = weight;
     
+    return symbol;
+}
+
++ (instancetype)resourceSymbolWithName:(NSString *)resourceName color:(UIColor *)color size:(CGFloat)size {
+    SCISymbol *symbol = [[self alloc] init];
+    symbol.name = resourceName;
+    symbol.color = color ?: [UIColor labelColor];
+    symbol.size = size;
+    symbol.usesResourceImage = YES;
     return symbol;
 }
 

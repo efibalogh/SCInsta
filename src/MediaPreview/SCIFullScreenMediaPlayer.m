@@ -47,6 +47,14 @@ static CGFloat const kDismissVelocityCommit = 650.0;
 static CGFloat const kDismissFinishDuration = 0.32;
 static CGFloat const kDismissCancelSpringDamping = 0.82;
 
+static UIImage *SCIFullScreenResourceOrSystem(NSString *resourceName, NSString *systemName, UIImageSymbolConfiguration *sym) {
+    UIImage *img = [SCIUtils sci_resourceImageNamed:resourceName template:YES];
+    if (!img) {
+        img = [UIImage systemImageNamed:systemName withConfiguration:sym];
+    }
+    return img;
+}
+
 @interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
 
 @property (nonatomic, strong) NSArray<SCIMediaItem *> *items;
@@ -325,21 +333,21 @@ fromViewController:(UIViewController *)presenter {
 
     _savePhotosButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _savePhotosButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_savePhotosButton setImage:[UIImage systemImageNamed:@"arrow.down" withConfiguration:sym] forState:UIControlStateNormal];
+    [_savePhotosButton setImage:SCIFullScreenResourceOrSystem(@"download", @"arrow.down", sym) forState:UIControlStateNormal];
     _savePhotosButton.tintColor = [UIColor whiteColor];
     [_savePhotosButton addTarget:self action:@selector(saveToPhotos) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_savePhotosButton];
 
     _shareButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _shareButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_shareButton setImage:[UIImage systemImageNamed:@"square.and.arrow.up" withConfiguration:sym] forState:UIControlStateNormal];
+    [_shareButton setImage:SCIFullScreenResourceOrSystem(@"share", @"square.and.arrow.up", sym) forState:UIControlStateNormal];
     _shareButton.tintColor = [UIColor whiteColor];
     [_shareButton addTarget:self action:@selector(shareMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_shareButton];
 
     _clipboardButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _clipboardButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_clipboardButton setImage:[UIImage systemImageNamed:@"doc.on.doc" withConfiguration:sym] forState:UIControlStateNormal];
+    [_clipboardButton setImage:SCIFullScreenResourceOrSystem(@"copy", @"doc.on.doc", sym) forState:UIControlStateNormal];
     _clipboardButton.tintColor = [UIColor whiteColor];
     [_clipboardButton addTarget:self action:@selector(copyMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_clipboardButton];
@@ -347,14 +355,14 @@ fromViewController:(UIViewController *)presenter {
     if (_isFromVault) {
         _deleteVaultButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _deleteVaultButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_deleteVaultButton setImage:[UIImage systemImageNamed:@"trash" withConfiguration:sym] forState:UIControlStateNormal];
+        [_deleteVaultButton setImage:SCIFullScreenResourceOrSystem(@"delete", @"trash", sym) forState:UIControlStateNormal];
         _deleteVaultButton.tintColor = [UIColor systemRedColor];
         [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteVaultButton];
     } else {
         _saveVaultButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _saveVaultButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_saveVaultButton setImage:[UIImage systemImageNamed:@"tray.and.arrow.down" withConfiguration:sym] forState:UIControlStateNormal];
+        [_saveVaultButton setImage:SCIFullScreenResourceOrSystem(@"photo_gallery", @"tray.and.arrow.down", sym) forState:UIControlStateNormal];
         _saveVaultButton.tintColor = [UIColor whiteColor];
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveVaultButton];

@@ -1,5 +1,6 @@
 #import "SCIVaultListCollectionCell.h"
 #import "SCIVaultFile.h"
+#import "../Utils.h"
 
 @interface SCIVaultListCollectionCell ()
 
@@ -13,7 +14,7 @@
 @property (nonatomic, strong) UILabel *pillLabel;
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UIImageView *favoriteIcon;
-@property (nonatomic, strong) UIImageView *moreIcon;
+@property (nonatomic, strong) UIButton *moreButton;
 
 @end
 
@@ -82,17 +83,30 @@
     [self.contentView addSubview:self.dateLabel];
 
     UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold];
-    self.favoriteIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg]];
+    UIImage *favImg = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:14];
+    if (!favImg) {
+        favImg = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
+    }
+    self.favoriteIcon = [[UIImageView alloc] initWithImage:favImg];
+    self.favoriteIcon.contentMode = UIViewContentModeScaleAspectFit;
     self.favoriteIcon.translatesAutoresizingMaskIntoConstraints = NO;
     self.favoriteIcon.tintColor = [UIColor systemPinkColor];
     self.favoriteIcon.hidden = YES;
     [self.contentView addSubview:self.favoriteIcon];
 
-    UIImageSymbolConfiguration *moreCfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
-    self.moreIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"ellipsis" withConfiguration:moreCfg]];
-    self.moreIcon.translatesAutoresizingMaskIntoConstraints = NO;
-    self.moreIcon.tintColor = [UIColor tertiaryLabelColor];
-    [self.contentView addSubview:self.moreIcon];
+    UIImage *moreImg = [SCIUtils sci_resourceImageNamed:@"more" template:YES maxPointSize:22];
+    if (!moreImg) {
+        UIImageSymbolConfiguration *moreCfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
+        moreImg = [UIImage systemImageNamed:@"ellipsis" withConfiguration:moreCfg];
+    }
+    self.moreButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.moreButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.moreButton setImage:moreImg forState:UIControlStateNormal];
+    self.moreButton.tintColor = [UIColor tertiaryLabelColor];
+    self.moreButton.accessibilityLabel = @"More";
+    self.moreButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+    self.moreButton.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
+    [self.contentView addSubview:self.moreButton];
 
     UILayoutGuide *margin = self.contentView.layoutMarginsGuide;
     [NSLayoutConstraint activateConstraints:@[
@@ -101,8 +115,10 @@
         [self.thumbnailView.widthAnchor constraintEqualToConstant:56],
         [self.thumbnailView.heightAnchor constraintEqualToConstant:56],
 
-        [self.moreIcon.trailingAnchor constraintEqualToAnchor:margin.trailingAnchor constant:-4],
-        [self.moreIcon.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.moreButton.trailingAnchor constraintEqualToAnchor:margin.trailingAnchor constant:-2],
+        [self.moreButton.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.moreButton.widthAnchor constraintEqualToConstant:40],
+        [self.moreButton.heightAnchor constraintEqualToConstant:40],
 
         [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.thumbnailView.trailingAnchor constant:12],
         [self.titleLabel.topAnchor constraintEqualToAnchor:self.thumbnailView.topAnchor constant:-1],
@@ -115,7 +131,7 @@
 
         [self.technicalLabel.leadingAnchor constraintEqualToAnchor:self.rowTypeIcon.trailingAnchor constant:4],
         [self.technicalLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:3],
-        [self.technicalLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.moreIcon.leadingAnchor constant:-8],
+        [self.technicalLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.moreButton.leadingAnchor constant:-8],
 
         [self.pillBackground.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
         [self.pillBackground.topAnchor constraintEqualToAnchor:self.technicalLabel.bottomAnchor constant:4],
@@ -126,10 +142,12 @@
 
         [self.dateLabel.leadingAnchor constraintEqualToAnchor:self.pillBackground.trailingAnchor constant:8],
         [self.dateLabel.centerYAnchor constraintEqualToAnchor:self.pillBackground.centerYAnchor],
-        [self.dateLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.moreIcon.leadingAnchor constant:-8],
+        [self.dateLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.moreButton.leadingAnchor constant:-8],
 
-        [self.favoriteIcon.trailingAnchor constraintEqualToAnchor:self.moreIcon.leadingAnchor constant:-6],
+        [self.favoriteIcon.trailingAnchor constraintEqualToAnchor:self.moreButton.leadingAnchor constant:-6],
         [self.favoriteIcon.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
+        [self.favoriteIcon.widthAnchor constraintEqualToConstant:14],
+        [self.favoriteIcon.heightAnchor constraintEqualToConstant:14],
     ]];
 }
 
@@ -142,6 +160,8 @@
     self.dateLabel.text = nil;
     self.favoriteIcon.hidden = YES;
     self.file = nil;
+    self.moreButton.menu = nil;
+    self.moreButton.showsMenuAsPrimaryAction = NO;
 }
 
 - (void)configureWithVaultFile:(SCIVaultFile *)file {
@@ -169,6 +189,11 @@
             if (img) weakSelf.thumbnailView.image = img;
         }];
     }
+}
+
+- (void)setMoreActionsMenu:(UIMenu *)menu {
+    self.moreButton.menu = menu;
+    self.moreButton.showsMenuAsPrimaryAction = (menu != nil);
 }
 
 @end

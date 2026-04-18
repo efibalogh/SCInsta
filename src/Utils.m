@@ -644,6 +644,155 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     }
 }
 
+// MARK: Resources (SCInsta.bundle + LiveContainer loose files / nested bundle)
+
++ (NSBundle *)sci_resourcesBundle {
+    static NSBundle *bundle;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSMutableArray<NSString *> *candidatePaths = [NSMutableArray arrayWithArray:@[
+            @"/var/jb/Library/Application Support/SCInsta.bundle",
+            @"/Library/Application Support/SCInsta.bundle",
+            @"/var/jb/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
+            @"/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
+        ]];
+
+        NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        if (documentsPath.length) {
+            NSString *liveBundle = [documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta/SCInsta.bundle"];
+            [candidatePaths addObject:liveBundle];
+        }
+
+        for (NSString *path in candidatePaths) {
+            if ([fileManager fileExistsAtPath:path]) {
+                bundle = [NSBundle bundleWithPath:path];
+                if (bundle) {
+                    break;
+                }
+            }
+        }
+
+        if (!bundle) {
+            bundle = [NSBundle bundleForClass:[SCIUtils class]];
+        }
+    });
+
+    return bundle;
+}
+
+/// `imageWithContentsOfFile:` does not infer @2x/@3x scale; without this, bitmap pixels are shown 1:1 in points (huge icons).
+static UIImage *SCIImageWithContentsOfFileApplyingScale(NSString *path) {
+    if (!path.length) {
+        return nil;
+    }
+    UIImage *img = [UIImage imageWithContentsOfFile:path];
+    if (!img) {
+        return nil;
+    }
+    CGFloat scale = 1.0;
+    if ([path containsString:@"@3x"]) {
+        scale = 3.0;
+    } else if ([path containsString:@"@2x"]) {
+        scale = 2.0;
+    }
+    if (fabs(img.scale - scale) < 0.01) {
+        return img;
+    }
+    return [UIImage imageWithCGImage:img.CGImage scale:scale orientation:img.imageOrientation];
+}
+
++ (UIImage *)sci_scaleImage:(UIImage *)image maxPointDimension:(CGFloat)maxPt {
+    if (!image || maxPt <= 0) {
+        return image;
+    }
+    CGFloat w = image.size.width;
+    CGFloat h = image.size.height;
+    CGFloat maxdim = MAX(w, h);
+    if (maxdim <= maxPt + 0.01) {
+        return image;
+    }
+    CGFloat ratio = maxPt / maxdim;
+    CGSize newSize = CGSizeMake(round(w * ratio), round(h * ratio));
+    UIGraphicsImageRendererFormat *fmt = [UIGraphicsImageRendererFormat defaultFormat];
+    fmt.scale = image.scale;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:newSize format:fmt];
+    UIImage *out = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    }];
+    UIImageRenderingMode mode = image.renderingMode;
+    if (mode != UIImageRenderingModeAutomatic) {
+        out = [out imageWithRenderingMode:mode];
+    }
+    return out;
+}
+
++ (UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate {
+    return [self sci_resourceImageNamed:name template:asTemplate maxPointSize:0];
+}
+
++ (UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate maxPointSize:(CGFloat)maxPointSize {
+    if (!name.length) {
+        return nil;
+    }
+
+    NSBundle *resourceBundle = [self sci_resourcesBundle];
+    UIImage *image = [UIImage imageNamed:name inBundle:resourceBundle compatibleWithTraitCollection:nil];
+
+    if (!image) {
+        NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        if (documentsPath.length) {
+            NSString *baseDir = [documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta"];
+            NSArray<NSString *> *fileNames = @[
+                [NSString stringWithFormat:@"%@@3x.png", name],
+                [NSString stringWithFormat:@"%@@2x.png", name],
+                [NSString stringWithFormat:@"%@.png", name],
+            ];
+            for (NSString *fileName in fileNames) {
+                NSString *path = [baseDir stringByAppendingPathComponent:fileName];
+                if (!path.length) {
+                    continue;
+                }
+                image = SCIImageWithContentsOfFileApplyingScale(path);
+                if (image) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!image) {
+        NSArray<NSString *> *candidateNames = @[[NSString stringWithFormat:@"%@@3x", name], [NSString stringWithFormat:@"%@@2x", name], name];
+        for (NSString *resName in candidateNames) {
+            NSString *path = [resourceBundle pathForResource:resName ofType:@"png"];
+            if (!path.length) {
+                continue;
+            }
+            image = SCIImageWithContentsOfFileApplyingScale(path);
+            if (image) {
+                break;
+            }
+        }
+    }
+
+    if (!image) {
+        image = [UIImage imageNamed:name];
+    }
+
+    if (!image) {
+        return nil;
+    }
+
+    if (maxPointSize > 0) {
+        image = [self sci_scaleImage:image maxPointDimension:maxPointSize];
+    }
+
+    if (asTemplate) {
+        return [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    return image;
+}
+
 // Ivars
 + (id)getIvarForObj:(id)obj name:(const char *)name {
     Ivar ivar = class_getInstanceVariable(object_getClass(obj), name);

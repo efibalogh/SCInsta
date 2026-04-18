@@ -9,6 +9,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)configureWithVaultFile:(SCIVaultFile *)file;
 
+/// Same actions as long-press context menu on the row. Pass `nil` to clear (e.g. in `prepareForReuse`).
+- (void)setMoreActionsMenu:(nullable UIMenu *)menu;
+
 @end
 
 NS_ASSUME_NONNULL_END
