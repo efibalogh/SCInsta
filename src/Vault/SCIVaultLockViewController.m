@@ -12,6 +12,7 @@ static NSInteger const kPasscodeLength = 4;
 @property (nonatomic, strong) UIStackView *keypadStackView;
 @property (nonatomic, strong) UIButton *biometricButton;
 @property (nonatomic, strong) UIButton *cancelButton;
+@property (nonatomic, strong) UISelectionFeedbackGenerator *keyPressFeedbackGenerator;
 
 @property (nonatomic, strong) NSMutableString *enteredPasscode;
 @property (nonatomic, copy, nullable) NSString *firstPasscode; // for set/change confirm
@@ -113,6 +114,8 @@ static NSInteger const kPasscodeLength = 4;
     }
 
     [self setupKeypad];
+    self.keyPressFeedbackGenerator = [[UISelectionFeedbackGenerator alloc] init];
+    [self.keyPressFeedbackGenerator prepare];
 
     self.biometricButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.biometricButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -183,17 +186,26 @@ static NSInteger const kPasscodeLength = 4;
                 ]];
                 [rowStack addArrangedSubview:spacer];
             } else if (n == -2) {
-                UIButton *del = [self createKeypadButton:nil subtitle:nil tag:-2];
+                UIButton *del = [self createKeypadButton:nil tag:-2];
                 UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightRegular];
                 [del setImage:[UIImage systemImageNamed:@"delete.left" withConfiguration:cfg] forState:UIControlStateNormal];
                 [del setTitle:@"" forState:UIControlStateNormal];
                 del.tintColor = [UIColor labelColor];
                 [del addTarget:self action:@selector(deleteTapped) forControlEvents:UIControlEventTouchUpInside];
+                [del addTarget:self action:@selector(keyTouchDown:) forControlEvents:UIControlEventTouchDown];
+                [del addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchUpInside];
+                [del addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchUpOutside];
+                [del addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchCancel];
+                [del addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchDragExit];
                 [rowStack addArrangedSubview:del];
             } else {
-                NSString *letters = [self lettersForDigit:n];
-                UIButton *btn = [self createKeypadButton:[NSString stringWithFormat:@"%ld", (long)n] subtitle:letters tag:n];
+                UIButton *btn = [self createKeypadButton:[NSString stringWithFormat:@"%ld", (long)n] tag:n];
                 [btn addTarget:self action:@selector(numberTapped:) forControlEvents:UIControlEventTouchUpInside];
+                [btn addTarget:self action:@selector(keyTouchDown:) forControlEvents:UIControlEventTouchDown];
+                [btn addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchUpInside];
+                [btn addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchUpOutside];
+                [btn addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchCancel];
+                [btn addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchDragExit];
                 [rowStack addArrangedSubview:btn];
             }
         }
@@ -202,25 +214,12 @@ static NSInteger const kPasscodeLength = 4;
     }
 }
 
-- (NSString *)lettersForDigit:(NSInteger)digit {
-    switch (digit) {
-        case 2: return @"ABC";
-        case 3: return @"DEF";
-        case 4: return @"GHI";
-        case 5: return @"JKL";
-        case 6: return @"MNO";
-        case 7: return @"PQRS";
-        case 8: return @"TUV";
-        case 9: return @"WXYZ";
-        default: return @"";
-    }
-}
-
-- (UIButton *)createKeypadButton:(NSString *)title subtitle:(NSString *)subtitle tag:(NSInteger)tag {
+- (UIButton *)createKeypadButton:(NSString *)title tag:(NSInteger)tag {
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
     btn.tag = tag;
-    btn.layer.cornerRadius = 37.5;
-    btn.backgroundColor = [UIColor secondarySystemBackgroundColor];
+    BOOL isDeleteButton = (tag == -2);
+    btn.layer.cornerRadius = isDeleteButton ? 0.0 : 37.5;
+    btn.backgroundColor = isDeleteButton ? [UIColor clearColor] : [UIColor secondarySystemBackgroundColor];
     btn.translatesAutoresizingMaskIntoConstraints = NO;
     [NSLayoutConstraint activateConstraints:@[
         [btn.widthAnchor constraintEqualToConstant:75],
@@ -237,20 +236,9 @@ static NSInteger const kPasscodeLength = 4;
         digitLabel.userInteractionEnabled = NO;
         [btn addSubview:digitLabel];
 
-        UILabel *lettersLabel = [[UILabel alloc] init];
-        lettersLabel.text = subtitle ?: @"";
-        lettersLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-        lettersLabel.textColor = [UIColor secondaryLabelColor];
-        lettersLabel.textAlignment = NSTextAlignmentCenter;
-        lettersLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        lettersLabel.userInteractionEnabled = NO;
-        [btn addSubview:lettersLabel];
-
         [NSLayoutConstraint activateConstraints:@[
             [digitLabel.centerXAnchor constraintEqualToAnchor:btn.centerXAnchor],
-            [digitLabel.centerYAnchor constraintEqualToAnchor:btn.centerYAnchor constant:-6],
-            [lettersLabel.centerXAnchor constraintEqualToAnchor:btn.centerXAnchor],
-            [lettersLabel.topAnchor constraintEqualToAnchor:digitLabel.bottomAnchor constant:-2],
+            [digitLabel.centerYAnchor constraintEqualToAnchor:btn.centerYAnchor],
         ]];
     }
 
@@ -320,8 +308,31 @@ static NSInteger const kPasscodeLength = 4;
 
 #pragma mark - Keypad actions
 
+- (void)keyTouchDown:(UIButton *)sender {
+    [UIView animateWithDuration:0.08
+                     animations:^{
+                         sender.transform = CGAffineTransformMakeScale(0.93, 0.93);
+                         sender.alpha = 0.72;
+                     }];
+}
+
+- (void)keyTouchUp:(UIButton *)sender {
+    [UIView animateWithDuration:0.12
+                          delay:0.0
+         usingSpringWithDamping:0.72
+          initialSpringVelocity:0.0
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+                         sender.transform = CGAffineTransformIdentity;
+                         sender.alpha = 1.0;
+                     }
+                     completion:nil];
+}
+
 - (void)numberTapped:(UIButton *)sender {
     if (self.enteredPasscode.length >= kPasscodeLength) return;
+    [self.keyPressFeedbackGenerator selectionChanged];
+    [self.keyPressFeedbackGenerator prepare];
     [self.enteredPasscode appendFormat:@"%ld", (long)sender.tag];
     [self updateDots];
 
@@ -335,6 +346,8 @@ static NSInteger const kPasscodeLength = 4;
 
 - (void)deleteTapped {
     if (self.enteredPasscode.length == 0) return;
+    [self.keyPressFeedbackGenerator selectionChanged];
+    [self.keyPressFeedbackGenerator prepare];
     [self.enteredPasscode deleteCharactersInRange:NSMakeRange(self.enteredPasscode.length - 1, 1)];
     [self updateDots];
 }

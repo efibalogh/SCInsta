@@ -16,7 +16,8 @@
 NSString *SCIVersionString = @"v1.2.0-dev";
 
 // Variables that work across features
-BOOL dmVisualMsgsViewedButtonEnabled = false;
+__weak id SCIPendingDirectVisualMessageToMarkSeen = nil;
+BOOL SCIForceMarkStoryAsSeen = NO;
 
 // MARK: Tweak first-time setup
 %hook IGInstagramAppDelegate
@@ -41,7 +42,8 @@ BOOL dmVisualMsgsViewedButtonEnabled = false;
         @"disable_disappearing_swipe_up": @(NO),
         @"hide_vanish_screenshot": @(NO),
         @"disable_auto_unmuting_reels": @(YES),
-        @"doom_scrolling_reel_count": @(1)
+        @"doom_scrolling_reel_count": @(1),
+        @"disable_home_button_refresh": @(NO)
     };
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:sciDefaults];

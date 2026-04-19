@@ -1,24 +1,15 @@
 #import "../../Utils.h"
-#import "../../InstagramHeaders.h"
+#import "../../Tweak.h"
 
-%hook IGStorySeenStateUploader
-- (id)initWithUserSessionPK:(id)arg1 networker:(id)arg2 {
-    if ([SCIUtils getBoolPref:@"no_seen_receipt"]) {
-        NSLog(@"[SCInsta] Prevented seen receipt from being sent");
-
-        return nil;
+%hook IGStoryViewerViewController
+- (void)fullscreenSectionController:(id)arg1 didMarkItemAsSeen:(id)arg2 {
+    (void)arg1;
+    (void)arg2;
+    if ([SCIUtils getBoolPref:@"no_seen_receipt"] && !SCIForceMarkStoryAsSeen) {
+        NSLog(@"[SCInsta] Prevented automatic story seen marking");
+        return;
     }
-    
-    return %orig;
-}
 
-- (id)networker {
-    if ([SCIUtils getBoolPref:@"no_seen_receipt"]) {
-        NSLog(@"[SCInsta] Prevented seen receipt from being sent");
-
-        return nil;
-    }
-    
-    return %orig;
+    %orig;
 }
 %end

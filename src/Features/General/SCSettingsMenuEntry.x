@@ -1,5 +1,19 @@
+#import <objc/runtime.h>
+
 #import "../../InstagramHeaders.h"
 #import "../../Settings/SCISettingsViewController.h"
+#import "../../Vault/SCIVaultViewController.h"
+
+static const void *kSCIHomeTabSettingsLongPressAssocKey = &kSCIHomeTabSettingsLongPressAssocKey;
+static const void *kSCIDirectTabVaultLongPressAssocKey = &kSCIDirectTabVaultLongPressAssocKey;
+static const NSTimeInterval kSCIHomeTabLongPressDuration = 0.3;
+static const NSTimeInterval kSCIDirectTabVaultLongPressDuration = 1.0;
+
+@interface IGTabBarButton (SCIQuickActions)
+- (void)sci_addLongPressWithAction:(SEL)action marker:(const void *)marker minimumDuration:(NSTimeInterval)minimumDuration;
+- (void)handleHomeTabLongPress:(UILongPressGestureRecognizer *)sender;
+- (void)handleDirectInboxTabLongPress:(UILongPressGestureRecognizer *)sender;
+@end
 
 // Show SCInsta tweak settings by holding on the settings/more icon under profile for ~1 second
 %hook IGBadgedNavigationButton
@@ -35,24 +49,42 @@
 - (void)didMoveToSuperview {
     %orig;
 
-    // Only work on home/feed tab
-    if (![self.accessibilityIdentifier isEqualToString:@"mainfeed-tab"]) return;
-    
-    if ([SCIUtils getBoolPref:@"settings_shortcut"]) {
-        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-        longPress.minimumPressDuration = 0.3;
-        
-        // Take precidence over existing gesture recognizers
-        for (UIGestureRecognizer *existing in self.gestureRecognizers) {
-            [existing requireGestureRecognizerToFail:longPress];
-        }
-        
-        [self addGestureRecognizer:longPress];
+    NSString *identifier = self.accessibilityIdentifier ?: @"";
+    if ([identifier isEqualToString:@"mainfeed-tab"] && [SCIUtils getBoolPref:@"settings_shortcut"]) {
+        [self sci_addLongPressWithAction:@selector(handleHomeTabLongPress:) marker:kSCIHomeTabSettingsLongPressAssocKey minimumDuration:kSCIHomeTabLongPressDuration];
+    } else if ([identifier isEqualToString:@"direct-inbox-tab"] && [SCIUtils getBoolPref:@"header_long_press_vault"]) {
+        [self sci_addLongPressWithAction:@selector(handleDirectInboxTabLongPress:) marker:kSCIDirectTabVaultLongPressAssocKey minimumDuration:kSCIDirectTabVaultLongPressDuration];
     }
 }
-%new - (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
+
+%new - (void)sci_addLongPressWithAction:(SEL)action marker:(const void *)marker minimumDuration:(NSTimeInterval)minimumDuration {
+    for (UIGestureRecognizer *gesture in self.gestureRecognizers) {
+        if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]]) continue;
+        if (objc_getAssociatedObject(gesture, marker)) {
+            return;
+        }
+    }
+
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:action];
+    longPress.minimumPressDuration = minimumDuration;
+
+    for (UIGestureRecognizer *existing in self.gestureRecognizers) {
+        [existing requireGestureRecognizerToFail:longPress];
+    }
+
+    [self addGestureRecognizer:longPress];
+    objc_setAssociatedObject(longPress, marker, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+%new - (void)handleHomeTabLongPress:(UILongPressGestureRecognizer *)sender {
     if (sender.state != UIGestureRecognizerStateBegan) return;
 
     [SCIUtils showSettingsVC:[self window]];
+}
+
+%new - (void)handleDirectInboxTabLongPress:(UILongPressGestureRecognizer *)sender {
+    if (sender.state != UIGestureRecognizerStateBegan) return;
+
+    [SCIVaultViewController presentVault];
 }
 %end

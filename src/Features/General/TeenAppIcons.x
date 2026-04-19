@@ -1,6 +1,5 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
-#import "../../Vault/SCIVaultViewController.h"
 
 %hook IGImageWithAccessoryButton
 
@@ -33,8 +32,6 @@
         if (homeFeedHeaderVC != nil) {
             [homeFeedHeaderVC headerDidLongPressLogo:nil];
         }
-    } else if ([SCIUtils getBoolPref:@"header_long_press_vault"]) {
-        [SCIVaultViewController presentVault];
     }
 }
 

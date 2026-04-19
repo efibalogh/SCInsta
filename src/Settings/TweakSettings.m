@@ -37,7 +37,7 @@
                                                 [SCISetting switchCellWithTitle:@"Use detailed color picker" subtitle:@"Long press on the eyedropper tool in stories to customize the text color more precisely" defaultsKey:@"detailed_color_picker"],
                                                 [SCISetting switchCellWithTitle:@"Enable liquid glass buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Enable liquid glass surfaces" subtitle:@"Enables liquid glass for other elements, such as menus" defaultsKey:@"liquid_glass_surfaces" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Enable teen app icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES mutuallyExclusiveDefaultsKey:@"header_long_press_vault"],
+                                                [SCISetting switchCellWithTitle:@"Enable teen app icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Disable app haptics" subtitle:@"Disables haptics/vibrations within the Instagram app" defaultsKey:@"disable_haptics"]
                                             ]
                                         },
@@ -74,7 +74,8 @@
                                                 [SCISetting switchCellWithTitle:@"No suggested reels" subtitle:@"Hides suggested reels to watch" defaultsKey:@"no_suggested_reels"],
                                                 [SCISetting switchCellWithTitle:@"No suggested threads posts" subtitle:@"Hides suggested threads posts" defaultsKey:@"no_suggested_threads"],
                                                 [SCISetting switchCellWithTitle:@"Disable video autoplay" subtitle:@"Prevents videos on your feed from playing automatically" defaultsKey:@"disable_feed_autoplay"],
-                                                [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from feed posts and reels" defaultsKey:@"hide_repost_button"]
+                                                [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from feed posts and reels" defaultsKey:@"hide_repost_button"],
+                                                [SCISetting switchCellWithTitle:@"Disable home button refresh" subtitle:@"Prevents feed refresh when re-tapping the home tab button" defaultsKey:@"disable_home_button_refresh"]
                                             ]
                                         }]
                 ],
@@ -117,7 +118,7 @@
                                                                           icon:[SCISymbol resourceSymbolWithName:@"media" color:[UIColor labelColor] size:26]
                                                                         action:^(void) { [SCIVaultViewController presentVault]; }
                                                 ],
-                                                [SCISetting switchCellWithTitle:@"Enable quick media vault access" subtitle:@"Hold down on the Instagram logo to open" defaultsKey:@"header_long_press_vault" requiresRestart:YES mutuallyExclusiveDefaultsKey:@"teen_app_icons"],
+                                                [SCISetting switchCellWithTitle:@"Enable quick media vault access" subtitle:@"Hold down on the DM tab to open" defaultsKey:@"header_long_press_vault" requiresRestart:YES],
                                             ]
                                         },
                                         @{
@@ -144,11 +145,11 @@
                                         @{
                                             @"header": @"Visual messages & stories",
                                             @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Unlimited replay of visual messages" subtitle:@"Replays direct visual messages normal/once stories unlimited times (toggle with image check icon)" defaultsKey:@"unlimited_replay"],
+                                                [SCISetting switchCellWithTitle:@"Unlimited replay of visual messages" subtitle:@"Replay direct visual messages unlimited times and mark them as seen manually with the eye button" defaultsKey:@"unlimited_replay"],
                                                 [SCISetting switchCellWithTitle:@"Disable view-once limitations" subtitle:@"Makes view-once messages behave like normal visual messages (loopable/pauseable)" defaultsKey:@"disable_view_once_limitations"],
                                                 [SCISetting switchCellWithTitle:@"Disable screenshot detection" subtitle:@"Removes the screenshot-prevention features for visual messages in DMs" defaultsKey:@"remove_screenshot_alert"],
                                                 [SCISetting switchCellWithTitle:@"Hide vanish screenshot events" subtitle:@"Suppresses screenshot/screen-record callbacks while disappearing mode is active" defaultsKey:@"hide_vanish_screenshot"],
-                                                [SCISetting switchCellWithTitle:@"Disable story seen receipt" subtitle:@"Hides the notification for others when you view their story" defaultsKey:@"no_seen_receipt"],
+                                                [SCISetting switchCellWithTitle:@"Disable story seen receipt" subtitle:@"Prevents automatic story seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
                                                 [SCISetting switchCellWithTitle:@"Disable instants creation" subtitle:@"Hides the functionality to create/send instants" defaultsKey:@"disable_instants_creation" requiresRestart:YES]
                                             ]
                                         }]

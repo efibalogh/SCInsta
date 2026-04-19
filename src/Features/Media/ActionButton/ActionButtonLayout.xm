@@ -11,7 +11,6 @@ static NSInteger const kSCIFeedActionButtonTag = 921341;
 static NSInteger const kSCIReelsActionButtonTag = 921342;
 static NSInteger const kSCIStoriesActionButtonTag = 921343;
 static NSInteger const kSCIDirectActionButtonTag = 921344;
-static NSInteger const kSCIDirectSeenButtonTag = 921345;
 
 static const void *kSCIReelsActionBottomConstraintAssocKey = &kSCIReelsActionBottomConstraintAssocKey;
 static const void *kSCIReelsActionCenterXConstraintAssocKey = &kSCIReelsActionCenterXConstraintAssocKey;
@@ -21,12 +20,6 @@ static const void *kSCIDirectActionBottomConstraintAssocKey = &kSCIDirectActionB
 static const void *kSCIDirectActionTrailingConstraintAssocKey = &kSCIDirectActionTrailingConstraintAssocKey;
 static const void *kSCIDirectActionWidthConstraintAssocKey = &kSCIDirectActionWidthConstraintAssocKey;
 static const void *kSCIDirectActionHeightConstraintAssocKey = &kSCIDirectActionHeightConstraintAssocKey;
-static const void *kSCIDirectSeenBottomConstraintAssocKey = &kSCIDirectSeenBottomConstraintAssocKey;
-static const void *kSCIDirectSeenWidthConstraintAssocKey = &kSCIDirectSeenWidthConstraintAssocKey;
-static const void *kSCIDirectSeenHeightConstraintAssocKey = &kSCIDirectSeenHeightConstraintAssocKey;
-static const void *kSCIDirectSeenTrailingToActionAssocKey = &kSCIDirectSeenTrailingToActionAssocKey;
-static const void *kSCIDirectSeenTrailingToOverlayAssocKey = &kSCIDirectSeenTrailingToOverlayAssocKey;
-static const void *kSCIDirectSeenTapActionAssocKey = &kSCIDirectSeenTapActionAssocKey;
 
 void SCIInstallFeedActionButton(UIView *barView) {
 	if (!barView) return;
@@ -192,11 +185,6 @@ static UIView *SCIDirectOverlayView(UIViewController *controller) {
 	return [overlay isKindOfClass:[UIView class]] ? (UIView *)overlay : nil;
 }
 
-static BOOL SCIShouldShowDirectSeenButton(void) {
-	// Reuse SCInsta's manual seen toggle for visual DM seen button visibility.
-	return [SCIUtils getBoolPref:@"remove_lastseen"];
-}
-
 static CGFloat SCIHeightFromFrameLikeObject(id object) {
 	if (!object) return 0.0;
 
@@ -227,46 +215,15 @@ static CGFloat SCIDirectBottomOffset(UIViewController *controller) {
 	return (CGFloat)offset;
 }
 
-static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
-	if (!controller) return;
-
-	id message = SCIDirectCurrentMessageFromController(controller);
-	if (!message) {
-		[SCIUtils showToastForDuration:1.5 title:@"Message not found"];
-		return;
-	}
-
-	id responders = [SCIUtils getIvarForObj:controller name:"_eventResponders"];
-	if (!responders) responders = SCIKVCObject(controller, @"eventResponders");
-
-	SEL beginPlaybackSelector = NSSelectorFromString(@"visualMessageViewerController:didBeginPlaybackForVisualMessage:atIndex:");
-	for (id responder in SCIArrayFromCollection(responders) ?: @[]) {
-		if ([responder respondsToSelector:beginPlaybackSelector]) {
-			((void (*)(id, SEL, id, id, NSInteger))objc_msgSend)(responder, beginPlaybackSelector, controller, message, 0);
-			break;
-		}
-	}
-
-	SEL overlayTapSelector = NSSelectorFromString(@"fullscreenOverlay:didTapInRegion:");
-	if ([controller respondsToSelector:overlayTapSelector]) {
-		((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
-	}
-
-	[SCIUtils showToastForDuration:1.5 title:@"Marked as seen"];
-}
-
 void SCIInstallDirectActionButton(UIViewController *controller) {
 	UIView *overlay = SCIDirectOverlayView(controller);
 	if (!overlay) return;
 
 	UIButton *button = (UIButton *)[overlay viewWithTag:kSCIDirectActionButtonTag];
-	UIButton *seenButton = (UIButton *)[overlay viewWithTag:kSCIDirectSeenButtonTag];
 	BOOL shouldShowActionButton = [SCIUtils getBoolPref:kSCIShowActionButtonPrefKey];
-	BOOL shouldShowSeenButton = SCIShouldShowDirectSeenButton();
 
-	if (!shouldShowActionButton && !shouldShowSeenButton) {
+	if (!shouldShowActionButton) {
 		[button removeFromSuperview];
-		[seenButton removeFromSuperview];
 		return;
 	}
 
@@ -285,7 +242,6 @@ void SCIInstallDirectActionButton(UIViewController *controller) {
 
 	CGFloat size = 44.0;
 	CGFloat bottomOffset = SCIDirectBottomOffset(controller);
-	BOOL actionButtonVisible = (button && !button.hidden && button.superview == overlay);
 
 	if (button) {
 		button.translatesAutoresizingMaskIntoConstraints = NO;
@@ -322,77 +278,4 @@ void SCIInstallDirectActionButton(UIViewController *controller) {
 		SCIApplyButtonStyle(button, SCIActionButtonSourceDirect);
 		[overlay bringSubviewToFront:button];
 	}
-
-	if (!shouldShowSeenButton) {
-		[seenButton removeFromSuperview];
-		return;
-	}
-
-	seenButton = SCIActionButtonWithTag(overlay, kSCIDirectSeenButtonTag);
-	seenButton.translatesAutoresizingMaskIntoConstraints = NO;
-	seenButton.showsMenuAsPrimaryAction = NO;
-	seenButton.adjustsImageWhenHighlighted = YES;
-	UIImage *seenImage = SCIActionButtonImage(@"eye", @"eye", 20.0);
-	[seenButton setImage:[seenImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-	// seenButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
-	SCIApplyButtonStyle(seenButton, SCIActionButtonSourceDirect);
-
-	UIAction *oldSeenTapAction = objc_getAssociatedObject(seenButton, kSCIDirectSeenTapActionAssocKey);
-	if (oldSeenTapAction) {
-		[seenButton removeAction:oldSeenTapAction forControlEvents:UIControlEventTouchUpInside];
-	}
-	__weak UIViewController *weakController = controller;
-	UIAction *newSeenTapAction = [UIAction actionWithHandler:^(__unused UIAction *action) {
-		UIViewController *strongController = weakController;
-		if (!strongController) return;
-		SCIMarkDirectVisualMessageAsSeen(strongController);
-	}];
-	[seenButton addAction:newSeenTapAction forControlEvents:UIControlEventTouchUpInside];
-	objc_setAssociatedObject(seenButton, kSCIDirectSeenTapActionAssocKey, newSeenTapAction, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
-	NSLayoutConstraint *seenBottomConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenBottomConstraintAssocKey);
-	NSLayoutConstraint *seenWidthConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenWidthConstraintAssocKey);
-	NSLayoutConstraint *seenHeightConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenHeightConstraintAssocKey);
-
-	if (!seenBottomConstraint || !seenWidthConstraint || !seenHeightConstraint) {
-		seenBottomConstraint = [seenButton.bottomAnchor constraintEqualToAnchor:overlay.bottomAnchor constant:-bottomOffset];
-		seenWidthConstraint = [seenButton.widthAnchor constraintEqualToConstant:size];
-		seenHeightConstraint = [seenButton.heightAnchor constraintEqualToConstant:size];
-
-		[NSLayoutConstraint activateConstraints:@[
-			seenBottomConstraint,
-			seenWidthConstraint,
-			seenHeightConstraint
-		]];
-
-		objc_setAssociatedObject(seenButton, kSCIDirectSeenBottomConstraintAssocKey, seenBottomConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-		objc_setAssociatedObject(seenButton, kSCIDirectSeenWidthConstraintAssocKey, seenWidthConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-		objc_setAssociatedObject(seenButton, kSCIDirectSeenHeightConstraintAssocKey, seenHeightConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-	}
-
-	seenBottomConstraint.constant = -bottomOffset;
-	seenWidthConstraint.constant = size;
-	seenHeightConstraint.constant = size;
-
-	NSLayoutConstraint *seenTrailingToAction = objc_getAssociatedObject(seenButton, kSCIDirectSeenTrailingToActionAssocKey);
-	NSLayoutConstraint *seenTrailingToOverlay = objc_getAssociatedObject(seenButton, kSCIDirectSeenTrailingToOverlayAssocKey);
-	if (seenTrailingToAction) {
-		seenTrailingToAction.active = NO;
-	}
-	if (seenTrailingToOverlay) {
-		seenTrailingToOverlay.active = NO;
-	}
-
-	if (actionButtonVisible) {
-		seenTrailingToAction = [seenButton.trailingAnchor constraintEqualToAnchor:button.leadingAnchor constant:-5.0];
-		seenTrailingToAction.active = YES;
-		objc_setAssociatedObject(seenButton, kSCIDirectSeenTrailingToActionAssocKey, seenTrailingToAction, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-	} else {
-		seenTrailingToOverlay = [seenButton.trailingAnchor constraintEqualToAnchor:overlay.trailingAnchor constant:-10.0];
-		seenTrailingToOverlay.active = YES;
-		objc_setAssociatedObject(seenButton, kSCIDirectSeenTrailingToOverlayAssocKey, seenTrailingToOverlay, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-	}
-
-	[overlay bringSubviewToFront:seenButton];
 }
-
