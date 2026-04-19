@@ -435,7 +435,7 @@ fromViewController:(UIViewController *)presenter {
     } else {
         _saveVaultButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _saveVaultButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_saveVaultButton setImage:SCIFullScreenResourceOrSystem(@"photo_gallery", @"tray.and.arrow.down", sym) forState:UIControlStateNormal];
+        [_saveVaultButton setImage:SCIFullScreenResourceOrSystem(@"chest", @"tray.and.arrow.down", sym) forState:UIControlStateNormal];
         _saveVaultButton.tintColor = [UIColor whiteColor];
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveVaultButton];

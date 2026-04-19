@@ -308,7 +308,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self.bottomBarStack removeFromSuperview];
     self.bottomBarStack = nil;
 
-    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease.circle" resource:@"filter" accessibility:@"Filter"];
+    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease.circle" resource:@"slider" accessibility:@"Filter"];
     [filterBtn addTarget:self action:@selector(presentFilter) forControlEvents:UIControlEventTouchUpInside];
 
     UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down.circle" resource:@"sort" accessibility:@"Sort"];
@@ -400,7 +400,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     _emptyStateView.hidden = YES;
     [self.view addSubview:_emptyStateView];
 
-    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"media" template:YES];
+    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"chest" template:YES];
     if (!emptyIconImage) {
         UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:56 weight:UIImageSymbolWeightLight];
         emptyIconImage = [UIImage systemImageNamed:@"tray" withConfiguration:cfg];

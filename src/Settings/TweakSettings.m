@@ -26,7 +26,7 @@
             @"rows": @[
                 [SCISetting navigationCellWithTitle:@"General"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"gear"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"settings" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
@@ -63,7 +63,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Feed"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"rectangle.stack"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"feed" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
@@ -81,7 +81,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Reels"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"film.stack"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"reels" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
@@ -115,7 +115,7 @@
                                             @"rows": @[
                                                 [SCISetting buttonCellWithTitle:@"Media Vault"
                                                                       subtitle:@"View your saved media"
-                                                                          icon:[SCISymbol resourceSymbolWithName:@"media" color:[UIColor labelColor] size:26]
+                                                                          icon:[SCISymbol resourceSymbolWithName:@"chest" color:[UIColor labelColor] size:26]
                                                                         action:^(void) { [SCIVaultViewController presentVault]; }
                                                 ],
                                                 [SCISetting switchCellWithTitle:@"Enable quick media vault access" subtitle:@"Hold down on the DM tab to open" defaultsKey:@"header_long_press_vault" requiresRestart:YES],
@@ -132,7 +132,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Stories and messages"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"rectangle.portrait.on.rectangle.portrait.angled"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"story" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"Messages",
                                             @"rows": @[
@@ -154,9 +154,9 @@
                                             ]
                                         }]
                 ],
-                [SCISetting navigationCellWithTitle:@"Navigation"
+                [SCISetting navigationCellWithTitle:@"Interface"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"hand.draw.fill"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"interface" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
@@ -177,7 +177,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Confirm actions"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"checkmark"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"check" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"",
                                             @"rows": @[
@@ -222,7 +222,7 @@
                 // ],
                 [SCISetting navigationCellWithTitle:@"Debug"
                                            subtitle:@""
-                                               icon:[SCISymbol symbolWithName:@"ladybug"]
+                                               icon:[SCISymbol resourceSymbolWithName:@"toolbox" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
                                             @"header": @"FLEX",
                                             @"rows": @[
@@ -322,59 +322,59 @@
     return @{
         @"action_button_default_action": [UIMenu menuWithChildren:@[
             [UICommand commandWithTitle:@"None"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"action" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"none"
-                           }
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"none"
+                            }
             ],
             [UICommand commandWithTitle:@"Download to Photos"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"download" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"download_library"
-                           }
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"download_library"
+                            }
             ],
             [UICommand commandWithTitle:@"Share"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"share" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"download_share"
-                           }
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"download_share"
+                            }
             ],
             [UICommand commandWithTitle:@"Copy link"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"link" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"copy_download_link"
-                           }
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"copy_download_link"
+                            }
             ],
             [UICommand commandWithTitle:@"Download to Vault"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"chest" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"download_vault"
-                           }
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"download_vault"
+                            }
             ],
             [UICommand commandWithTitle:@"Expand"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"expand" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"expand"
-                           }
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"expand"
+                            }
             ],
             [UICommand commandWithTitle:@"View Thumbnail"
-                                  image:nil
+                                  image:[[SCISymbol resourceSymbolWithName:@"photo_filled" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
-                               @"defaultsKey": @"action_button_default_action",
-                               @"value": @"view_thumbnail"
+                                @"defaultsKey": @"action_button_default_action",
+                                @"value": @"view_thumbnail"
                            }
             ],
         ]],

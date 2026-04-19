@@ -806,6 +806,10 @@ static UIImage *SCIImageWithContentsOfFileApplyingScale(NSString *path) {
 }
 
 // Ivars
++ (NSNumber *)numericValueForObj:(id)obj selectorName:(NSString *)selectorName {
+    return SCINumericValueForSelector(obj, selectorName);
+}
+
 + (id)getIvarForObj:(id)obj name:(const char *)name {
     Ivar ivar = class_getInstanceVariable(object_getClass(obj), name);
     if (!ivar) return nil;

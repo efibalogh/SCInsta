@@ -13,6 +13,8 @@ typedef NS_ENUM(NSInteger, SCIActionButtonSource) {
 @property (nonatomic, assign) SCIActionButtonSource source;
 @property (nonatomic, weak, nullable) UIView *view;
 @property (nonatomic, weak, nullable) UIViewController *controller;
+@property (nonatomic, assign) NSInteger currentIndexOverride;
+@property (nonatomic, strong, nullable) id mediaOverride;
 @end
 
 id SCIObjectForSelector(id target, NSString *selectorName);

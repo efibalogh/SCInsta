@@ -158,8 +158,17 @@ void SCIInstallStoriesActionButton(UIView *overlayView) {
 		y = CGRectGetMinY(footerContainer.frame) - size - 12.0;
 	}
 
-	id showCommentsPreview = [SCIUtils getIvarForObj:overlayView name:"_showCommentsPreview"];
-	BOOL hasCommentsPreview = [showCommentsPreview respondsToSelector:@selector(boolValue)] ? [showCommentsPreview boolValue] : NO;
+	NSNumber *showCommentsPreview = [SCIUtils numericValueForObj:overlayView selectorName:@"showCommentsPreview"];
+	if (!showCommentsPreview) {
+		showCommentsPreview = [SCIUtils numericValueForObj:overlayView selectorName:@"isShowingCommentsPreview"];
+	}
+	if (!showCommentsPreview) {
+		id kvcShowComments = SCIKVCObject(overlayView, @"showCommentsPreview");
+		if ([kvcShowComments respondsToSelector:@selector(boolValue)]) {
+			showCommentsPreview = @([kvcShowComments boolValue]);
+		}
+	}
+	BOOL hasCommentsPreview = showCommentsPreview.boolValue;
 	if (hasCommentsPreview) {
 		UIView *hypeFaceswarmView = [SCIUtils getIvarForObj:overlayView name:"_hypeFaceswarmView"];
 		if ([hypeFaceswarmView isKindOfClass:[UIView class]] && (y + size) > CGRectGetMinY(hypeFaceswarmView.frame)) {

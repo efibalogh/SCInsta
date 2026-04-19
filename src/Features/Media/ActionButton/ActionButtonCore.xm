@@ -32,6 +32,7 @@ static NSString * const kSCIActionCopyDownloadLink = @"copy_download_link";
 static NSString * const kSCIActionDownloadVault = @"download_vault";
 static NSString * const kSCIActionExpand = @"expand";
 static NSString * const kSCIActionViewThumbnail = @"view_thumbnail";
+static NSInteger const kSCIFeedActionButtonTag = 921341;
 
 static const void *kSCIActionButtonContextAssocKey = &kSCIActionButtonContextAssocKey;
 static const void *kSCIActionButtonTapActionAssocKey = &kSCIActionButtonTapActionAssocKey;
@@ -46,6 +47,12 @@ static const void *kSCIActionButtonTapActionAssocKey = &kSCIActionButtonTapActio
 @end
 
 @implementation SCIActionButtonContext
+- (instancetype)init {
+	if ((self = [super init])) {
+		_currentIndexOverride = -1;
+	}
+	return self;
+}
 @end
 
 id SCIObjectForSelector(id target, NSString *selectorName) {
@@ -207,10 +214,10 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, CGFloat size) {
 		return SCIActionButtonImage(@"link", @"link", size);
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadVault]) {
-		return SCIActionButtonImage(@"photo_gallery", @"tray.and.arrow.down", size);
+		return SCIActionButtonImage(@"chest", @"tray.and.arrow.down", size);
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
-		return SCIActionButtonImage(@"fullscreen", @"arrow.up.left.and.arrow.down.right", size);
+		return SCIActionButtonImage(@"expand", @"arrow.up.left.and.arrow.down.right", size);
 	}
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
 		return SCIActionButtonImage(@"photo_filled", @"photo", size);
@@ -306,12 +313,11 @@ static NSInteger SCIIndexFromPageIndicatorObject(id indicator) {
 		return (NSInteger)((UIPageControl *)indicator).currentPage;
 	}
 
-	id currentPage = SCIObjectForSelector(indicator, @"currentPage");
-	NSString *pageString = SCIStringFromValue(currentPage);
-	if (pageString.length > 0) return pageString.integerValue;
+	NSNumber *currentPageNumber = [SCIUtils numericValueForObj:indicator selectorName:@"currentPage"];
+	if (currentPageNumber) return currentPageNumber.integerValue;
 
-	currentPage = SCIKVCObject(indicator, @"currentPage");
-	pageString = SCIStringFromValue(currentPage);
+	id currentPage = SCIKVCObject(indicator, @"currentPage");
+	NSString *pageString = SCIStringFromValue(currentPage);
 	if (pageString.length > 0) return pageString.integerValue;
 
 	return -1;
@@ -319,6 +325,22 @@ static NSInteger SCIIndexFromPageIndicatorObject(id indicator) {
 
 static NSInteger SCIFeedCurrentIndexFromBarView(UIView *barView) {
 	if (!barView) return -1;
+
+	id delegate = SCIObjectForSelector(barView, @"delegate");
+	id nestedDelegate = SCIObjectForSelector(delegate, @"delegate");
+	id target = nestedDelegate ?: delegate;
+
+	id pageCellState = [SCIUtils getIvarForObj:target name:"_pageCellState"];
+	NSNumber *stateIndex = [SCIUtils numericValueForObj:pageCellState selectorName:@"currentPageIndex"];
+	if (stateIndex && stateIndex.integerValue >= 0) return stateIndex.integerValue;
+	stateIndex = [SCIUtils numericValueForObj:pageCellState selectorName:@"currentIndex"];
+	if (stateIndex && stateIndex.integerValue >= 0) return stateIndex.integerValue;
+
+	NSNumber *delegatePage = [SCIUtils numericValueForObj:delegate selectorName:@"pageControlCurrentPage"];
+	if (delegatePage && delegatePage.integerValue >= 0) return delegatePage.integerValue;
+
+	NSInteger delegatePageControlIdx = SCIIndexFromPageIndicatorObject(SCIObjectForSelector(delegate, @"pageControl"));
+	if (delegatePageControlIdx >= 0) return delegatePageControlIdx;
 
 	NSArray<NSString *> *indicatorSelectors = @[@"pageControl", @"pageIndicator", @"carouselPageControl"];
 	for (NSString *selectorName in indicatorSelectors) {
@@ -395,6 +417,102 @@ static id SCIStorySectionControllerFromOverlay(UIView *overlayView) {
 	}
 
 	return nil;
+}
+
+static BOOL SCIViewIsFeedCell(UIView *view) {
+	if (!view) return NO;
+
+	// Do not match generic UICollectionViewCell — nested carousel/page cells can be mistaken for the feed row.
+	for (NSString *className in @[
+		@"IGFeedItemMediaCell",
+		@"IGFeedItemPageCell",
+		@"IGModernFeedVideoCell",
+		@"IGModernFeedVideoCell.IGModernFeedVideoCell",
+	]) {
+		Class cls = NSClassFromString(className);
+		if (cls && [view isKindOfClass:cls]) {
+			return YES;
+		}
+	}
+
+	return NO;
+}
+
+/// Same idea as Regram's `rg_media`: resolve the post/media object from the feed row that owns the gesture, not from a UFI delegate chain.
+static id SCIFeedPostObjectFromFeedCell(UIView *feedCell) {
+	if (!feedCell) return nil;
+
+	id post = SCIObjectForSelector(feedCell, @"post");
+	if (post) return post;
+
+	post = SCIObjectForSelector(feedCell, @"mediaCellFeedItem");
+	if (post) return post;
+
+	post = SCIObjectForSelector(feedCell, @"media");
+	if (post) return post;
+
+	return [SCIUtils getIvarForObj:feedCell name:"_post"];
+}
+
+static UIView *SCIFeedCellAncestorForView(UIView *view) {
+	UIView *walker = view;
+	NSInteger depth = 0;
+	while (walker && depth < 16) {
+		if (SCIViewIsFeedCell(walker)) return walker;
+		walker = walker.superview;
+		depth++;
+	}
+	return nil;
+}
+
+/// Resolves which scroll-hosted row actually contains the touch. Profile / user-media viewers nest collection views;
+/// walking only the view chain can pair the gesture with a sibling row’s `post` (often “one above”). Prefer outer hosts first.
+static BOOL SCIFeedPostAndCellFromScrollContainers(UIView *view, UILongPressGestureRecognizer *sender, id *outPost, UIView **outCell) {
+	if (outPost) *outPost = nil;
+	if (outCell) *outCell = nil;
+	if (!view || !sender) return NO;
+
+	NSMutableArray<UIView *> *hosts = [NSMutableArray array];
+	UIView *walker = view;
+	while (walker) {
+		if ([walker isKindOfClass:[UICollectionView class]] || [walker isKindOfClass:[UITableView class]]) {
+			[hosts addObject:walker];
+		}
+		walker = walker.superview;
+	}
+
+	for (UIView *host in [hosts reverseObjectEnumerator]) {
+		CGPoint pt = [sender locationInView:host];
+		if (!CGRectContainsPoint(host.bounds, pt)) continue;
+
+		if ([host isKindOfClass:[UICollectionView class]]) {
+			UICollectionView *cv = (UICollectionView *)host;
+			NSIndexPath *ip = [cv indexPathForItemAtPoint:pt];
+			if (!ip) continue;
+			UICollectionViewCell *cell = [cv cellForItemAtIndexPath:ip];
+			if (!cell) continue;
+			id post = SCIFeedPostObjectFromFeedCell(cell);
+			if (post) {
+				if (outPost) *outPost = post;
+				if (outCell) *outCell = cell;
+				return YES;
+			}
+		} else {
+			UITableView *tv = (UITableView *)host;
+			NSIndexPath *ip = [tv indexPathForRowAtPoint:pt];
+			if (!ip) continue;
+			UITableViewCell *cell = [tv cellForRowAtIndexPath:ip];
+			if (!cell) continue;
+			id post = SCIFeedPostObjectFromFeedCell(cell);
+			if (post) {
+				if (outPost) *outPost = post;
+				if (outCell) *outCell = cell;
+				return YES;
+			}
+		}
+	}
+
+	return NO;
 }
 
 static id SCIStoryMediaFromOverlay(UIView *overlayView) {
@@ -598,6 +716,7 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 
 static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
 	if (!context) return nil;
+	if (context.mediaOverride) return context.mediaOverride;
 
 	switch (context.source) {
 		case SCIActionButtonSourceFeed:
@@ -615,6 +734,7 @@ static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
 
 static NSInteger SCIResolveCurrentIndexForContext(SCIActionButtonContext *context) {
 	if (!context) return 0;
+	if (context.currentIndexOverride >= 0) return context.currentIndexOverride;
 
 	switch (context.source) {
 		case SCIActionButtonSourceFeed:
@@ -889,27 +1009,45 @@ static UIView *SCIFeedActionContextViewFromMediaView(UIView *view, id targetMedi
 
 void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecognizer *sender) {
 	if (!view || !sender || sender.state != UIGestureRecognizerStateBegan) return;
+	if (!view.window) return;
 
-	id directMedia = nil;
-	UIView *mediaWalker = view;
-	while (mediaWalker && !directMedia) {
-		directMedia = [SCIUtils getIvarForObj:mediaWalker name:"_media"];
-		if (!directMedia) directMedia = SCIObjectForSelector(mediaWalker, @"media");
-		if (!directMedia) directMedia = SCIKVCObject(mediaWalker, @"media");
-		mediaWalker = mediaWalker.superview;
+	id postObject = nil;
+	UIView *feedCell = nil;
+	// Tie to the scroll view row under the finger (fixes profile / user-media stacks where hierarchy-only resolution lags the visible row).
+	if (!SCIFeedPostAndCellFromScrollContainers(view, sender, &postObject, &feedCell)) {
+		feedCell = SCIFeedCellAncestorForView(view);
+		if (!feedCell) return;
+		postObject = SCIFeedPostObjectFromFeedCell(feedCell);
+	}
+	if (!feedCell) return;
+
+	UIView *contextView = SCIFeedActionContextViewFromMediaView(feedCell, postObject);
+	if (!contextView) {
+		contextView = SCIFeedActionContextViewFromMediaView(feedCell, nil);
+	}
+	if (!contextView) return;
+
+	SCIActionButtonContext *context = nil;
+	UIButton *actionButton = (UIButton *)[contextView viewWithTag:kSCIFeedActionButtonTag];
+	if ([actionButton isKindOfClass:[UIButton class]]) {
+		id associatedContext = objc_getAssociatedObject(actionButton, kSCIActionButtonContextAssocKey);
+		if ([associatedContext isKindOfClass:[SCIActionButtonContext class]]) {
+			context = (SCIActionButtonContext *)associatedContext;
+		}
 	}
 
-	UIView *contextView = SCIFeedActionContextViewFromMediaView(view, directMedia);
+	if (!context) {
+		context = [[SCIActionButtonContext alloc] init];
+		context.source = SCIActionButtonSourceFeed;
+		context.view = contextView;
+	}
 
-	SCIActionButtonContext *context = [[SCIActionButtonContext alloc] init];
-	context.source = SCIActionButtonSourceFeed;
-	context.view = contextView ?: view;
+	if (postObject) {
+		context.mediaOverride = postObject;
+	}
 
 	id media = SCIResolveMediaForContext(context);
-	if (!media) media = directMedia;
-
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
-
 	if (entries.count == 0) return;
 
 	SCIExecuteActionIdentifier(kSCIActionExpand, context, YES);
@@ -1084,4 +1222,3 @@ UIView *SCIFeedFirstRightButtonFromBarView(UIView *barView) {
 
 	return nil;
 }
-

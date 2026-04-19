@@ -66,6 +66,15 @@ static id SCIKVCObject(id target, NSString *key) {
     }
 }
 
+static id SCIObjectForSelector(id target, NSString *selectorName) {
+    if (!target || selectorName.length == 0) return nil;
+
+    SEL selector = NSSelectorFromString(selectorName);
+    if (![target respondsToSelector:selector]) return nil;
+
+    return ((id (*)(id, SEL))objc_msgSend)(target, selector);
+}
+
 static UIButton *SCIStorySeenButtonWithTag(UIView *container, NSInteger tag) {
     UIView *existing = [container viewWithTag:tag];
     if ([existing isKindOfClass:[UIButton class]]) {
@@ -115,8 +124,17 @@ static CGRect SCIStorySeenBaseFrame(UIView *overlayView) {
         y = CGRectGetHeight(overlayView.bounds) - size - 12.0;
     }
 
-    id showCommentsPreview = [SCIUtils getIvarForObj:overlayView name:"_showCommentsPreview"];
-    BOOL hasCommentsPreview = [showCommentsPreview respondsToSelector:@selector(boolValue)] ? [showCommentsPreview boolValue] : NO;
+    NSNumber *showCommentsPreview = [SCIUtils numericValueForObj:overlayView selectorName:@"showCommentsPreview"];
+    if (!showCommentsPreview) {
+        showCommentsPreview = [SCIUtils numericValueForObj:overlayView selectorName:@"isShowingCommentsPreview"];
+    }
+    if (!showCommentsPreview) {
+        id kvcShowComments = SCIKVCObject(overlayView, @"showCommentsPreview");
+        if ([kvcShowComments respondsToSelector:@selector(boolValue)]) {
+            showCommentsPreview = @([kvcShowComments boolValue]);
+        }
+    }
+    BOOL hasCommentsPreview = showCommentsPreview.boolValue;
     if (hasCommentsPreview) {
         UIView *hypeFaceswarmView = [SCIUtils getIvarForObj:overlayView name:"_hypeFaceswarmView"];
         if ([hypeFaceswarmView isKindOfClass:[UIView class]] && (y + size) > CGRectGetMinY(hypeFaceswarmView.frame)) {
@@ -175,7 +193,7 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
         media = ((id (*)(id, SEL))objc_msgSend)(viewerController, currentStorySelector);
     }
 
-    SEL markSelector = NSSelectorFromString(@"fullscreenSectionController:didMarkItemAsSeen:");
+    SEL markSelector = NSSelectorFromString(@"expandSectionController:didMarkItemAsSeen:");
     if (!sectionController || !media || ![viewerController respondsToSelector:markSelector]) {
         [SCIUtils showToastForDuration:1.5 title:@"Unable to mark story as seen"];
         return;
@@ -275,7 +293,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
         return;
     }
 
-    SEL overlayTapSelector = NSSelectorFromString(@"fullscreenOverlay:didTapInRegion:");
+    SEL overlayTapSelector = NSSelectorFromString(@"expandOverlay:didTapInRegion:");
     if ([controller respondsToSelector:overlayTapSelector]) {
         ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
     }

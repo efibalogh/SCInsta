@@ -10,7 +10,7 @@ static NSString *_vaultThumbnailsDirectory;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-        _vaultDirectory = [docs stringByAppendingPathComponent:@".scinsta_vault"];
+        _vaultDirectory = [docs stringByAppendingPathComponent:@"Vault"];
         [self ensureDirectoryExists:_vaultDirectory];
     });
     return _vaultDirectory;

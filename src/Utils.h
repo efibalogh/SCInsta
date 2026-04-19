@@ -77,6 +77,9 @@
 // Math
 + (NSUInteger)decimalPlacesInDouble:(double)value;
 
+// Dynamic selector helpers
++ (nullable NSNumber *)numericValueForObj:(id)obj selectorName:(NSString *)selectorName;
+
 // Ivars
 + (id)getIvarForObj:(id)obj name:(const char *)name;
 + (void)setIvarForObj:(id)obj name:(const char *)name value:(id)value;
