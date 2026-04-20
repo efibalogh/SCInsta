@@ -3,6 +3,7 @@
 #import "SCIVaultLockViewController.h"
 #import "SCIVaultFile.h"
 #import "SCIVaultCoreDataStack.h"
+#import "../Utils.h"
 
 typedef NS_ENUM(NSInteger, SCIVaultStatsRow) {
     SCIVaultStatsRowTotal = 0,
@@ -15,6 +16,7 @@ typedef NS_ENUM(NSInteger, SCIVaultStatsRow) {
 typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     SCIVaultSettingsSectionStats = 0,
     SCIVaultSettingsSectionLock,
+    SCIVaultSettingsSectionShortcuts,
     SCIVaultSettingsSectionDelete,
     SCIVaultSettingsSectionCount
 };
@@ -98,6 +100,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     switch (section) {
         case SCIVaultSettingsSectionStats:  return @"Storage";
         case SCIVaultSettingsSectionLock:   return @"Lock";
+        case SCIVaultSettingsSectionShortcuts: return @"Shortcuts";
         case SCIVaultSettingsSectionDelete: return @"Delete";
     }
     return nil;
@@ -106,6 +109,9 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 - (NSString *)tableView:(UITableView *)tv titleForFooterInSection:(NSInteger)section {
     if (section == SCIVaultSettingsSectionLock) {
         return @"When enabled, the Media Vault requires a passcode or biometrics to open.";
+    }
+    if (section == SCIVaultSettingsSectionShortcuts) {
+        return @"Quick access requires an app restart to take effect.";
     }
     return nil;
 }
@@ -117,6 +123,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
             SCIVaultManager *mgr = [SCIVaultManager sharedManager];
             return mgr.isLockEnabled ? 2 : 1; // toggle, change passcode (if enabled)
         }
+        case SCIVaultSettingsSectionShortcuts: return 1;
         case SCIVaultSettingsSectionDelete: return 3; // clear all, delete by type, delete by source
     }
     return 0;
@@ -172,6 +179,16 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     }
 }
 
+- (void)configureShortcutsCell:(UITableViewCell *)cell {
+    cell.textLabel.text = @"Enable quick media vault access";
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+    UISwitch *sw = [[UISwitch alloc] init];
+    sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:@"header_long_press_vault"];
+    [sw addTarget:self action:@selector(quickAccessSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+    cell.accessoryView = sw;
+}
+
 #pragma mark - Render stats with Value1 style
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -190,6 +207,9 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     switch (indexPath.section) {
         case SCIVaultSettingsSectionLock:
             [self configureLockCell:cell atRow:indexPath.row];
+            break;
+        case SCIVaultSettingsSectionShortcuts:
+            [self configureShortcutsCell:cell];
             break;
         case SCIVaultSettingsSectionDelete:
             [self configureDeleteCell:cell atRow:indexPath.row];
@@ -225,6 +245,11 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
         }]];
         [self presentViewController:alert animated:YES completion:nil];
     }
+}
+
+- (void)quickAccessSwitchChanged:(UISwitch *)sw {
+    [[NSUserDefaults standardUserDefaults] setBool:sw.on forKey:@"header_long_press_vault"];
+    [SCIUtils showRestartConfirmation];
 }
 
 - (void)tableView:(UITableView *)tv didSelectRowAtIndexPath:(NSIndexPath *)ip {
@@ -290,7 +315,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 
     NSArray<NSNumber *> *sources = @[
         @(SCIVaultSourceFeed), @(SCIVaultSourceStories), @(SCIVaultSourceReels),
-        @(SCIVaultSourceProfile), @(SCIVaultSourceDMs), @(SCIVaultSourceOther),
+        @(SCIVaultSourceProfile), @(SCIVaultSourceDMs), @(SCIVaultSourceThumbnail), @(SCIVaultSourceOther),
     ];
     for (NSNumber *srcNum in sources) {
         SCIVaultSource src = (SCIVaultSource)srcNum.integerValue;

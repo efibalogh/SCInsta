@@ -172,8 +172,14 @@
     self.dateLabel.text = [file listDownloadDateString];
 
     BOOL isVideo = (file.mediaType == SCIVaultMediaTypeVideo);
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIImageSymbolWeightMedium];
-    self.rowTypeIcon.image = [UIImage systemImageNamed:(isVideo ? @"video.fill" : @"photo.fill") withConfiguration:cfg];
+    UIImage *rowIcon = [SCIUtils sci_resourceImageNamed:(isVideo ? @"video_filled" : @"photo_filled")
+                                                template:YES
+                                            maxPointSize:12];
+    if (!rowIcon) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightMedium];
+        rowIcon = [UIImage systemImageNamed:(isVideo ? @"video.fill" : @"photo.fill") withConfiguration:cfg];
+    }
+    self.rowTypeIcon.image = rowIcon;
 
     self.favoriteIcon.hidden = !file.isFavorite;
 

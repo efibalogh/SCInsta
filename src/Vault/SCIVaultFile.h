@@ -19,7 +19,8 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
     SCIVaultSourceStories = 2,
     SCIVaultSourceReels   = 3,
     SCIVaultSourceProfile = 4,
-    SCIVaultSourceDMs     = 5
+    SCIVaultSourceDMs     = 5,
+    SCIVaultSourceThumbnail = 6
 };
 
 @interface SCIVaultFile : NSManagedObject
@@ -50,7 +51,7 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
                                 folderPath:(nullable NSString *)folderPath
                                      error:(NSError **)error;
 
-/// When `metadata` is non-nil, its fields override `source` and populate list UI (Regram-style). File is probed for any missing dimensions/duration.
+/// When `metadata` is non-nil, its fields override `source` and populate list UI. File is probed for any missing dimensions/duration.
 + (nullable SCIVaultFile *)saveFileToVault:(NSURL *)fileURL
                                     source:(SCIVaultSource)source
                                  mediaType:(SCIVaultMediaType)mediaType

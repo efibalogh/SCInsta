@@ -4,8 +4,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface SCIVaultFolderCell : UICollectionViewCell
 
-/// `listStyle` uses the same row rhythm as file list rows; grid matches vault grid tiles.
-- (void)configureWithFolderName:(NSString *)name listStyle:(BOOL)listStyle;
+/// Folders are list-only; this matches the vault list row rhythm.
+- (void)configureWithFolderName:(NSString *)name;
 
 @end
 

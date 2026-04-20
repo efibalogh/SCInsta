@@ -28,6 +28,7 @@ static NSString *SCIVaultSourceSlug(SCIVaultSource source) {
         case SCIVaultSourceReels:   return @"reel";
         case SCIVaultSourceProfile: return @"profile-photo";
         case SCIVaultSourceDMs:     return @"dms";
+        case SCIVaultSourceThumbnail: return @"thumbnail";
         case SCIVaultSourceOther:
         default:                    return @"other";
     }
@@ -420,37 +421,40 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
 
 + (NSString *)labelForSource:(SCIVaultSource)source {
     switch (source) {
-        case SCIVaultSourceFeed:    return @"Feed";
-        case SCIVaultSourceStories: return @"Stories";
-        case SCIVaultSourceReels:   return @"Reels";
-        case SCIVaultSourceProfile: return @"Profile";
-        case SCIVaultSourceDMs:     return @"DMs";
+        case SCIVaultSourceFeed:      return @"Feed";
+        case SCIVaultSourceStories:   return @"Stories";
+        case SCIVaultSourceReels:     return @"Reels";
+        case SCIVaultSourceProfile:   return @"Profile";
+        case SCIVaultSourceDMs:       return @"DMs";
+        case SCIVaultSourceThumbnail: return @"Thumb";
         case SCIVaultSourceOther:
-        default:                    return @"Other";
+        default:                      return @"Other";
     }
 }
 
 + (NSString *)shortLabelForSource:(SCIVaultSource)source {
     switch (source) {
-        case SCIVaultSourceFeed:    return @"Feed";
-        case SCIVaultSourceStories: return @"Story";
-        case SCIVaultSourceReels:   return @"Reel";
-        case SCIVaultSourceProfile: return @"Profile";
-        case SCIVaultSourceDMs:     return @"DMs";
+        case SCIVaultSourceFeed:      return @"Feed";
+        case SCIVaultSourceStories:   return @"Story";
+        case SCIVaultSourceReels:     return @"Reel";
+        case SCIVaultSourceProfile:   return @"Profile";
+        case SCIVaultSourceDMs:       return @"DMs";
+        case SCIVaultSourceThumbnail: return @"Thumb";
         case SCIVaultSourceOther:
-        default:                    return @"Other";
+        default:                      return @"Other";
     }
 }
 
 + (NSString *)symbolNameForSource:(SCIVaultSource)source {
     switch (source) {
-        case SCIVaultSourceFeed:    return @"rectangle.stack";
-        case SCIVaultSourceStories: return @"rectangle.portrait.on.rectangle.portrait.angled";
-        case SCIVaultSourceReels:   return @"film.stack";
-        case SCIVaultSourceProfile: return @"person.crop.circle";
-        case SCIVaultSourceDMs:     return @"bubble.left.and.bubble.right";
+        case SCIVaultSourceFeed:    return @"feed";//@"rectangle.stack";
+        case SCIVaultSourceStories: return @"story";//@"rectangle.portrait.on.rectangle.portrait.angled";
+        case SCIVaultSourceReels:   return @"reels";//@"film.stack";
+        case SCIVaultSourceProfile: return @"profile";//@"person.crop.circle";
+        case SCIVaultSourceDMs:     return @"messages";//@"bubble.left.and.bubble.right";
+        case SCIVaultSourceThumbnail: return @"photo_gallery";//@"photo.on.rectangle";
         case SCIVaultSourceOther:
-        default:                    return @"tray";
+        default:                    return @"chest";//@"tray";
     }
 }
 

@@ -216,7 +216,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self.bottomBarStack removeFromSuperview];
     self.bottomBarStack = nil;
 
-    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease" resource:@"filter_alt" accessibility:@"Filter"];
+    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease" resource:@"filter" accessibility:@"Filter"];
     [filterBtn addTarget:self action:@selector(presentFilter) forControlEvents:UIControlEventTouchUpInside];
 
     UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down" resource:@"sort" accessibility:@"Sort"];
@@ -443,12 +443,20 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 #pragma mark - UICollectionViewDataSource
 
+- (BOOL)showsFolderSection {
+    return self.viewMode == SCIVaultViewModeList;
+}
+
+- (BOOL)isFolderIndexPath:(NSIndexPath *)indexPath {
+    return [self showsFolderSection] && indexPath.section == 0;
+}
+
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)cv {
-    return 2; // 0 = folders, 1 = files
+    return [self showsFolderSection] ? 2 : 1;
 }
 
 - (NSInteger)collectionView:(UICollectionView *)cv numberOfItemsInSection:(NSInteger)section {
-    if (section == 0) return self.viewMode == SCIVaultViewModeList ? self.subfolders.count : 0;
+    if ([self showsFolderSection] && section == 0) return self.subfolders.count;
     NSArray *sections = self.fetchedResultsController.sections;
     if (sections.count == 0) return 0;
     return ((id<NSFetchedResultsSectionInfo>)sections[0]).numberOfObjects;
@@ -456,10 +464,10 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)cv
                             cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 0) {
+    if ([self isFolderIndexPath:indexPath]) {
         SCIVaultFolderCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kFolderCellID forIndexPath:indexPath];
         NSString *path = self.subfolders[indexPath.item];
-        [cell configureWithFolderName:[path lastPathComponent] listStyle:(self.viewMode == SCIVaultViewModeList)];
+        [cell configureWithFolderName:[path lastPathComponent]];
         return cell;
     }
 
@@ -484,13 +492,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                   layout:(UICollectionViewLayout *)layout
   sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
     CGFloat width = cv.bounds.size.width;
-    if (indexPath.section == 0) {
-        if (self.viewMode == SCIVaultViewModeList) {
-            return CGSizeMake(width, 88);
-        }
-        CGFloat totalSpacing = kGridSpacing * (kGridColumns - 1);
-        CGFloat side = (width - totalSpacing) / kGridColumns;
-        return CGSizeMake(side, side + 28);
+    if ([self isFolderIndexPath:indexPath]) {
+        return CGSizeMake(width, 88);
     }
     if (self.viewMode == SCIVaultViewModeGrid) {
         CGFloat totalSpacing = kGridSpacing * (kGridColumns - 1);
@@ -503,7 +506,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (UIEdgeInsets)collectionView:(UICollectionView *)cv
                         layout:(UICollectionViewLayout *)layout
         insetForSectionAtIndex:(NSInteger)section {
-    if (section == 0 && self.subfolders.count > 0 && self.viewMode == SCIVaultViewModeList) {
+    if ([self showsFolderSection] && section == 0 && self.subfolders.count > 0) {
         return UIEdgeInsetsMake(10, 0, 6, 0);
     }
     return UIEdgeInsetsZero;
@@ -512,8 +515,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (CGFloat)collectionView:(UICollectionView *)cv
                    layout:(UICollectionViewLayout *)layout
  minimumInteritemSpacingForSectionAtIndex:(NSInteger)section {
-    if (section == 0) {
-        return self.viewMode == SCIVaultViewModeGrid ? kGridSpacing : 0;
+    if ([self showsFolderSection] && section == 0) {
+        return 0;
     }
     return self.viewMode == SCIVaultViewModeGrid ? kGridSpacing : 0;
 }
@@ -521,8 +524,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (CGFloat)collectionView:(UICollectionView *)cv
                    layout:(UICollectionViewLayout *)layout
  minimumLineSpacingForSectionAtIndex:(NSInteger)section {
-    if (section == 0) {
-        return self.viewMode == SCIVaultViewModeGrid ? kGridSpacing : 0;
+    if ([self showsFolderSection] && section == 0) {
+        return 0;
     }
     return self.viewMode == SCIVaultViewModeGrid ? kGridSpacing : 0;
 }
@@ -532,7 +535,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (void)collectionView:(UICollectionView *)cv didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     [cv deselectItemAtIndexPath:indexPath animated:YES];
 
-    if (indexPath.section == 0) {
+    if ([self isFolderIndexPath:indexPath]) {
         NSString *subfolderPath = self.subfolders[indexPath.item];
         SCIVaultViewController *child = [[SCIVaultViewController alloc] initWithFolderPath:subfolderPath];
         [self.navigationController pushViewController:child animated:YES];
@@ -551,7 +554,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (UIContextMenuConfiguration *)collectionView:(UICollectionView *)cv
     contextMenuConfigurationForItemAtIndexPath:(NSIndexPath *)indexPath
                                          point:(CGPoint)point {
-    if (indexPath.section == 0) {
+    if ([self isFolderIndexPath:indexPath]) {
         NSString *folder = self.subfolders[indexPath.item];
         return [self contextMenuForFolder:folder];
     }

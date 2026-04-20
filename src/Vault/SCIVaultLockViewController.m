@@ -1,5 +1,6 @@
 #import "SCIVaultLockViewController.h"
 #import "SCIVaultManager.h"
+#import "../Utils.h"
 
 static NSInteger const kPasscodeLength = 4;
 
@@ -187,8 +188,12 @@ static NSInteger const kPasscodeLength = 4;
                 [rowStack addArrangedSubview:spacer];
             } else if (n == -2) {
                 UIButton *del = [self createKeypadButton:nil tag:-2];
-                UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightRegular];
-                [del setImage:[UIImage systemImageNamed:@"delete.left" withConfiguration:cfg] forState:UIControlStateNormal];
+                UIImage *deleteIcon = [SCIUtils sci_resourceImageNamed:@"backspace" template:YES maxPointSize:24.0];
+                if (!deleteIcon) {
+                    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:24 weight:UIImageSymbolWeightRegular];
+                    deleteIcon = [UIImage systemImageNamed:@"delete.left" withConfiguration:cfg];
+                }
+                [del setImage:deleteIcon forState:UIControlStateNormal];
                 [del setTitle:@"" forState:UIControlStateNormal];
                 del.tintColor = [UIColor labelColor];
                 [del addTarget:self action:@selector(deleteTapped) forControlEvents:UIControlEventTouchUpInside];

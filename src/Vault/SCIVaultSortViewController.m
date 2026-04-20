@@ -1,4 +1,56 @@
 #import "SCIVaultSortViewController.h"
+#import "../Utils.h"
+
+static UIImage *SCIVaultSortSheetIcon(NSString *resourceName, NSString *systemFallback, CGFloat pointSize) {
+    UIImage *img = resourceName.length > 0
+        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:pointSize]
+        : nil;
+    if (img) {
+        return img;
+    }
+    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize
+                                                                                       weight:UIImageSymbolWeightMedium];
+    return [UIImage systemImageNamed:systemFallback withConfiguration:cfg];
+}
+
+static NSString *SCIVaultSortResourceSymbol(SCIVaultSortMode mode) {
+    switch (mode) {
+        case SCIVaultSortModeDateAddedDesc:
+        case SCIVaultSortModeDateAddedAsc:
+            return @"calendar";
+        case SCIVaultSortModeNameAsc:
+        case SCIVaultSortModeNameDesc:
+            return @"text";
+        case SCIVaultSortModeSizeDesc:
+            return @"size_large";
+        case SCIVaultSortModeSizeAsc:
+            return @"size_small";
+        case SCIVaultSortModeTypeAsc:
+            return @"photo";
+        case SCIVaultSortModeTypeDesc:
+            return @"video";
+    }
+    return @"sort";
+}
+
+static NSString *SCIVaultSortFallbackSymbol(SCIVaultSortMode mode) {
+    switch (mode) {
+        case SCIVaultSortModeDateAddedDesc:
+        case SCIVaultSortModeDateAddedAsc:
+            return @"calendar";
+        case SCIVaultSortModeNameAsc:
+        case SCIVaultSortModeNameDesc:
+            return @"textformat";
+        case SCIVaultSortModeSizeDesc:
+        case SCIVaultSortModeSizeAsc:
+            return @"internaldrive";
+        case SCIVaultSortModeTypeAsc:
+            return @"photo";
+        case SCIVaultSortModeTypeDesc:
+            return @"video";
+    }
+    return @"arrow.up.arrow.down";
+}
 
 @interface SCIVaultSortChip : UIButton
 @property (nonatomic, assign) SCIVaultSortMode mode;
@@ -11,8 +63,7 @@
 - (instancetype)initWithMode:(SCIVaultSortMode)mode {
     if ((self = [super initWithFrame:CGRectZero])) {
         _mode = mode;
-        self.layer.cornerRadius = 10;
-        self.layer.borderWidth = 1;
+        self.layer.cornerRadius = 12;
         self.contentEdgeInsets = UIEdgeInsetsMake(0, 12, 0, 12);
         self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
         [self updateChipAppearance];
@@ -27,7 +78,7 @@
 
 - (void)updateChipAppearance {
     if (self.selectedChip) {
-        self.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.18];
+        self.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.2];
         self.tintColor = [UIColor systemBlueColor];
         [self setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
         self.layer.borderColor = [UIColor systemBlueColor].CGColor;
@@ -75,8 +126,8 @@
     switch (mode) {
         case SCIVaultSortModeDateAddedDesc: return @"Newest first";
         case SCIVaultSortModeDateAddedAsc:  return @"Oldest first";
-        case SCIVaultSortModeNameAsc:       return @"Name A–Z";
-        case SCIVaultSortModeNameDesc:      return @"Name Z–A";
+        case SCIVaultSortModeNameAsc:       return @"Name A-Z";
+        case SCIVaultSortModeNameDesc:      return @"Name Z-A";
         case SCIVaultSortModeSizeDesc:      return @"Largest first";
         case SCIVaultSortModeSizeAsc:       return @"Smallest first";
         case SCIVaultSortModeTypeAsc:       return @"Images first";
@@ -97,26 +148,11 @@
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor systemBackgroundColor];
     [self setupNavigationBar];
-    [self configureSheetPresentation];
     [self setupContent];
 }
 
 - (void)setupNavigationBar {
     self.title = @"Sort";
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-        initWithBarButtonSystemItem:UIBarButtonSystemItemDone
-                             target:self
-                             action:@selector(dismissController)];
-}
-
-- (void)configureSheetPresentation {
-    UISheetPresentationController *sheet = self.sheetPresentationController;
-    if (sheet) {
-        sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent,
-                          UISheetPresentationControllerDetent.largeDetent];
-        sheet.prefersGrabberVisible = YES;
-        sheet.preferredCornerRadius = 20;
-    }
 }
 
 - (void)setupContent {
@@ -141,8 +177,6 @@
         @[@(SCIVaultSortModeTypeAsc),       @(SCIVaultSortModeTypeDesc)],
     ];
 
-    NSArray<NSString *> *icons = @[@"calendar", @"textformat", @"internaldrive", @"photo.on.rectangle"];
-
     for (NSInteger i = 0; i < rows.count; i++) {
         UIStackView *row = [[UIStackView alloc] init];
         row.axis = UILayoutConstraintAxisHorizontal;
@@ -153,8 +187,8 @@
             SCIVaultSortMode mode = (SCIVaultSortMode)modeNum.integerValue;
             SCIVaultSortChip *chip = [[SCIVaultSortChip alloc] initWithMode:mode];
             [chip setTitle:[SCIVaultSortViewController labelForMode:mode] forState:UIControlStateNormal];
-            UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightMedium];
-            [chip setImage:[UIImage systemImageNamed:icons[i] withConfiguration:cfg] forState:UIControlStateNormal];
+            UIImage *icon = SCIVaultSortSheetIcon(SCIVaultSortResourceSymbol(mode), SCIVaultSortFallbackSymbol(mode), 14.0);
+            [chip setImage:icon forState:UIControlStateNormal];
             chip.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
             chip.selectedChip = (mode == self.currentSortMode);
             [chip addTarget:self action:@selector(chipTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -169,9 +203,8 @@
 - (void)chipTapped:(SCIVaultSortChip *)chip {
     self.currentSortMode = chip.mode;
     for (SCIVaultSortChip *c in self.chips) c.selectedChip = (c.mode == chip.mode);
-
     if ([self.delegate respondsToSelector:@selector(sortController:didSelectSortMode:)]) {
-        [self.delegate sortController:self didSelectSortMode:chip.mode];
+        [self.delegate sortController:self didSelectSortMode:self.currentSortMode];
     }
     [self dismissController];
 }
