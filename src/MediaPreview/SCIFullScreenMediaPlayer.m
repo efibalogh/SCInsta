@@ -1,15 +1,17 @@
+#import <Photos/Photos.h>
+#import <AVFoundation/AVFoundation.h>
+
 #import "SCIFullScreenMediaPlayer.h"
 #import "SCIMediaItem.h"
 #import "SCIFullScreenImageViewController.h"
 #import "SCIFullScreenVideoViewController.h"
 #import "../InstagramHeaders.h"
 #import "../Utils.h"
+#import "../Shared/SCIMediaChrome.h"
 #import "../Vault/SCIVaultFile.h"
 #import "../Vault/SCIVaultSaveMetadata.h"
 #import "../Vault/SCIVaultCoreDataStack.h"
 #import "../Downloader/Download.h"
-#import <Photos/Photos.h>
-#import <AVFoundation/AVFoundation.h>
 
 static SCIDownloadDelegate *SCIMediaPlayerShareDelegate(void) {
     static SCIDownloadDelegate *delegate = nil;
@@ -38,23 +40,12 @@ static SCIDownloadDelegate *SCIMediaPlayerSaveVaultDelegate(void) {
     return delegate;
 }
 
-static CGFloat const kTopBarContentHeight = 44.0;
-static CGFloat const kBottomBarHeight = 44.0;
-
 static CGFloat const kDismissAxisLockSlop = 14.0;
 static CGFloat const kDismissProgressDenominator = 320.0;
 static CGFloat const kDismissProgressCommit = 0.28;
 static CGFloat const kDismissVelocityCommit = 650.0;
 static CGFloat const kDismissFinishDuration = 0.32;
 static CGFloat const kDismissCancelSpringDamping = 0.82;
-
-static UIImage *SCIFullScreenResourceOrSystem(NSString *resourceName, NSString *systemName, UIImageSymbolConfiguration *sym) {
-    UIImage *img = [SCIUtils sci_resourceImageNamed:resourceName template:YES];
-    if (!img) {
-        img = [UIImage systemImageNamed:systemName withConfiguration:sym];
-    }
-    return img;
-}
 
 static void SCICollectAVPlayersFromLayer(CALayer *layer, NSMutableSet<AVPlayer *> *players) {
     if (!layer || !players) return;
@@ -75,12 +66,10 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
     UIApplication *app = [UIApplication sharedApplication];
     NSMutableArray<UIWindow *> *windows = [NSMutableArray array];
 
-    if (@available(iOS 13.0, *)) {
-        for (UIScene *scene in app.connectedScenes) {
-            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-            UIWindowScene *windowScene = (UIWindowScene *)scene;
-            [windows addObjectsFromArray:windowScene.windows];
-        }
+    for (UIScene *scene in app.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        [windows addObjectsFromArray:windowScene.windows];
     }
 
     if (windows.count == 0) {
@@ -94,10 +83,7 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 
     NSMutableArray<AVPlayer *> *playingPlayers = [NSMutableArray array];
     for (AVPlayer *player in players) {
-        BOOL isPlaying = player.rate > 0.0;
-        if (@available(iOS 10.0, *)) {
-            isPlaying = isPlaying || (player.timeControlStatus == AVPlayerTimeControlStatusPlaying);
-        }
+        BOOL isPlaying = (player.rate > 0.0) || (player.timeControlStatus == AVPlayerTimeControlStatusPlaying);
         if (isPlaying) {
             [playingPlayers addObject:player];
         }
@@ -130,6 +116,7 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 
 @property (nonatomic, assign) BOOL dismissPanDecided;
 @property (nonatomic, assign) BOOL dismissPanIsVertical;
+@property (nonatomic, weak) UIScrollView *pageScrollView;
 
 @property (nonatomic, copy) NSArray<AVPlayer *> *pausedUnderlyingPlayers;
 
@@ -231,16 +218,36 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 }
 
 + (void)showImage:(UIImage *)image {
+    [self showImage:image metadata:nil];
+}
+
++ (void)showImage:(UIImage *)image metadata:(SCIVaultSaveMetadata *)metadata {
     if (!image) return;
     SCIMediaItem *item = [SCIMediaItem itemWithImage:image];
+    item.vaultMetadata = metadata;
+    if (metadata.sourceUsername.length > 0) {
+        item.title = metadata.sourceUsername;
+    }
+    item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
+
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     [player playItems:@[item] startingAtIndex:0 fromViewController:topMostController()];
 }
 
 + (void)showRemoteImageURL:(NSURL *)url {
+    [self showRemoteImageURL:url metadata:nil];
+}
+
++ (void)showRemoteImageURL:(NSURL *)url metadata:(SCIVaultSaveMetadata *)metadata {
     if (!url) return;
 
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
+    item.vaultMetadata = metadata;
+    if (metadata.sourceUsername.length > 0) {
+        item.title = metadata.sourceUsername;
+    }
+    item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
+
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     UIViewController *presenter = topMostController();
     [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
@@ -248,16 +255,12 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(NSString *)username {
     if (!url) return;
-
-    SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
-    if (username.length) {
-        item.title = username;
+    SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
+    meta.source = (int16_t)SCIVaultSourceProfile;
+    if (username.length > 0) {
+        meta.sourceUsername = username;
     }
-    item.vaultSaveSource = (NSInteger)SCIVaultSourceProfile;
-
-    SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    UIViewController *presenter = topMostController();
-    [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
+    [self showRemoteImageURL:url metadata:meta];
 }
 
 #pragma mark - Present
@@ -270,7 +273,15 @@ fromViewController:(UIViewController *)presenter {
     _isSingleItemMode = (items.count <= 1);
     _isToolbarVisible = YES;
 
-    self.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    // Pause any currently-playing in-app AVPlayers before presenting the preview,
+    // regardless of whether the first preview item is image or video.
+    [self pauseUnderlyingPlaybackIfNeeded];
+
+    // Only force full-screen outside vault so feed/reels playback reliably stops.
+    // Keep vault previews over-full-screen to preserve existing vault presentation behavior.
+    self.modalPresentationStyle = self.isFromVault
+        ? UIModalPresentationOverFullScreen
+        : UIModalPresentationFullScreen;
     self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [presenter presentViewController:self animated:YES completion:nil];
 }
@@ -279,6 +290,7 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     self.view.backgroundColor = [UIColor blackColor];
 
     [self pauseUnderlyingPlaybackIfNeeded];
@@ -304,139 +316,105 @@ fromViewController:(UIViewController *)presenter {
     _topToolbar.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_topToolbar];
 
-    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:SCIMediaChromeBlurEffect()];
     blurView.translatesAutoresizingMaskIntoConstraints = NO;
-    [_topToolbar insertSubview:blurView atIndex:0];
-    [NSLayoutConstraint activateConstraints:@[
-        [blurView.topAnchor constraintEqualToAnchor:_topToolbar.topAnchor],
-        [blurView.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [blurView.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
-        [blurView.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
-    ]];
+    [_topToolbar addSubview:blurView];
+
+    UIView *contentView = [[UIView alloc] initWithFrame:CGRectZero];
+    contentView.translatesAutoresizingMaskIntoConstraints = NO;
+    [_topToolbar addSubview:contentView];
 
     UIView *bottomBorder = [[UIView alloc] initWithFrame:CGRectZero];
     bottomBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    bottomBorder.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
+    bottomBorder.backgroundColor = [UIColor separatorColor];
     [_topToolbar addSubview:bottomBorder];
-    [NSLayoutConstraint activateConstraints:@[
-        [bottomBorder.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [bottomBorder.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
-        [bottomBorder.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
-        [bottomBorder.heightAnchor constraintEqualToConstant:1.0 / [UIScreen mainScreen].scale],
-    ]];
-
-    UIImageSymbolConfiguration *sym = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
 
     _closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _closeButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_closeButton setImage:[UIImage systemImageNamed:@"xmark" withConfiguration:sym] forState:UIControlStateNormal];
-    _closeButton.tintColor = [UIColor whiteColor];
+    [_closeButton setImage:SCIMediaChromeTopIcon(@"xmark", @"xmark") forState:UIControlStateNormal];
+    _closeButton.tintColor = [UIColor labelColor];
+    _closeButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
     [_closeButton addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
-    [_topToolbar addSubview:_closeButton];
+    [contentView addSubview:_closeButton];
 
-    _counterLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _counterLabel = SCIMediaChromeTitleLabel(@"");
     _counterLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _counterLabel.textColor = [UIColor whiteColor];
-    _counterLabel.font = [UIFont monospacedDigitSystemFontOfSize:16.0 weight:UIFontWeightMedium];
-    _counterLabel.textAlignment = NSTextAlignmentCenter;
-    [_topToolbar addSubview:_counterLabel];
+    [contentView addSubview:_counterLabel];
 
     [NSLayoutConstraint activateConstraints:@[
         [_topToolbar.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [_topToolbar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_topToolbar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [_topToolbar.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:kTopBarContentHeight],
+        [_topToolbar.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:SCIMediaChromeTopBarContentHeight],
 
-        [_closeButton.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor constant:16],
-        [_closeButton.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [_closeButton.heightAnchor constraintEqualToConstant:kTopBarContentHeight],
+        [blurView.topAnchor constraintEqualToAnchor:_topToolbar.topAnchor],
+        [blurView.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
+        [blurView.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
+        [blurView.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
+
+        [contentView.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
+        [contentView.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
+        [contentView.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
+        [contentView.heightAnchor constraintEqualToConstant:SCIMediaChromeTopBarContentHeight],
+
+        [bottomBorder.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
+        [bottomBorder.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
+        [bottomBorder.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
+        [bottomBorder.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale],
+
+        [_closeButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:16],
+        [_closeButton.topAnchor constraintEqualToAnchor:contentView.topAnchor],
+        [_closeButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor],
         [_closeButton.widthAnchor constraintEqualToConstant:44],
 
-        [_counterLabel.centerXAnchor constraintEqualToAnchor:_topToolbar.centerXAnchor],
+        [_counterLabel.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
         [_counterLabel.centerYAnchor constraintEqualToAnchor:_closeButton.centerYAnchor],
     ]];
 
     if (_isFromVault) {
         _topFavoriteButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _topFavoriteButton.translatesAutoresizingMaskIntoConstraints = NO;
-        _topFavoriteButton.tintColor = [UIColor whiteColor];
+        [_topFavoriteButton setImage:SCIMediaChromeTopIcon(@"heart", @"heart") forState:UIControlStateNormal];
+        _topFavoriteButton.tintColor = [UIColor labelColor];
+        _topFavoriteButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentRight;
         [_topFavoriteButton addTarget:self action:@selector(favoriteTapped) forControlEvents:UIControlEventTouchUpInside];
-        [_topToolbar addSubview:_topFavoriteButton];
+        [contentView addSubview:_topFavoriteButton];
 
         [NSLayoutConstraint activateConstraints:@[
-            [_topFavoriteButton.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor constant:-16],
-            [_topFavoriteButton.centerYAnchor constraintEqualToAnchor:_closeButton.centerYAnchor],
+            [_topFavoriteButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-16],
+            [_topFavoriteButton.topAnchor constraintEqualToAnchor:contentView.topAnchor],
+            [_topFavoriteButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor],
             [_topFavoriteButton.widthAnchor constraintEqualToConstant:44],
-            [_topFavoriteButton.heightAnchor constraintEqualToConstant:kTopBarContentHeight],
         ]];
+    } else {
+        _topFavoriteButton = nil;
     }
 }
 
 #pragma mark - Bottom Bar
 
 - (void)setupBottomBar {
-    _bottomBar = [[UIView alloc] initWithFrame:CGRectZero];
-    _bottomBar.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:_bottomBar];
+    _bottomBar = SCIMediaChromeInstallBottomBar(self.view);
 
-    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
-    blurView.translatesAutoresizingMaskIntoConstraints = NO;
-    [_bottomBar insertSubview:blurView atIndex:0];
-    [NSLayoutConstraint activateConstraints:@[
-        [blurView.topAnchor constraintEqualToAnchor:_bottomBar.topAnchor],
-        [blurView.bottomAnchor constraintEqualToAnchor:_bottomBar.bottomAnchor],
-        [blurView.leadingAnchor constraintEqualToAnchor:_bottomBar.leadingAnchor],
-        [blurView.trailingAnchor constraintEqualToAnchor:_bottomBar.trailingAnchor],
-    ]];
-
-    UIView *topBorder = [[UIView alloc] initWithFrame:CGRectZero];
-    topBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    topBorder.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-    [_bottomBar addSubview:topBorder];
-    [NSLayoutConstraint activateConstraints:@[
-        [topBorder.topAnchor constraintEqualToAnchor:_bottomBar.topAnchor],
-        [topBorder.leadingAnchor constraintEqualToAnchor:_bottomBar.leadingAnchor],
-        [topBorder.trailingAnchor constraintEqualToAnchor:_bottomBar.trailingAnchor],
-        [topBorder.heightAnchor constraintEqualToConstant:1.0 / [UIScreen mainScreen].scale],
-    ]];
-
-    UIImageSymbolConfiguration *sym = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
-
-    _savePhotosButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _savePhotosButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_savePhotosButton setImage:SCIFullScreenResourceOrSystem(@"download", @"arrow.down", sym) forState:UIControlStateNormal];
-    _savePhotosButton.tintColor = [UIColor whiteColor];
+    _savePhotosButton = SCIMediaChromeBottomButton(@"arrow.down.to.line", @"download", @"Save to Photos");
     [_savePhotosButton addTarget:self action:@selector(saveToPhotos) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_savePhotosButton];
 
-    _shareButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _shareButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_shareButton setImage:SCIFullScreenResourceOrSystem(@"share", @"square.and.arrow.up", sym) forState:UIControlStateNormal];
-    _shareButton.tintColor = [UIColor whiteColor];
+    _shareButton = SCIMediaChromeBottomButton(@"square.and.arrow.up", @"share", @"Share");
     [_shareButton addTarget:self action:@selector(shareMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_shareButton];
 
-    _clipboardButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _clipboardButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_clipboardButton setImage:SCIFullScreenResourceOrSystem(@"copy", @"doc.on.doc", sym) forState:UIControlStateNormal];
-    _clipboardButton.tintColor = [UIColor whiteColor];
+    _clipboardButton = SCIMediaChromeBottomButton(@"doc.on.doc", @"copy", @"Copy");
     [_clipboardButton addTarget:self action:@selector(copyMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_clipboardButton];
 
     if (_isFromVault) {
-        _deleteVaultButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        _deleteVaultButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_deleteVaultButton setImage:SCIFullScreenResourceOrSystem(@"delete", @"trash", sym) forState:UIControlStateNormal];
+        _deleteVaultButton = SCIMediaChromeBottomButton(@"trash", @"trash", @"Delete from Vault");
         _deleteVaultButton.tintColor = [UIColor systemRedColor];
         [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteVaultButton];
     } else {
-        _saveVaultButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        _saveVaultButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_saveVaultButton setImage:SCIFullScreenResourceOrSystem(@"chest", @"tray.and.arrow.down", sym) forState:UIControlStateNormal];
-        _saveVaultButton.tintColor = [UIColor whiteColor];
+        _saveVaultButton = SCIMediaChromeBottomButton(@"tray.and.arrow.down", @"chest", @"Save to Vault");
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveVaultButton];
     }
@@ -445,30 +423,7 @@ fromViewController:(UIViewController *)presenter {
         ? @[_savePhotosButton, _shareButton, _clipboardButton, _deleteVaultButton]
         : @[_savePhotosButton, _shareButton, _clipboardButton, _saveVaultButton];
 
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:row];
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    stack.axis = UILayoutConstraintAxisHorizontal;
-    stack.distribution = UIStackViewDistributionFillEqually;
-    stack.alignment = UIStackViewAlignmentCenter;
-    [_bottomBar addSubview:stack];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [stack.topAnchor constraintEqualToAnchor:_bottomBar.topAnchor],
-        [stack.leadingAnchor constraintEqualToAnchor:_bottomBar.leadingAnchor],
-        [stack.trailingAnchor constraintEqualToAnchor:_bottomBar.trailingAnchor],
-        [stack.heightAnchor constraintEqualToConstant:kBottomBarHeight],
-    ]];
-
-    for (UIView *v in row) {
-        [v.heightAnchor constraintEqualToConstant:kBottomBarHeight].active = YES;
-    }
-
-    [NSLayoutConstraint activateConstraints:@[
-        [_bottomBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [_bottomBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [_bottomBar.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
-        [_bottomBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-kBottomBarHeight],
-    ]];
+    SCIMediaChromeInstallBottomRow(_bottomBar, row);
 }
 
 #pragma mark - Page View Controller
@@ -491,6 +446,13 @@ fromViewController:(UIViewController *)presenter {
         [_pageViewController.view.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_pageViewController.view.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];
+
+    for (UIView *subview in _pageViewController.view.subviews) {
+        if ([subview isKindOfClass:[UIScrollView class]]) {
+            _pageScrollView = (UIScrollView *)subview;
+            break;
+        }
+    }
 
     UIViewController *initialVC = [self viewControllerForIndex:_currentIndex];
     if (initialVC) {
@@ -581,11 +543,13 @@ fromViewController:(UIViewController *)presenter {
 - (void)updateCounter {
     if (_isSingleItemMode) {
         _counterLabel.text = @"";
+        [_counterLabel sizeToFit];
         return;
     }
     _counterLabel.text = [NSString stringWithFormat:@"%ld of %lu",
                           (long)_currentIndex + 1,
                           (unsigned long)_items.count];
+    [_counterLabel sizeToFit];
 }
 
 - (void)updateFavoriteButton {
@@ -593,10 +557,9 @@ fromViewController:(UIViewController *)presenter {
 
     SCIMediaItem *item = [self currentItem];
     BOOL isFav = item.vaultFile.isFavorite;
-    UIImageSymbolConfiguration *sym = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
     UIImage *img = isFav
-        ? SCIFullScreenResourceOrSystem(@"heart_filled", @"heart.fill", sym)
-        : SCIFullScreenResourceOrSystem(@"heart", @"heart", sym);
+        ? SCIMediaChromeTopIcon(@"heart_filled", @"heart.fill")
+        : SCIMediaChromeTopIcon(@"heart", @"heart");
 
     if (!item.vaultFile) {
         _topFavoriteButton.hidden = YES;
@@ -605,7 +568,7 @@ fromViewController:(UIViewController *)presenter {
 
     _topFavoriteButton.hidden = NO;
     [_topFavoriteButton setImage:img forState:UIControlStateNormal];
-    _topFavoriteButton.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor whiteColor];
+    _topFavoriteButton.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
 }
 
 #pragma mark - Toolbar Toggle
@@ -926,6 +889,7 @@ fromViewController:(UIViewController *)presenter {
     if (pan.state == UIGestureRecognizerStateBegan) {
         _dismissPanDecided = NO;
         _dismissPanIsVertical = NO;
+        _pageScrollView.scrollEnabled = YES;
         return;
     }
 
@@ -942,6 +906,7 @@ fromViewController:(UIViewController *)presenter {
         }
         _dismissPanDecided = YES;
         _dismissPanIsVertical = fabs(ty) >= fabs(tx);
+        _pageScrollView.scrollEnabled = !_dismissPanIsVertical;
     }
 
     if (!_dismissPanIsVertical) {
@@ -1002,6 +967,7 @@ fromViewController:(UIViewController *)presenter {
                 }];
             }
             _dismissPanDecided = NO;
+            _pageScrollView.scrollEnabled = YES;
             break;
         }
         case UIGestureRecognizerStateFailed: {
@@ -1010,6 +976,7 @@ fromViewController:(UIViewController *)presenter {
             }
             _dismissPanDecided = NO;
             _dismissPanIsVertical = NO;
+            _pageScrollView.scrollEnabled = YES;
             break;
         }
         default:
@@ -1020,6 +987,7 @@ fromViewController:(UIViewController *)presenter {
 - (void)resetDismissInteractiveStateAnimated:(BOOL)animated {
     _dismissPanDecided = NO;
     _dismissPanIsVertical = NO;
+    _pageScrollView.scrollEnabled = YES;
     void (^animations)(void) = ^{
         self->_pageViewController.view.transform = CGAffineTransformIdentity;
         self.view.backgroundColor = [UIColor blackColor];

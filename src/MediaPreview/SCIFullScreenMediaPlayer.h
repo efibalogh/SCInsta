@@ -36,7 +36,9 @@ fromViewController:(UIViewController *)presenter;
               metadata:(nullable SCIVaultSaveMetadata *)metadata;
 
 + (void)showImage:(UIImage *)image;
++ (void)showImage:(UIImage *)image metadata:(nullable SCIVaultSaveMetadata *)metadata;
 + (void)showRemoteImageURL:(NSURL *)url;
++ (void)showRemoteImageURL:(NSURL *)url metadata:(nullable SCIVaultSaveMetadata *)metadata;
 /// Profile / avatar long-press: sets vault source + optional username for “Save to Vault”.
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(nullable NSString *)username;
 

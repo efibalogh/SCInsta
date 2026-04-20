@@ -10,6 +10,7 @@
 #import "SCIVaultFilterViewController.h"
 #import "SCIVaultSettingsViewController.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "../Shared/SCIMediaChrome.h"
 #import "../InstagramHeaders.h"
 #import "../Utils.h"
 #import <CoreData/CoreData.h>
@@ -23,14 +24,7 @@ static NSString * const kViewModeKey    = @"scinsta_vault_view_mode"; // 0 = gri
 
 static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
-/// Matches `SCIFullScreenMediaPlayer` bottom bar row height (tab-style actions).
-static CGFloat const kVaultBottomBarHeight = 44.0;
 static CGFloat const kVaultMenuIconPointSize = 18.0;
-
-/// Adaptive material: follows light/dark automatically.
-static UIBlurEffect *SCIVaultAdaptiveChromeBlurEffect(void) {
-    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
-}
 
 static UIImage *SCIVaultMenuActionIcon(NSString *resourceName, NSString *systemName) {
     UIImage *img = resourceName.length > 0
@@ -185,119 +179,33 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     if (!nav) {
         return;
     }
-
-    UINavigationBar *bar = nav.navigationBar;
-    UIBlurEffect *blur = SCIVaultAdaptiveChromeBlurEffect();
-    UIColor *fg = [UIColor labelColor];
-    UIColor *hairline = [UIColor separatorColor];
-
-    UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
-    [appearance configureWithTransparentBackground];
-    appearance.backgroundEffect = blur;
-    appearance.shadowColor = hairline;
-    NSDictionary *titleAttrs = @{
-        NSForegroundColorAttributeName: fg,
-        NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold],
-    };
-    appearance.titleTextAttributes = titleAttrs;
-    appearance.largeTitleTextAttributes = titleAttrs;
-
-    UIBarButtonItemAppearance *itemAppearance = [[UIBarButtonItemAppearance alloc] init];
-    itemAppearance.normal.titleTextAttributes = @{NSForegroundColorAttributeName: fg};
-    appearance.buttonAppearance = itemAppearance;
-    appearance.doneButtonAppearance = itemAppearance;
-
-    bar.standardAppearance = appearance;
-    bar.scrollEdgeAppearance = appearance;
-    bar.compactAppearance = appearance;
-    bar.compactScrollEdgeAppearance = appearance;
-
-    bar.translucent = YES;
-    bar.tintColor = fg;
+    SCIApplyMediaChromeNavigationBar(nav.navigationBar);
 
     if ([self.navigationItem.titleView isKindOfClass:[UILabel class]]) {
-        ((UILabel *)self.navigationItem.titleView).textColor = fg;
+        ((UILabel *)self.navigationItem.titleView).textColor = [UIColor labelColor];
     }
 }
 
 - (void)setupCenteredTitle {
     NSString *text = self.currentFolderPath.length > 0 ? [self.currentFolderPath lastPathComponent] : @"Media Vault";
-    UILabel *label = [[UILabel alloc] init];
-    label.text = text;
-    label.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    label.textColor = [UIColor labelColor];
-    label.textAlignment = NSTextAlignmentCenter;
-    [label sizeToFit];
-    self.navigationItem.titleView = label;
+    self.navigationItem.titleView = SCIMediaChromeTitleLabel(text);
 }
 
 - (void)setupNavigationItems {
     if (self.navigationController.viewControllers.firstObject == self) {
-        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
-            initWithBarButtonSystemItem:UIBarButtonSystemItemClose
-                                 target:self
-                                 action:@selector(dismissSelf)];
+        self.navigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItem(@"xmark", @"xmark", self, @selector(dismissSelf));
     }
 
-    UIImage *settingsImg = [SCIUtils sci_resourceImageNamed:@"settings" template:YES];
-    if (!settingsImg) {
-        settingsImg = [UIImage systemImageNamed:@"gear"];
-    }
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-        initWithImage:settingsImg
-                style:UIBarButtonItemStylePlain
-               target:self
-               action:@selector(pushSettings)];
+    self.navigationItem.rightBarButtonItem = SCIMediaChromeTopBarButtonItem(@"settings", @"gear", self, @selector(pushSettings));
 }
 
 - (void)setupBottomToolbar {
-    self.bottomBar = [[UIView alloc] initWithFrame:CGRectZero];
-    self.bottomBar.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.bottomBar];
-
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:SCIVaultAdaptiveChromeBlurEffect()];
-    blurView.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.bottomBar addSubview:blurView];
-    [NSLayoutConstraint activateConstraints:@[
-        [blurView.topAnchor constraintEqualToAnchor:self.bottomBar.topAnchor],
-        [blurView.bottomAnchor constraintEqualToAnchor:self.bottomBar.bottomAnchor],
-        [blurView.leadingAnchor constraintEqualToAnchor:self.bottomBar.leadingAnchor],
-        [blurView.trailingAnchor constraintEqualToAnchor:self.bottomBar.trailingAnchor],
-    ]];
-
-    UIView *topBorder = [[UIView alloc] initWithFrame:CGRectZero];
-    topBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    topBorder.backgroundColor = [UIColor separatorColor];
-    [self.bottomBar addSubview:topBorder];
-    [NSLayoutConstraint activateConstraints:@[
-        [topBorder.topAnchor constraintEqualToAnchor:self.bottomBar.topAnchor],
-        [topBorder.leadingAnchor constraintEqualToAnchor:self.bottomBar.leadingAnchor],
-        [topBorder.trailingAnchor constraintEqualToAnchor:self.bottomBar.trailingAnchor],
-        [topBorder.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale],
-    ]];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [self.bottomBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.bottomBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.bottomBar.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
-        [self.bottomBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-kVaultBottomBarHeight],
-    ]];
-
+    self.bottomBar = SCIMediaChromeInstallBottomBar(self.view);
     [self refreshBottomToolbarItems];
 }
 
 - (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName resource:(NSString *)resourceName accessibility:(NSString *)label {
-    UIImageSymbolConfiguration *sym = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-    btn.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImage *img = resourceName.length ? [SCIUtils sci_resourceImageNamed:resourceName template:YES] : nil;
-    if (!img) {
-        img = [UIImage systemImageNamed:symbolName withConfiguration:sym];
-    }
-    [btn setImage:img forState:UIControlStateNormal];
-    btn.tintColor = [UIColor labelColor];
-    btn.accessibilityLabel = label;
-    return btn;
+    return SCIMediaChromeBottomButton(symbolName, resourceName, label);
 }
 
 - (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName accessibility:(NSString *)label {
@@ -308,10 +216,10 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self.bottomBarStack removeFromSuperview];
     self.bottomBarStack = nil;
 
-    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease.circle" resource:@"slider" accessibility:@"Filter"];
+    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease" resource:@"filter_alt" accessibility:@"Filter"];
     [filterBtn addTarget:self action:@selector(presentFilter) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down.circle" resource:@"sort" accessibility:@"Sort"];
+    UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down" resource:@"sort" accessibility:@"Sort"];
     [sortBtn addTarget:self action:@selector(presentSort) forControlEvents:UIControlEventTouchUpInside];
 
     NSString *toggleSymbol = self.viewMode == SCIVaultViewModeGrid ? @"list.bullet" : @"square.grid.2x2";
@@ -325,23 +233,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn];
 
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:row];
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    stack.axis = UILayoutConstraintAxisHorizontal;
-    stack.distribution = UIStackViewDistributionFillEqually;
-    stack.alignment = UIStackViewAlignmentCenter;
-    [self.bottomBar addSubview:stack];
-    self.bottomBarStack = stack;
-
-    [NSLayoutConstraint activateConstraints:@[
-        [stack.topAnchor constraintEqualToAnchor:self.bottomBar.topAnchor],
-        [stack.leadingAnchor constraintEqualToAnchor:self.bottomBar.leadingAnchor],
-        [stack.trailingAnchor constraintEqualToAnchor:self.bottomBar.trailingAnchor],
-        [stack.heightAnchor constraintEqualToConstant:kVaultBottomBarHeight],
-    ]];
-    for (UIView *v in row) {
-        [v.heightAnchor constraintEqualToConstant:kVaultBottomBarHeight].active = YES;
-    }
+    self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, row);
 }
 
 #pragma mark - Collection View
@@ -707,7 +599,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [weakSelf presentViewController:acVC animated:YES completion:nil];
     }];
 
-    UIImage *deleteImg = SCIVaultMenuActionIcon(@"delete", @"trash");
+    UIImage *deleteImg = SCIVaultMenuActionIcon(@"trash", @"trash");
     UIAction *deleteAction = [UIAction actionWithTitle:@"Delete"
                                                  image:deleteImg
                                             identifier:nil
@@ -751,7 +643,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                                 identifier:nil
                                                    handler:^(UIAction *a) { [weakSelf renameFolder:folderPath]; }];
 
-    UIImage *folderDeleteImg = SCIVaultMenuActionIcon(@"delete", @"trash");
+    UIImage *folderDeleteImg = SCIVaultMenuActionIcon(@"trash", @"trash");
         UIAction *deleteAction = [UIAction actionWithTitle:@"Delete folder"
                                                      image:folderDeleteImg
                                                 identifier:nil
@@ -1045,6 +937,24 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     vc.currentSortMode = self.sortMode;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
     [self configureVaultSheetForNavigation:nav];
+
+    UISheetPresentationController *sheet = nav.sheetPresentationController;
+    if (sheet) {
+        if (@available(iOS 16.0, *)) {
+            UISheetPresentationControllerDetent *compact = [UISheetPresentationControllerDetent
+                customDetentWithIdentifier:@"scinsta.vault.sort.compact"
+                                   resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
+                CGFloat target = MIN(430.0, context.maximumDetentValue * 0.58);
+                return MAX(330.0, target);
+            }];
+            sheet.detents = @[compact, UISheetPresentationControllerDetent.mediumDetent];
+            sheet.selectedDetentIdentifier = compact.identifier;
+        } else {
+            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
+        }
+        sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
+    }
+
     [self presentViewController:nav animated:YES completion:nil];
 }
 
