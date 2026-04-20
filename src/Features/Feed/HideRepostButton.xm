@@ -12,8 +12,16 @@ static UIView *SCIRepostContainerForSelector(id view, NSString *selectorName) {
     return (containerView && containerView != view) ? containerView : buttonView;
 }
 
+static inline BOOL SCIHideFeedRepostEnabled(void) {
+    return [SCIUtils getBoolPref:@"hide_repost_button_feed"];
+}
+
+static inline BOOL SCIHideReelsRepostEnabled(void) {
+    return [SCIUtils getBoolPref:@"hide_repost_button_reels"];
+}
+
 static void SCIHideFeedRepostButtons(id view) {
-    if (![SCIUtils getBoolPref:@"hide_repost_button"]) return;
+    if (!SCIHideFeedRepostEnabled()) return;
 
     UIView *repostContainer = SCIRepostContainerForSelector(view, @"repostButton");
     if (repostContainer && !repostContainer.hidden) {
@@ -44,7 +52,7 @@ static void SCIHideFeedRepostButtons(id view) {
 
 %hook IGSundialViewerUFIViewModel
 - (BOOL)shouldShowRepostButton {
-    if ([SCIUtils getBoolPref:@"hide_repost_button"]) {
+    if (SCIHideReelsRepostEnabled()) {
         return NO;
     }
 

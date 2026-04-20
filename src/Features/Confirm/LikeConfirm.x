@@ -4,9 +4,19 @@
 
 // Confirmation handlers
 
-#define CONFIRMPOSTLIKE(orig)                             \
-    if ([SCIUtils getBoolPref:@"like_confirm"]) {           \
-        NSLog(@"[SCInsta] Confirm post like triggered");  \
+#define CONFIRMFEEDLIKE(orig)                             \
+    if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {      \
+        NSLog(@"[SCInsta] Confirm feed like triggered");  \
+                                                          \
+        [SCIUtils showConfirmation:^(void) { orig; }];    \
+    }                                                     \
+    else {                                                \
+        return orig;                                      \
+    }                                                     \
+
+#define CONFIRMSTORYLIKE(orig)                            \
+    if ([SCIUtils getBoolPref:@"like_confirm_stories"]) {   \
+        NSLog(@"[SCInsta] Confirm story like triggered"); \
                                                           \
         [SCIUtils showConfirmation:^(void) { orig; }];    \
     }                                                     \
@@ -29,17 +39,17 @@
 // Liking posts
 %hook IGUFIButtonBarView
 - (void)_onLikeButtonPressed:(id)arg1 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 %end
 %hook IGFeedPhotoView
 - (void)_onDoubleTap:(id)arg1 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 %end
 %hook IGVideoPlayerOverlayContainerView
 - (void)_handleDoubleTapGesture:(id)arg1 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 %end
 
@@ -75,37 +85,37 @@
 // Liking comments
 %hook IGCommentCellController
 - (void)commentCell:(id)arg1 didTapLikeButton:(id)arg2 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 - (void)commentCell:(id)arg1 didTapLikedByButtonForUser:(id)arg2 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 - (void)commentCellDidLongPressOnLikeButton:(id)arg1 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 - (void)commentCellDidEndLongPressOnLikeButton:(id)arg1 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 - (void)commentCellDidDoubleTap:(id)arg1 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 %end
 %hook IGFeedItemPreviewCommentCell
 - (void)_didTapLikeButton {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 %end
 
 // Liking stories
 %hook IGStoryFullscreenDefaultFooterView
 - (void)_handleLikeTapped {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMSTORYLIKE(%orig);
 }
 - (void)_likeTapped {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMSTORYLIKE(%orig);
 }
 - (void)inputView:(id)arg1 didTapLikeButton:(id)arg2 {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMSTORYLIKE(%orig);
 }
 
 // For some stupid reason they removed the "liketapped" methods on newer Instagram versions
@@ -114,7 +124,7 @@
 - (void)layoutSubviews {
     %orig;
 
-    if (![SCIUtils getBoolPref:@"like_confirm"]) return;
+    if (![SCIUtils getBoolPref:@"like_confirm_stories"]) return;
 
     UIButton *likeButton = [self valueForKey:@"likeButton"];
     if (!likeButton) return;
@@ -145,6 +155,6 @@
 // DM like button (seems to be hidden)
 %hook IGDirectThreadViewController
 - (void)_didTapLikeButton {
-    CONFIRMPOSTLIKE(%orig);
+    CONFIRMFEEDLIKE(%orig);
 }
 %end
