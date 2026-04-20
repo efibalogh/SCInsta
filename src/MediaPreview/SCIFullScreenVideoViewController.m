@@ -1,6 +1,7 @@
 #import "SCIFullScreenVideoViewController.h"
 #import "SCIMediaItem.h"
 #import <AVFoundation/AVFoundation.h>
+#import "../Utils.h"
 
 @interface SCIFullScreenVideoViewController () <AVPlayerViewControllerDelegate>
 
@@ -147,7 +148,7 @@
     AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
     _playerItem = item;
     _player = [AVPlayer playerWithPlayerItem:item];
-    _player.muted = NO;
+    _player.muted = [SCIUtils getBoolPref:@"expanded_video_start_muted"];
 
     [item addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:nil];
 
@@ -175,7 +176,7 @@
 
     NSError *audioErr = nil;
     AVAudioSession *session = [AVAudioSession sharedInstance];
-    [session setCategory:AVAudioSessionCategoryAmbient error:&audioErr];
+    [session setCategory:AVAudioSessionCategoryPlayback error:&audioErr];
     [session setActive:YES error:&audioErr];
 
     _playerViewController.player = _player;

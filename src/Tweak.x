@@ -28,11 +28,14 @@ BOOL SCIForceMarkStoryAsSeen = NO;
         @"copy_description": @(YES),
         @"detailed_color_picker": @(YES),
         @"remove_screenshot_alert": @(YES),
+        @"like_confirm_feed": @(NO),
+        @"like_confirm_stories": @(NO),
         @"call_confirm": @(YES),
         @"keep_deleted_message": @(YES),
         @"profile_photo_zoom": @(YES),
         @"show_action_button": @(NO),
         @"view_thumbnail": @(NO),
+        @"expanded_video_start_muted": @(NO),
         @"action_button_default_action": @"none",
         @"reels_tap_control": @"default",
         @"nav_icon_ordering": @"default",
@@ -43,7 +46,11 @@ BOOL SCIForceMarkStoryAsSeen = NO;
         @"hide_vanish_screenshot": @(NO),
         @"disable_auto_unmuting_reels": @(YES),
         @"doom_scrolling_reel_count": @(1),
-        @"disable_home_button_refresh": @(NO)
+        @"disable_home_button_refresh": @(NO),
+        @"repost_confirm_feed": @(NO),
+        @"repost_confirm_reels": @(NO),
+        @"hide_repost_button_feed": @(NO),
+        @"hide_repost_button_reels": @(NO)
     };
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:sciDefaults];
@@ -58,7 +65,7 @@ BOOL SCIForceMarkStoryAsSeen = NO;
     if ([defaults objectForKey:@"action_button_default_action"] == nil && legacyDefaultAction != nil) {
         [defaults setObject:legacyDefaultAction forKey:@"action_button_default_action"];
     }
-    
+
     // Override instagram defaults
     if ([SCIUtils getBoolPref:@"liquid_glass_buttons"]) {
         [[NSUserDefaults standardUserDefaults] setValue:@(YES) forKey:@"instagram.override.project.lucent.navigation"];
@@ -624,7 +631,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
 %hook IGFeedItemUFICell
 - (void)UFIButtonBarDidTapOnLike:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"like_confirm"]) {
+    if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {
         NSLog(@"[SCInsta] Confirm post like triggered");
 
         [SCIUtils showConfirmation:^(void) { %orig; }];
@@ -635,7 +642,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 
 - (void)UFIButtonBarDidTapOnRepost:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"repost_confirm"]) {
+    if ([SCIUtils getBoolPref:@"repost_confirm_feed"]) {
         NSLog(@"[SCInsta] Confirm repost triggered");
 
         [SCIUtils showConfirmation:^(void) { %orig; }];
@@ -646,7 +653,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 
 - (void)UFIButtonBarDidLongPressOnRepost:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"repost_confirm"]) {
+    if ([SCIUtils getBoolPref:@"repost_confirm_feed"]) {
         NSLog(@"[SCInsta] Confirm repost triggered (long press ignored)");
     }
     else {
@@ -654,7 +661,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     }
 }
 - (void)UFIButtonBarDidLongPressOnRepost:(id)arg1 withGestureRecognizer:(id)arg2 {
-    if ([SCIUtils getBoolPref:@"repost_confirm"]) {
+    if ([SCIUtils getBoolPref:@"repost_confirm_feed"]) {
         NSLog(@"[SCInsta] Confirm repost triggered (long press ignored)");
     }
     else {
@@ -685,7 +692,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 
 - (void)_didTapRepostButton:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"repost_confirm"]) {
+    if ([SCIUtils getBoolPref:@"repost_confirm_reels"]) {
         NSLog(@"[SCInsta] Confirm repost triggered");
 
         [SCIUtils showConfirmation:^(void) { %orig; }];
@@ -696,7 +703,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 
 - (void)_didLongPressRepostButton:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"repost_confirm"]) {
+    if ([SCIUtils getBoolPref:@"repost_confirm_reels"]) {
         NSLog(@"[SCInsta] Confirm repost triggered (long press ignored)");
     }
     else {

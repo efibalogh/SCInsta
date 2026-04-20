@@ -1,5 +1,9 @@
 #import "TweakSettings.h"
 
+@interface SCITweakSettings ()
++ (NSArray *)sciFeatureSections;
+@end
+
 @implementation SCITweakSettings
 
 // MARK: - Sections
@@ -14,6 +18,10 @@
 /// `"footer`: The section footer (leave blank for no footer)
 
 + (NSArray *)sections {
+    return [self sciFeatureSections];
+}
+
++ (NSArray *)sciFeatureSections {
     return @[
         @{
             @"header": @"",
@@ -28,17 +36,186 @@
                                            subtitle:@""
                                                icon:[SCISymbol resourceSymbolWithName:@"settings" color:[UIColor labelColor] size:22]
                                         navSections:@[@{
-                                            @"header": @"",
+                                            @"header": @"Core",
                                             @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Hide ads" subtitle:@"Removes all ads from the Instagram app" defaultsKey:@"hide_ads"],
                                                 [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the meta ai buttons/functionality within the app" defaultsKey:@"hide_meta_ai"],
                                                 [SCISetting switchCellWithTitle:@"Copy description" subtitle:@"Copy description text fields by long-pressing on them" defaultsKey:@"copy_description"],
                                                 [SCISetting switchCellWithTitle:@"Do not save recent searches" subtitle:@"Search bars will no longer save your recent searches" defaultsKey:@"no_recent_searches"],
-                                                [SCISetting switchCellWithTitle:@"Use detailed color picker" subtitle:@"Long press on the eyedropper tool in stories to customize the text color more precisely" defaultsKey:@"detailed_color_picker"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Media",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Enhanced media resolution" subtitle:@"Increases the screen size reported to Instagram in outgoing requests (User-Agent), allowing higher-resolution media in feeds and downloads—especially on smaller devices." defaultsKey:@"enhanced_media_resolution"],
+                                                [SCISetting switchCellWithTitle:@"Start expanded videos muted" subtitle:@"When enabled, expanded videos open muted. You can still unmute from player controls." defaultsKey:@"expanded_video_start_muted"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Recommendations",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"No suggested users" subtitle:@"Hides all suggested users for you to follow, outside your feed" defaultsKey:@"no_suggested_users"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Confirmation",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Confirm follow" subtitle:@"Shows an alert when you click the follow button to confirm the follow" defaultsKey:@"follow_confirm"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Action button",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Show action button" subtitle:@"Adds an action button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_action_button"],
+                                                [SCISetting menuCellWithTitle:@"Default tap action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:[self menus][@"action_button_default_action"]],
+                                                [SCISetting switchCellWithTitle:@"View thumbnail" subtitle:@"Adds a view thumbnail action to the action menu that shows the cover image or video thumbnail" defaultsKey:@"view_thumbnail"]
+                                            ]
+                                        }]
+                ],
+                [SCISetting navigationCellWithTitle:@"Interface"
+                                           subtitle:@""
+                                               icon:[SCISymbol resourceSymbolWithName:@"interface" color:[UIColor labelColor] size:22]
+                                        navSections:@[@{
+                                            @"header": @"Navigation",
+                                            @"rows": @[
+                                                [SCISetting menuCellWithTitle:@"Icon order" subtitle:@"The order of the icons on the bottom navigation bar" menu:[self menus][@"nav_icon_ordering"]],
+                                                [SCISetting menuCellWithTitle:@"Swipe between tabs" subtitle:@"Lets you swipe to switch between navigation bar tabs" menu:[self menus][@"swipe_nav_tabs"]],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Appearance",
+                                            @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Enable liquid glass buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Enable liquid glass surfaces" subtitle:@"Enables liquid glass for other elements, such as menus" defaultsKey:@"liquid_glass_surfaces" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Enable teen app icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Disable app haptics" subtitle:@"Disables haptics/vibrations within the Instagram app" defaultsKey:@"disable_haptics"]
+                                                [SCISetting switchCellWithTitle:@"Disable app haptics" subtitle:@"Disables haptics/vibrations within the Instagram app" defaultsKey:@"disable_haptics"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Explore",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Hide explore posts grid" subtitle:@"Hides the grid of suggested posts on the explore/search tab" defaultsKey:@"hide_explore_grid"],
+                                                [SCISetting switchCellWithTitle:@"Hide trending searches" subtitle:@"Hides the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Hide tabs",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Hide feed tab" subtitle:@"Hides the feed/home tab on the bottom navigation bar" defaultsKey:@"hide_feed_tab" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Hide explore tab" subtitle:@"Hides the explore/search tab on the bottom navigation bar" defaultsKey:@"hide_explore_tab" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Hide messages tab" subtitle:@"Hides the direct messages tab on the bottom navigation bar" defaultsKey:@"hide_messages_tab" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Hide reels tab" subtitle:@"Hides the reels tab on the bottom navigation bar" defaultsKey:@"hide_reels_tab" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Hide create tab" subtitle:@"Hides the create tab on the bottom navigation bar" defaultsKey:@"hide_create_tab" requiresRestart:YES]
+                                            ]
+                                        }]
+                ],
+                [SCISetting navigationCellWithTitle:@"Feed"
+                                           subtitle:@""
+                                               icon:[SCISymbol resourceSymbolWithName:@"feed" color:[UIColor labelColor] size:22]
+                                        navSections:@[@{
+                                            @"header": @"Content",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Hide stories tray" subtitle:@"Hides the story tray at the top and within your feed" defaultsKey:@"hide_stories_tray"],
+                                                [SCISetting switchCellWithTitle:@"Hide entire feed" subtitle:@"Removes all content from your home feed, including posts" defaultsKey:@"hide_entire_feed"],
+                                                [SCISetting switchCellWithTitle:@"No suggested posts" subtitle:@"Removes suggested posts from your feed" defaultsKey:@"no_suggested_post"],
+                                                [SCISetting switchCellWithTitle:@"No suggested for you" subtitle:@"Hides suggested accounts for you to follow" defaultsKey:@"no_suggested_account"],
+                                                [SCISetting switchCellWithTitle:@"No suggested reels" subtitle:@"Hides suggested reels to watch" defaultsKey:@"no_suggested_reels"],
+                                                [SCISetting switchCellWithTitle:@"No suggested threads posts" subtitle:@"Hides suggested threads posts" defaultsKey:@"no_suggested_threads"],
+                                                [SCISetting switchCellWithTitle:@"Disable video autoplay" subtitle:@"Prevents videos on your feed from playing automatically" defaultsKey:@"disable_feed_autoplay"],
+                                                [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from feed posts" defaultsKey:@"hide_repost_button_feed"],
+                                                [SCISetting switchCellWithTitle:@"Hide metrics" subtitle:@"Hides the metrics numbers under posts & reels (likes, comments, reshares, shares)" defaultsKey:@"hide_metrics"],
+                                                [SCISetting switchCellWithTitle:@"Disable home button refresh" subtitle:@"Prevents feed refresh when re-tapping the home tab button" defaultsKey:@"disable_home_button_refresh"]
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Confirmation",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Confirm likes" subtitle:@"Shows an alert when you click the like button on feed posts to confirm the like" defaultsKey:@"like_confirm_feed"],
+                                                [SCISetting switchCellWithTitle:@"Confirm repost" subtitle:@"Shows an alert when you click the repost button on feed posts to confirm before reposting" defaultsKey:@"repost_confirm_feed"],
+                                                [SCISetting switchCellWithTitle:@"Confirm posting comment" subtitle:@"Shows an alert when you click the post comment button to confirm" defaultsKey:@"post_comment_confirm"]
+                                            ]
+                                        }]
+                ],
+                [SCISetting navigationCellWithTitle:@"Reels"
+                                           subtitle:@""
+                                               icon:[SCISymbol resourceSymbolWithName:@"reels" color:[UIColor labelColor] size:22]
+                                        navSections:@[@{
+                                            @"header": @"Behavior",
+                                            @"rows": @[
+                                                [SCISetting menuCellWithTitle:@"Tap Controls" subtitle:@"Change what happens when you tap on a reel" menu:[self menus][@"reels_tap_control"]],
+                                                [SCISetting switchCellWithTitle:@"Always show progress scrubber" subtitle:@"Forces the progress bar to appear on every reel" defaultsKey:@"reels_show_scrubber"],
+                                                [SCISetting switchCellWithTitle:@"Disable auto-unmuting reels" subtitle:@"Prevents reels from unmuting when the volume/silent button is pressed" defaultsKey:@"disable_auto_unmuting_reels" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Confirm reel refresh" subtitle:@"Shows an alert when you trigger a reels refresh" defaultsKey:@"refresh_reel_confirm"],
+                                                [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from reels" defaultsKey:@"hide_repost_button_reels"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Layout",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Hide reels header" subtitle:@"Hides the top navigation bar when watching reels" defaultsKey:@"hide_reels_header"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Limits",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Disable scrolling reels" subtitle:@"Prevents reels from being scrolled to the next video" defaultsKey:@"disable_scrolling_reels" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Prevent doom scrolling" subtitle:@"Limits the amount of reels available to scroll at any given time, and prevents refreshing" defaultsKey:@"prevent_doom_scrolling"],
+                                                [SCISetting stepperCellWithTitle:@"Doom scrolling limit" subtitle:@"Only loads %@ %@" defaultsKey:@"doom_scrolling_reel_count" min:1 max:100 step:1 label:@"reels" singularLabel:@"reel"]
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Confirmation",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Confirm like" subtitle:@"Shows an alert when you click the like button on reels to confirm the like" defaultsKey:@"like_confirm_reels"],
+                                                [SCISetting switchCellWithTitle:@"Confirm repost" subtitle:@"Shows an alert when you click the repost button on reels to confirm before reposting" defaultsKey:@"repost_confirm_reels"]
+                                            ]
+                                        }]
+                ],
+                [SCISetting navigationCellWithTitle:@"Stories"
+                                           subtitle:@""
+                                               icon:[SCISymbol resourceSymbolWithName:@"story" color:[UIColor labelColor] size:22]
+                                        navSections:@[@{
+                                            @"header": @"Privacy & visibility",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Disable story seen receipt" subtitle:@"Prevents automatic story seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Creation",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Use detailed color picker" subtitle:@"Long press on the eyedropper tool in stories to customize the text color more precisely" defaultsKey:@"detailed_color_picker"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Confirmation",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Confirm likes" subtitle:@"Shows an alert when you click the like button on stories to confirm the like" defaultsKey:@"like_confirm_stories"],
+                                                [SCISetting switchCellWithTitle:@"Confirm sticker interaction" subtitle:@"Shows an alert when you click a sticker on someone's story to confirm the action" defaultsKey:@"sticker_interact_confirm"]
+                                            ]
+                                        }]
+                ],
+                [SCISetting navigationCellWithTitle:@"Messages"
+                                           subtitle:@""
+                                               icon:[SCISymbol resourceSymbolWithName:@"messages" color:[UIColor labelColor] size:22]
+                                        navSections:@[@{
+                                            @"header": @"Messages",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Keep deleted messages" subtitle:@"Saves deleted messages in chat conversations" defaultsKey:@"keep_deleted_message"],
+                                                [SCISetting switchCellWithTitle:@"Manually mark messages as seen" subtitle:@"Adds a button to DM threads, which will mark messages as seen" defaultsKey:@"remove_lastseen"],
+                                                [SCISetting switchCellWithTitle:@"Disable disappearing swipe-up" subtitle:@"Blocks swipe-up gesture paths used to enter/toggle disappearing mode" defaultsKey:@"disable_disappearing_swipe_up"],
+                                                [SCISetting switchCellWithTitle:@"Disable typing status" subtitle:@"Prevents the typing indicator from being shown to others when you're typing in DMs" defaultsKey:@"disable_typing_status"],
+                                                [SCISetting switchCellWithTitle:@"No suggested chats" subtitle:@"Hides the suggested broadcast channels in direct messages" defaultsKey:@"no_suggested_chats"],
+                                                [SCISetting switchCellWithTitle:@"Hide reels blend button" subtitle:@"Hides the button in DMs to open a reels blend" defaultsKey:@"hide_reels_blend"]
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Visual messages",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Unlimited replay of visual messages" subtitle:@"Replay direct visual messages unlimited times and mark them as seen manually with the eye button" defaultsKey:@"unlimited_replay"],
+                                                [SCISetting switchCellWithTitle:@"Disable view-once limitations" subtitle:@"Makes view-once messages behave like normal visual messages (loopable/pauseable)" defaultsKey:@"disable_view_once_limitations"],
+                                                [SCISetting switchCellWithTitle:@"Disable screenshot detection" subtitle:@"Removes the screenshot-prevention features for visual messages in DMs" defaultsKey:@"remove_screenshot_alert"],
+                                                [SCISetting switchCellWithTitle:@"Hide vanish screenshot events" subtitle:@"Suppresses screenshot/screen-record callbacks while disappearing mode is active" defaultsKey:@"hide_vanish_screenshot"],
+                                                [SCISetting switchCellWithTitle:@"Disable instants creation" subtitle:@"Hides the functionality to create/send instants" defaultsKey:@"disable_instants_creation" requiresRestart:YES]
                                             ]
                                         },
                                         @{
@@ -51,175 +228,21 @@
                                             ]
                                         },
                                         @{
-                                            @"header": @"Focus/distractions",
+                                            @"header": @"Confirmation",
                                             @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"No suggested users" subtitle:@"Hides all suggested users for you to follow, outside your feed" defaultsKey:@"no_suggested_users"],
-                                                [SCISetting switchCellWithTitle:@"No suggested chats" subtitle:@"Hides the suggested broadcast channels in direct messages" defaultsKey:@"no_suggested_chats"],
-                                                [SCISetting switchCellWithTitle:@"Hide explore posts grid" subtitle:@"Hides the grid of suggested posts on the explore/search tab" defaultsKey:@"hide_explore_grid"],
-                                                [SCISetting switchCellWithTitle:@"Hide trending searches" subtitle:@"Hides the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"],
-                                                [SCISetting switchCellWithTitle:@"Hide metrics" subtitle:@"Hides the metrics numbers under posts & reels (likes, comments, reshares, shares)" defaultsKey:@"hide_metrics"],
-                                            ]
-                                        }]
-                ],
-                [SCISetting navigationCellWithTitle:@"Feed"
-                                           subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"feed" color:[UIColor labelColor] size:22]
-                                        navSections:@[@{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Hide stories tray" subtitle:@"Hides the story tray at the top and within your feed" defaultsKey:@"hide_stories_tray"],
-                                                [SCISetting switchCellWithTitle:@"Hide entire feed" subtitle:@"Removes all content from your home feed, including posts" defaultsKey:@"hide_entire_feed"],
-                                                [SCISetting switchCellWithTitle:@"No suggested posts" subtitle:@"Removes suggested posts from your feed" defaultsKey:@"no_suggested_post"],
-                                                [SCISetting switchCellWithTitle:@"No suggested for you" subtitle:@"Hides suggested accounts for you to follow" defaultsKey:@"no_suggested_account"],
-                                                [SCISetting switchCellWithTitle:@"No suggested reels" subtitle:@"Hides suggested reels to watch" defaultsKey:@"no_suggested_reels"],
-                                                [SCISetting switchCellWithTitle:@"No suggested threads posts" subtitle:@"Hides suggested threads posts" defaultsKey:@"no_suggested_threads"],
-                                                [SCISetting switchCellWithTitle:@"Disable video autoplay" subtitle:@"Prevents videos on your feed from playing automatically" defaultsKey:@"disable_feed_autoplay"],
-                                                [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from feed posts and reels" defaultsKey:@"hide_repost_button"],
-                                                [SCISetting switchCellWithTitle:@"Disable home button refresh" subtitle:@"Prevents feed refresh when re-tapping the home tab button" defaultsKey:@"disable_home_button_refresh"]
-                                            ]
-                                        }]
-                ],
-                [SCISetting navigationCellWithTitle:@"Reels"
-                                           subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"reels" color:[UIColor labelColor] size:22]
-                                        navSections:@[@{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                [SCISetting menuCellWithTitle:@"Tap Controls" subtitle:@"Change what happens when you tap on a reel" menu:[self menus][@"reels_tap_control"]],
-                                                [SCISetting switchCellWithTitle:@"Always show progress scrubber" subtitle:@"Forces the progress bar to appear on every reel" defaultsKey:@"reels_show_scrubber"],
-                                                [SCISetting switchCellWithTitle:@"Disable auto-unmuting reels" subtitle:@"Prevents reels from unmuting when the volume/silent button is pressed" defaultsKey:@"disable_auto_unmuting_reels" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Confirm reel refresh" subtitle:@"Shows an alert when you trigger a reels refresh" defaultsKey:@"refresh_reel_confirm"],
-                                            ]
-                                        },
-                                        @{
-                                            @"header": @"Hiding",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Hide reels header" subtitle:@"Hides the top navigation bar when watching reels" defaultsKey:@"hide_reels_header"],
-                                                [SCISetting switchCellWithTitle:@"Hide reels blend button" subtitle:@"Hides the button in DMs to open a reels blend" defaultsKey:@"hide_reels_blend"]
-                                            ]
-                                        },
-                                        @{
-                                            @"header": @"Limits",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Disable scrolling reels" subtitle:@"Prevents reels from being scrolled to the next video" defaultsKey:@"disable_scrolling_reels" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Prevent doom scrolling" subtitle:@"Limits the amount of reels available to scroll at any given time, and prevents refreshing" defaultsKey:@"prevent_doom_scrolling"],
-                                                [SCISetting stepperCellWithTitle:@"Doom scrolling limit" subtitle:@"Only loads %@ %@" defaultsKey:@"doom_scrolling_reel_count" min:1 max:100 step:1 label:@"reels" singularLabel:@"reel"]
-                                            ]
-                                        }]
-                ],
-                [SCISetting navigationCellWithTitle:@"Saving"
-                                           subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"download" color:[UIColor labelColor] size:22]
-                                        navSections:@[@{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                [SCISetting buttonCellWithTitle:@"Media Vault"
-                                                                      subtitle:@"View your saved media"
-                                                                          icon:[SCISymbol resourceSymbolWithName:@"chest" color:[UIColor labelColor] size:26]
-                                                                        action:^(void) { [SCIVaultViewController presentVault]; }
-                                                ],
-                                                [SCISetting switchCellWithTitle:@"Enable quick media vault access" subtitle:@"Hold down on the DM tab to open" defaultsKey:@"header_long_press_vault" requiresRestart:YES],
-                                            ]
-                                        },
-                                        @{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                                [SCISetting switchCellWithTitle:@"Show action button" subtitle:@"Adds an action button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_action_button"],
-                                                                [SCISetting menuCellWithTitle:@"Default tap action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:[self menus][@"action_button_default_action"]],
-                                                                [SCISetting switchCellWithTitle:@"View thumbnail" subtitle:@"Adds a view thumbnail action to the action menu that shows the cover image or video thumbnail" defaultsKey:@"view_thumbnail"]
-                                            ]
-                                        }]
-                ],
-                [SCISetting navigationCellWithTitle:@"Stories and messages"
-                                           subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"story" color:[UIColor labelColor] size:22]
-                                        navSections:@[@{
-                                            @"header": @"Messages",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Keep deleted messages" subtitle:@"Saves deleted messages in chat conversations" defaultsKey:@"keep_deleted_message"],
-                                                [SCISetting switchCellWithTitle:@"Manually mark messages as seen" subtitle:@"Adds a button to DM threads, which will mark messages as seen" defaultsKey:@"remove_lastseen"],
-                                                [SCISetting switchCellWithTitle:@"Disable disappearing swipe-up" subtitle:@"Blocks swipe-up gesture paths used to enter/toggle disappearing mode" defaultsKey:@"disable_disappearing_swipe_up"],
-                                                [SCISetting switchCellWithTitle:@"Disable typing status" subtitle:@"Prevents the typing indicator from being shown to others when you're typing in DMs" defaultsKey:@"disable_typing_status"],
-                                            ]
-                                        },
-                                        @{
-                                            @"header": @"Visual messages & stories",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Unlimited replay of visual messages" subtitle:@"Replay direct visual messages unlimited times and mark them as seen manually with the eye button" defaultsKey:@"unlimited_replay"],
-                                                [SCISetting switchCellWithTitle:@"Disable view-once limitations" subtitle:@"Makes view-once messages behave like normal visual messages (loopable/pauseable)" defaultsKey:@"disable_view_once_limitations"],
-                                                [SCISetting switchCellWithTitle:@"Disable screenshot detection" subtitle:@"Removes the screenshot-prevention features for visual messages in DMs" defaultsKey:@"remove_screenshot_alert"],
-                                                [SCISetting switchCellWithTitle:@"Hide vanish screenshot events" subtitle:@"Suppresses screenshot/screen-record callbacks while disappearing mode is active" defaultsKey:@"hide_vanish_screenshot"],
-                                                [SCISetting switchCellWithTitle:@"Disable story seen receipt" subtitle:@"Prevents automatic story seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
-                                                [SCISetting switchCellWithTitle:@"Disable instants creation" subtitle:@"Hides the functionality to create/send instants" defaultsKey:@"disable_instants_creation" requiresRestart:YES]
-                                            ]
-                                        }]
-                ],
-                [SCISetting navigationCellWithTitle:@"Interface"
-                                           subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"interface" color:[UIColor labelColor] size:22]
-                                        navSections:@[@{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                [SCISetting menuCellWithTitle:@"Icon order" subtitle:@"The order of the icons on the bottom navigation bar" menu:[self menus][@"nav_icon_ordering"]],
-                                                [SCISetting menuCellWithTitle:@"Swipe between tabs" subtitle:@"Lets you swipe to switch between navigation bar tabs" menu:[self menus][@"swipe_nav_tabs"]],
-                                            ]
-                                        },
-                                        @{
-                                            @"header": @"Hiding tabs",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Hide feed tab" subtitle:@"Hides the feed/home tab on the bottom navigation bar" defaultsKey:@"hide_feed_tab" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Hide explore tab" subtitle:@"Hides the explore/search tab on the bottom navigation bar" defaultsKey:@"hide_explore_tab" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Hide messages tab" subtitle:@"Hides the direct messages tab on the bottom navigation bar" defaultsKey:@"hide_messages_tab" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Hide reels tab" subtitle:@"Hides the reels tab on the bottom navigation bar" defaultsKey:@"hide_reels_tab" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Hide create tab" subtitle:@"Hides the create tab on the bottom navigation bar" defaultsKey:@"hide_create_tab" requiresRestart:YES]
-                                            ]
-                                        }]
-                ],
-                [SCISetting navigationCellWithTitle:@"Confirm actions"
-                                           subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"check" color:[UIColor labelColor] size:22]
-                                        navSections:@[@{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Confirm like: Posts/Stories" subtitle:@"Shows an alert when you click the like button on posts or stories to confirm the like" defaultsKey:@"like_confirm"],
-                                                [SCISetting switchCellWithTitle:@"Confirm like: Reels" subtitle:@"Shows an alert when you click the like button on reels to confirm the like" defaultsKey:@"like_confirm_reels"]
-                                            ]
-                                        },
-                                        @{
-                                            @"header": @"",
-                                            @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Confirm follow" subtitle:@"Shows an alert when you click the follow button to confirm the follow" defaultsKey:@"follow_confirm"],
-                                                [SCISetting switchCellWithTitle:@"Confirm repost" subtitle:@"Shows an alert when you click the repost button to confirm before resposting" defaultsKey:@"repost_confirm"],
                                                 [SCISetting switchCellWithTitle:@"Confirm call" subtitle:@"Shows an alert when you click the audio/video call button to confirm before calling" defaultsKey:@"call_confirm"],
                                                 [SCISetting switchCellWithTitle:@"Confirm voice messages" subtitle:@"Shows an alert to confirm before sending a voice message" defaultsKey:@"voice_message_confirm"],
                                                 [SCISetting switchCellWithTitle:@"Confirm follow requests" subtitle:@"Shows an alert when you accept/decline a follow request" defaultsKey:@"follow_request_confirm"],
                                                 [SCISetting switchCellWithTitle:@"Confirm shh mode" subtitle:@"Shows an alert to confirm before toggling disappearing messages" defaultsKey:@"shh_mode_confirm"],
-                                                [SCISetting switchCellWithTitle:@"Confirm posting comment" subtitle:@"Shows an alert when you click the post comment button to confirm" defaultsKey:@"post_comment_confirm"],
                                                 [SCISetting switchCellWithTitle:@"Confirm changing theme" subtitle:@"Shows an alert when you change a chat theme to confirm" defaultsKey:@"change_direct_theme_confirm"],
-                                                [SCISetting switchCellWithTitle:@"Confirm sticker interaction" subtitle:@"Shows an alert when you click a sticker on someone's story to confirm the action" defaultsKey:@"sticker_interact_confirm"]
                                             ]
                                         }]
-                ]
-            ]
-        },
-        @{
-            @"header": @"",
-            @"rows": @[
-                // [SCISetting navigationCellWithTitle:@"Experimental"
-                //                            subtitle:@""
-                //                                icon:[SCISymbol symbolWithName:@"testtube.2"]
-                //                         navSections:@[@{
-                //                             @"header": @"Warning",
-                //                             @"footer": @"These features are unstable and cause the Instagram app to crash unexpectedly.\n\nUse at your own risk!"
-                //                         },
-                //                         @{
-                //                             @"header": @"",
-                //                             @"rows": @[
-
-                //                             ]
-                //                         }
-                //                         ]
-                // ],
+                ],
+                [SCISetting buttonCellWithTitle:@"Media Vault"
+                                       subtitle:@""
+                                           icon:[SCISymbol resourceSymbolWithName:@"chest" color:[UIColor labelColor] size:22]
+                                         action:^(void) { [SCIVaultViewController presentVault]; }
+                ],
                 [SCISetting navigationCellWithTitle:@"Debug"
                                            subtitle:@""
                                                icon:[SCISymbol resourceSymbolWithName:@"toolbox" color:[UIColor labelColor] size:22]
@@ -275,9 +298,8 @@
                                             ],
                                             @"footer": @"_ Example"
                                         }
-                                        ]
+                                        ]]
                 ]
-            ]
         },
         @{
             @"header": @"Credits",
@@ -289,7 +311,6 @@
         }
     ];
 }
-
 
 // MARK: - Title
 
@@ -329,7 +350,7 @@
                                 @"value": @"none"
                             }
             ],
-            [UICommand commandWithTitle:@"Download to Photos"
+            [UICommand commandWithTitle:@"Download"
                                   image:[[SCISymbol resourceSymbolWithName:@"download" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
@@ -345,7 +366,7 @@
                                 @"value": @"download_share"
                             }
             ],
-            [UICommand commandWithTitle:@"Copy link"
+            [UICommand commandWithTitle:@"Copy Link"
                                   image:[[SCISymbol resourceSymbolWithName:@"link" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
@@ -370,7 +391,7 @@
                             }
             ],
             [UICommand commandWithTitle:@"View Thumbnail"
-                                  image:[[SCISymbol resourceSymbolWithName:@"photo_filled" color:[UIColor labelColor] size:18] image]
+                                  image:[[SCISymbol resourceSymbolWithName:@"photo_gallery" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
                                 @"defaultsKey": @"action_button_default_action",
