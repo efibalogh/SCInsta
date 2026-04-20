@@ -12,8 +12,11 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <AVFoundation/AVFoundation.h>
+#import <os/log.h>
+#import <stdarg.h>
 
 #import "ActionButtonCore.h"
+#import "ActionButtonLookupUtils.h"
 #import "../../../InstagramHeaders.h"
 #import "../../../Utils.h"
 #import "../../../Downloader/Download.h"
@@ -36,6 +39,7 @@ static NSInteger const kSCIFeedActionButtonTag = 921341;
 
 static const void *kSCIActionButtonContextAssocKey = &kSCIActionButtonContextAssocKey;
 static const void *kSCIActionButtonTapActionAssocKey = &kSCIActionButtonTapActionAssocKey;
+static const void *kSCIActionButtonHapticActionAssocKey = &kSCIActionButtonHapticActionAssocKey;
 
 @interface SCIResolvedMediaEntry : NSObject
 @property (nonatomic, strong, nullable) id mediaObject;
@@ -55,76 +59,12 @@ static const void *kSCIActionButtonTapActionAssocKey = &kSCIActionButtonTapActio
 }
 @end
 
-id SCIObjectForSelector(id target, NSString *selectorName) {
-	if (!target || selectorName.length == 0) return nil;
-
-	SEL selector = NSSelectorFromString(selectorName);
-	if (![target respondsToSelector:selector]) return nil;
-
-	return ((id (*)(id, SEL))objc_msgSend)(target, selector);
-}
-
-id SCIKVCObject(id target, NSString *key) {
-	if (!target || key.length == 0) return nil;
-
-	@try {
-		return [target valueForKey:key];
-	} @catch (__unused NSException *exception) {
-		return nil;
-	}
-}
-
-NSArray *SCIArrayFromCollection(id collection) {
-	if (!collection ||
-		[collection isKindOfClass:[NSDictionary class]] ||
-		[collection isKindOfClass:[NSString class]] ||
-		[collection isKindOfClass:[NSURL class]]) {
-		return nil;
-	}
-
-	if ([collection isKindOfClass:[NSArray class]]) {
-		return collection;
-	}
-
-	if ([collection isKindOfClass:[NSOrderedSet class]]) {
-		return [(NSOrderedSet *)collection array];
-	}
-
-	if ([collection isKindOfClass:[NSSet class]]) {
-		return [(NSSet *)collection allObjects];
-	}
-
-	if ([collection conformsToProtocol:@protocol(NSFastEnumeration)]) {
-		NSMutableArray *array = [NSMutableArray array];
-		for (id item in collection) {
-			[array addObject:item];
-		}
-		return array;
-	}
-
-	return nil;
-}
-
-static NSURL *SCIURLFromValue(id value) {
-	if (!value) return nil;
-
-	if ([value isKindOfClass:[NSURL class]]) {
-		return value;
-	}
-
-	if ([value isKindOfClass:[NSString class]]) {
-		NSString *string = (NSString *)value;
-		if (string.length == 0) return nil;
-		return [NSURL URLWithString:string];
-	}
-
-	return nil;
-}
-
-static NSString *SCIStringFromValue(id value) {
-	if ([value isKindOfClass:[NSString class]]) return value;
-	if ([value respondsToSelector:@selector(stringValue)]) return [value stringValue];
-	return nil;
+static void SCIDMTrace(NSString *format, ...) {
+	va_list args;
+	va_start(args, format);
+	NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
+	va_end(args);
+	os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_DEFAULT, "[SCInsta][DMTrace] %{public}@", message ?: @"(nil)");
 }
 
 static BOOL SCIIsVideoExtension(NSString *ext) {
@@ -146,32 +86,6 @@ static NSString *SCIExtensionForURL(NSURL *url, BOOL isVideo) {
 	return isVideo ? @"mp4" : @"jpg";
 }
 
-static NSString *SCIUsernameFromUserObject(id user) {
-	if (!user) return nil;
-
-	id username = SCIObjectForSelector(user, @"username");
-	if (!username) {
-		username = SCIKVCObject(user, @"username");
-	}
-
-	if ([username isKindOfClass:[NSString class]] && [(NSString *)username length] > 0) {
-		return (NSString *)username;
-	}
-
-	return nil;
-}
-
-static NSString *SCIUsernameFromMediaObject(id media) {
-	if (!media) return nil;
-
-	id user = SCIObjectForSelector(media, @"user");
-	if (!user) user = SCIObjectForSelector(media, @"owner");
-	if (!user) user = SCIObjectForSelector(media, @"author");
-	if (!user) user = SCIKVCObject(media, @"user");
-
-	return SCIUsernameFromUserObject(user);
-}
-
 static UIViewController *SCIViewControllerForAncestorView(UIView *view) {
 	if (!view) return nil;
 
@@ -191,6 +105,11 @@ UIImage *SCIActionButtonImage(NSString *resourceName, NSString *systemFallback, 
 	return [UIImage systemImageNamed:systemFallback withConfiguration:config];
 }
 
+static void SCIPlayActionButtonTapHaptic(void) {
+	UISelectionFeedbackGenerator *feedback = [UISelectionFeedbackGenerator new];
+	[feedback selectionChanged];
+}
+
 static UIColor *SCIActionButtonTintForSource(SCIActionButtonSource source) {
 	switch (source) {
 		case SCIActionButtonSourceFeed:
@@ -205,7 +124,7 @@ static UIColor *SCIActionButtonTintForSource(SCIActionButtonSource source) {
 
 static UIImage *SCIIconForActionIdentifier(NSString *identifier, CGFloat size) {
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) {
-		return SCIActionButtonImage(@"download", @"arrow.down", size);
+		return SCIActionButtonImage(@"download", @"arrow.down.to.line", size);
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadShare]) {
 		return SCIActionButtonImage(@"share", @"square.and.arrow.up", size);
@@ -217,22 +136,22 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, CGFloat size) {
 		return SCIActionButtonImage(@"chest", @"tray.and.arrow.down", size);
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
-		return SCIActionButtonImage(@"expand", @"arrow.up.left.and.arrow.down.right", size);
+		return SCIActionButtonImage(@"expand", @"arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", size);
 	}
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
-		return SCIActionButtonImage(@"photo_filled", @"photo", size);
+		return SCIActionButtonImage(@"photo_gallery", @"photo.on.rectangle", size);
 	}
 
-	return SCIActionButtonImage(@"action", @"ellipsis", size);
+	return SCIActionButtonImage(@"action", @"option", size);
 }
 
 static NSString *SCITitleForActionIdentifier(NSString *identifier) {
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) return @"Download";
 	if ([identifier isEqualToString:kSCIActionDownloadShare]) return @"Share";
-	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) return @"Copy link";
+	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) return @"Copy Link";
 	if ([identifier isEqualToString:kSCIActionDownloadVault]) return @"Download to Vault";
 	if ([identifier isEqualToString:kSCIActionExpand]) return @"Expand";
-	if ([identifier isEqualToString:kSCIActionViewThumbnail]) return @"View thumbnail";
+	if ([identifier isEqualToString:kSCIActionViewThumbnail]) return @"View Thumbnail";
 	return @"Action";
 }
 
@@ -438,7 +357,7 @@ static BOOL SCIViewIsFeedCell(UIView *view) {
 	return NO;
 }
 
-/// Same idea as Regram's `rg_media`: resolve the post/media object from the feed row that owns the gesture, not from a UFI delegate chain.
+/// Resolve the post/media object from the feed row that owns the gesture, not from a UFI delegate chain.
 static id SCIFeedPostObjectFromFeedCell(UIView *feedCell) {
 	if (!feedCell) return nil;
 
@@ -527,18 +446,6 @@ static id SCIStoryMediaFromOverlay(UIView *overlayView) {
 	return nil;
 }
 
-id SCIDirectCurrentMessageFromController(UIViewController *controller) {
-	if (!controller) return nil;
-
-	id dataSource = [SCIUtils getIvarForObj:controller name:"_dataSource"];
-	if (!dataSource) dataSource = SCIKVCObject(controller, @"dataSource");
-
-	id message = [SCIUtils getIvarForObj:dataSource name:"_currentMessage"];
-	if (!message) message = SCIKVCObject(dataSource, @"currentMessage");
-
-	return message;
-}
-
 static UIView *SCIDirectMediaView(UIViewController *controller) {
 	if (!controller) return nil;
 
@@ -589,6 +496,58 @@ static void SCIResumeDirectPlaybackFromController(UIViewController *controller) 
 	}
 }
 
+static NSURL *SCIURLFromURLCollectionValue(id collection) {
+	if (!collection) return nil;
+
+	NSArray *items = SCIArrayFromCollection(collection);
+	if (!items) return SCIURLFromValue(collection);
+
+	for (id item in items) {
+		NSURL *url = nil;
+		if ([item isKindOfClass:[NSDictionary class]]) {
+			NSDictionary *dict = (NSDictionary *)item;
+			url = SCIURLFromValue(dict[@"url"] ?: dict[@"urlString"]);
+		} else {
+			url = SCIURLFromValue(SCIObjectForSelector(item, @"url"));
+			if (!url) url = SCIURLFromValue(SCIObjectForSelector(item, @"urlString"));
+			if (!url) url = SCIURLFromValue(item);
+		}
+		if (url) return url;
+	}
+
+	return nil;
+}
+
+static NSURL *SCIURLFromAssetLikeObject(id object, BOOL videoHint) {
+	if (!object) return nil;
+
+	NSArray<NSString *> *primarySelectors = videoHint
+		? @[@"videoURL", @"videoUrl", @"downloadURL", @"url", @"urlString"]
+		: @[@"imageURL", @"imageUrl", @"displayURL", @"thumbnailURL", @"url", @"urlString"];
+
+	for (NSString *selectorName in primarySelectors) {
+		NSURL *url = SCIURLFromValue(SCIObjectForSelector(object, selectorName));
+		if (!url) url = SCIURLFromValue(SCIKVCObject(object, selectorName));
+		if (url) return url;
+	}
+
+	if (videoHint) {
+		for (NSString *selectorName in @[@"allVideoURLs", @"sortedVideoURLsBySize", @"videoURLs", @"videoUrls"]) {
+			NSURL *url = SCIURLFromURLCollectionValue(SCIObjectForSelector(object, selectorName));
+			if (!url) url = SCIURLFromURLCollectionValue(SCIKVCObject(object, selectorName));
+			if (url) return url;
+		}
+	} else {
+		SEL imageURLForWidth = NSSelectorFromString(@"imageURLForWidth:");
+		if ([object respondsToSelector:imageURLForWidth]) {
+			NSURL *url = ((id (*)(id, SEL, CGFloat))objc_msgSend)(object, imageURLForWidth, 100000.0);
+			if ([url isKindOfClass:[NSURL class]]) return url;
+		}
+	}
+
+	return nil;
+}
+
 static SCIResolvedMediaEntry *SCIEntryFromMediaObject(id mediaObject) {
 	if (!mediaObject) return nil;
 
@@ -598,6 +557,9 @@ static SCIResolvedMediaEntry *SCIEntryFromMediaObject(id mediaObject) {
 	id photoObject = SCIObjectForSelector(mediaObject, @"photo");
 	if (photoObject) {
 		entry.photoURL = [SCIUtils getPhotoUrl:photoObject];
+		if (!entry.photoURL) {
+			entry.photoURL = SCIURLFromAssetLikeObject(photoObject, NO);
+		}
 	}
 
 	if (!entry.photoURL) {
@@ -623,6 +585,9 @@ static SCIResolvedMediaEntry *SCIEntryFromMediaObject(id mediaObject) {
 	}
 	if (videoObject) {
 		entry.videoURL = [SCIUtils getVideoUrl:videoObject];
+		if (!entry.videoURL) {
+			entry.videoURL = SCIURLFromAssetLikeObject(videoObject, YES);
+		}
 	}
 
 	if (!entry.videoURL) {
@@ -661,10 +626,34 @@ static NSArray<SCIResolvedMediaEntry *> *SCIEntriesFromMedia(id media) {
 	if (items.count > 0) {
 		for (id item in items) {
 			SCIResolvedMediaEntry *entry = SCIEntryFromMediaObject(item);
+			if (!entry) {
+				id nested = SCIObjectForSelector(item, @"media");
+				if (!nested) nested = SCIKVCObject(item, @"media");
+				entry = SCIEntryFromMediaObject(nested);
+			}
+			if (!entry) {
+				id nested = SCIObjectForSelector(item, @"visualMessage");
+				if (!nested) nested = SCIKVCObject(item, @"visualMessage");
+				entry = SCIEntryFromMediaObject(nested);
+			}
+			if (!entry) {
+				id nested = SCIObjectForSelector(item, @"item");
+				if (!nested) nested = SCIKVCObject(item, @"item");
+				entry = SCIEntryFromMediaObject(nested);
+			}
+			if (entry) {
+				// Keep the wrapper item as identity (contains sender/user in direct-message paths).
+				entry.mediaObject = item;
+			}
 			if (entry) [entries addObject:entry];
 		}
 	} else {
 		SCIResolvedMediaEntry *singleEntry = SCIEntryFromMediaObject(media);
+		if (!singleEntry) {
+			id nested = SCIObjectForSelector(media, @"media");
+			if (!nested) nested = SCIKVCObject(media, @"media");
+			singleEntry = SCIEntryFromMediaObject(nested);
+		}
 		if (singleEntry) {
 			[entries addObject:singleEntry];
 		}
@@ -700,7 +689,7 @@ static NSString *SCIResolvedDefaultActionIdentifier(NSArray<NSString *> *visible
 
 static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSource source) {
 	if ([identifier isEqualToString:kSCIActionNone]) {
-		return SCIActionButtonImage(@"action", @"option", 20.0);
+		return SCIActionButtonImage(@"action", @"option", 22.0);
 	}
 
 	if (identifier.length > 0) {
@@ -708,10 +697,10 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 	}
 
 	if (source == SCIActionButtonSourceFeed) {
-		return SCIActionButtonImage(@"action", @"option", 20.0);
+		return SCIActionButtonImage(@"action", @"option", 22.0);
 	}
 
-	return SCIActionButtonImage(@"more", @"ellipsis", 20.0);
+	return SCIActionButtonImage(@"action", @"option", 22.0);
 }
 
 static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
@@ -726,7 +715,7 @@ static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
 		case SCIActionButtonSourceStories:
 			return SCIStoryMediaFromOverlay(context.view);
 		case SCIActionButtonSourceDirect:
-			return SCIDirectCurrentMessageFromController(context.controller);
+			return SCIDirectResolvedMediaFromController(context.controller);
 	}
 
 	return nil;
@@ -742,8 +731,9 @@ static NSInteger SCIResolveCurrentIndexForContext(SCIActionButtonContext *contex
 		case SCIActionButtonSourceReels:
 			return SCIReelsCurrentIndexFromVerticalUFI(context.view);
 		case SCIActionButtonSourceStories:
-		case SCIActionButtonSourceDirect:
 			return 0;
+		case SCIActionButtonSourceDirect:
+			return SCIDirectCurrentIndexFromController(context.controller);
 	}
 
 	return 0;
@@ -805,7 +795,7 @@ static NSArray<SCIMediaItem *> *SCIPlayerItemsFromEntries(NSArray<SCIResolvedMed
 	return items;
 }
 
-static void SCIShowExtractedVideoCover(NSURL *videoURL) {
+static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *metadata) {
 	if (!videoURL) {
 		[SCIUtils showToastForDuration:2.0 title:@"Cover unavailable"];
 		return;
@@ -832,7 +822,7 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL) {
 		CGImageRelease(imageRef);
 
 		dispatch_async(dispatch_get_main_queue(), ^{
-			[SCIFullScreenMediaPlayer showImage:image];
+			[SCIFullScreenMediaPlayer showImage:image metadata:metadata];
 		});
 	});
 }
@@ -842,9 +832,15 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 
 	id media = SCIResolveMediaForContext(context);
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
+	if (context.source == SCIActionButtonSourceDirect) {
+		SCIDMTrace(@"action=%@ mediaClass=%@ entries=%lu", identifier, SCIClassName(media), (unsigned long)entries.count);
+	}
 
 	if (entries.count == 0) {
 		[SCIUtils showToastForDuration:2.0 title:@"Media not found"];
+		if (context.source == SCIActionButtonSourceDirect) {
+			SCIDMTrace(@"no entries resolved; aborting");
+		}
 		return;
 	}
 
@@ -852,8 +848,30 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 	SCIResolvedMediaEntry *currentEntry = entries[resolvedIndex];
 	NSURL *currentURL = currentEntry.videoURL ?: currentEntry.photoURL;
 
-	NSString *username = SCIUsernameFromMediaObject(media);
+	NSString *username = (context.source == SCIActionButtonSourceDirect)
+		? SCIDirectUsernameFromController(context.controller)
+		: SCIUsernameFromMediaObject(media);
+	if (username.length == 0) {
+		username = SCIUsernameFromMediaObject(currentEntry.mediaObject);
+	}
+	if (username.length == 0) {
+		for (SCIResolvedMediaEntry *entry in entries) {
+			username = SCIUsernameFromMediaObject(entry.mediaObject);
+			if (username.length > 0) break;
+		}
+	}
+	if (context.source == SCIActionButtonSourceDirect && username.length > 0) {
+		NSString *sessionUsername = SCISessionUsernameFromController(context.controller);
+		if (sessionUsername.length > 0 &&
+			[username caseInsensitiveCompare:sessionUsername] == NSOrderedSame) {
+			SCIDMTrace(@"dropping username because it matches session user: %@", username);
+			username = nil;
+		}
+	}
 	SCIVaultSaveMetadata *meta = SCIVaultMetadata(context.source, username);
+	if (context.source == SCIActionButtonSourceDirect) {
+		SCIDMTrace(@"resolvedIndex=%ld currentURL=%@ username=%@ sourceUsername=%@", (long)resolvedIndex, currentURL.absoluteString ?: @"(nil)", username ?: @"(nil)", meta.sourceUsername ?: @"(nil)");
+	}
 
 	if (context.source == SCIActionButtonSourceStories && isDefaultTap) {
 		SCIPauseStoryPlaybackFromOverlaySubview(context.view);
@@ -937,12 +955,18 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 		}
 
 		if (currentEntry.photoURL) {
-			[SCIFullScreenMediaPlayer showRemoteImageURL:currentEntry.photoURL];
+			SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
+			thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
+			thumbnailMeta.sourceUsername = meta.sourceUsername;
+			[SCIFullScreenMediaPlayer showRemoteImageURL:currentEntry.photoURL metadata:thumbnailMeta];
 			return;
 		}
 
 		if (currentEntry.videoURL) {
-			SCIShowExtractedVideoCover(currentEntry.videoURL);
+			SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
+			thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
+			thumbnailMeta.sourceUsername = meta.sourceUsername;
+			SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta);
 			return;
 		}
 
@@ -1120,6 +1144,16 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	BOOL shouldOpenMenuOnTap = [defaultIdentifier isEqualToString:kSCIActionNone];
 
 	__weak UIButton *weakButton = button;
+	UIAction *oldHapticAction = objc_getAssociatedObject(button, kSCIActionButtonHapticActionAssocKey);
+	if (oldHapticAction) {
+		[button removeAction:oldHapticAction forControlEvents:UIControlEventTouchDown];
+	}
+	UIAction *newHapticAction = [UIAction actionWithHandler:^(__unused UIAction *action) {
+		SCIPlayActionButtonTapHaptic();
+	}];
+	[button addAction:newHapticAction forControlEvents:UIControlEventTouchDown];
+	objc_setAssociatedObject(button, kSCIActionButtonHapticActionAssocKey, newHapticAction, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
 	UIAction *oldTapAction = objc_getAssociatedObject(button, kSCIActionButtonTapActionAssocKey);
 	if (oldTapAction) {
 		[button removeAction:oldTapAction forControlEvents:UIControlEventTouchUpInside];

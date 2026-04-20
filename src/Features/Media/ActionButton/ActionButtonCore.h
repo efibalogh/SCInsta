@@ -1,6 +1,7 @@
 #pragma once
 
 #import <UIKit/UIKit.h>
+#import "ActionButtonLookupUtils.h"
 
 typedef NS_ENUM(NSInteger, SCIActionButtonSource) {
 	SCIActionButtonSourceFeed = 1,
@@ -17,13 +18,7 @@ typedef NS_ENUM(NSInteger, SCIActionButtonSource) {
 @property (nonatomic, strong, nullable) id mediaOverride;
 @end
 
-id SCIObjectForSelector(id target, NSString *selectorName);
-id SCIKVCObject(id target, NSString *key);
-NSArray *SCIArrayFromCollection(id collection);
-
 UIImage *SCIActionButtonImage(NSString *resourceName, NSString *systemFallback, CGFloat maxPointSize);
-
-id SCIDirectCurrentMessageFromController(UIViewController *controller);
 void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecognizer *sender);
 UIButton *SCIActionButtonWithTag(UIView *container, NSInteger tag);
 void SCIApplyButtonStyle(UIButton *button, SCIActionButtonSource source);
