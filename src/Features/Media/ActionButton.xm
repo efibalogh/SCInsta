@@ -159,6 +159,12 @@ static void SCIHookSwiftModernFeedVideoLayout(id self, SEL _cmd) {
 	%orig;
 
 	SCIInstallDirectActionButton((UIViewController *)self);
+	__weak UIViewController *weakController = (UIViewController *)self;
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIViewController *strongController = weakController;
+		if (!strongController) return;
+		SCIInstallDirectActionButton(strongController);
+	});
 }
 %end
 

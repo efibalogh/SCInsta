@@ -213,10 +213,10 @@ static CGFloat SCIHeightFromFrameLikeObject(id object) {
 }
 
 static CGFloat SCIDirectBottomOffset(UIViewController *controller) {
-	if (!controller) return 40.0;
+	if (!controller) return 12.0;
 
 	id inputView = [SCIUtils getIvarForObj:controller name:"_inputView"];
-	NSInteger offset = (NSInteger)(controller.view.safeAreaInsets.bottom + 40.0);
+	NSInteger offset = (NSInteger)(controller.view.safeAreaInsets.bottom + 12.0);
 	if (inputView) {
 		offset = (NSInteger)(SCIHeightFromFrameLikeObject(inputView) + (CGFloat)offset);
 	}

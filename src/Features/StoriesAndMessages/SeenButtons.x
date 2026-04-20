@@ -10,6 +10,19 @@ static NSInteger const kSCIStorySeenButtonTag = 926001;
 static NSInteger const kSCIStoriesActionButtonTag = 921343;
 static NSInteger const kSCIDirectActionButtonTag = 921344;
 static NSInteger const kSCIDirectSeenButtonTag = 921345;
+static const void *kSCIStoryOverlayObservedFooterAssocKey = &kSCIStoryOverlayObservedFooterAssocKey;
+static const void *kSCIStoryOverlayHasObserverAssocKey = &kSCIStoryOverlayHasObserverAssocKey;
+static const void *kSCIDirectSeenBottomConstraintAssocKey = &kSCIDirectSeenBottomConstraintAssocKey;
+static const void *kSCIDirectSeenTrailingOverlayConstraintAssocKey = &kSCIDirectSeenTrailingOverlayConstraintAssocKey;
+static const void *kSCIDirectSeenTrailingActionConstraintAssocKey = &kSCIDirectSeenTrailingActionConstraintAssocKey;
+static const void *kSCIDirectSeenCenterYActionConstraintAssocKey = &kSCIDirectSeenCenterYActionConstraintAssocKey;
+static const void *kSCIDirectSeenWidthConstraintAssocKey = &kSCIDirectSeenWidthConstraintAssocKey;
+static const void *kSCIDirectSeenHeightConstraintAssocKey = &kSCIDirectSeenHeightConstraintAssocKey;
+static const void *kSCIDirectSeenAnchoredActionButtonAssocKey = &kSCIDirectSeenAnchoredActionButtonAssocKey;
+static const void *kSCIDirectVisualObservedInputViewAssocKey = &kSCIDirectVisualObservedInputViewAssocKey;
+static const void *kSCIDirectVisualHasInputObserverAssocKey = &kSCIDirectVisualHasInputObserverAssocKey;
+static void *kSCIStoryOverlayAlphaObserverContext = &kSCIStoryOverlayAlphaObserverContext;
+static void *kSCIDirectVisualInputAlphaObserverContext = &kSCIDirectVisualInputAlphaObserverContext;
 
 static inline BOOL SCIManualMessageSeenEnabled(void) {
     return [SCIUtils getBoolPref:@"remove_lastseen"];
@@ -109,10 +122,72 @@ static void SCIApplyStorySeenButtonStyle(UIButton *button) {
 
     button.tintColor = UIColor.whiteColor;
     button.backgroundColor = UIColor.clearColor;
-    button.layer.cornerRadius = 0.0;
-    button.layer.shadowOpacity = 0.0;
-    button.layer.shadowRadius = 0.0;
-    button.layer.shadowOffset = CGSizeZero;
+    button.layer.cornerRadius = 8.0;
+    button.layer.shadowColor = [UIColor blackColor].CGColor;
+    button.layer.shadowOpacity = 0.5;
+    button.layer.shadowRadius = 2.0;
+    button.layer.shadowOffset = CGSizeMake(0.0, 2.0);
+}
+
+static UIView *SCIStoryFooterContainerFromOverlay(UIView *overlayView) {
+    if (!overlayView) return nil;
+
+    UIView *footerContainer = [SCIUtils getIvarForObj:overlayView name:"_footerContainerView"];
+    if (![footerContainer isKindOfClass:[UIView class]]) {
+        id selectorFooter = SCIObjectForSelector(overlayView, @"footerContainerView");
+        footerContainer = [selectorFooter isKindOfClass:[UIView class]] ? (UIView *)selectorFooter : nil;
+    }
+    return footerContainer;
+}
+
+static void SCIUpdateStoryButtonsAlpha(UIView *overlayView, CGFloat alpha) {
+    if (!overlayView) return;
+
+    UIButton *actionButton = (UIButton *)[overlayView viewWithTag:kSCIStoriesActionButtonTag];
+    if ([actionButton isKindOfClass:[UIButton class]]) {
+        actionButton.alpha = alpha;
+    }
+
+    UIButton *seenButton = (UIButton *)[overlayView viewWithTag:kSCIStorySeenButtonTag];
+    if ([seenButton isKindOfClass:[UIButton class]]) {
+        seenButton.alpha = alpha;
+    }
+}
+
+static void SCIRemoveStoryOverlayAlphaObserverIfNeeded(UIView *overlayView) {
+    UIView *observedFooter = objc_getAssociatedObject(overlayView, kSCIStoryOverlayObservedFooterAssocKey);
+    BOOL hasObserver = [objc_getAssociatedObject(overlayView, kSCIStoryOverlayHasObserverAssocKey) boolValue];
+    if (observedFooter && hasObserver) {
+        [observedFooter removeObserver:overlayView forKeyPath:@"alpha" context:kSCIStoryOverlayAlphaObserverContext];
+    }
+
+    objc_setAssociatedObject(overlayView, kSCIStoryOverlayObservedFooterAssocKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(overlayView, kSCIStoryOverlayHasObserverAssocKey, @NO, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static void SCIEnsureStoryOverlayAlphaObserver(UIView *overlayView) {
+    if (!overlayView) return;
+
+    UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
+    UIView *observedFooter = objc_getAssociatedObject(overlayView, kSCIStoryOverlayObservedFooterAssocKey);
+    BOOL hasObserver = [objc_getAssociatedObject(overlayView, kSCIStoryOverlayHasObserverAssocKey) boolValue];
+    if (observedFooter && observedFooter != footerContainer && hasObserver) {
+        [observedFooter removeObserver:overlayView forKeyPath:@"alpha" context:kSCIStoryOverlayAlphaObserverContext];
+        objc_setAssociatedObject(overlayView, kSCIStoryOverlayHasObserverAssocKey, @NO, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        hasObserver = NO;
+    }
+
+    if (observedFooter != footerContainer) {
+        objc_setAssociatedObject(overlayView, kSCIStoryOverlayObservedFooterAssocKey, footerContainer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    if (footerContainer && !hasObserver) {
+        [footerContainer addObserver:overlayView
+                          forKeyPath:@"alpha"
+                             options:NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew
+                             context:kSCIStoryOverlayAlphaObserverContext];
+        objc_setAssociatedObject(overlayView, kSCIStoryOverlayHasObserverAssocKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 
 static CGRect SCIStorySeenBaseFrame(UIView *overlayView) {
@@ -283,6 +358,68 @@ static CGFloat SCIDirectBottomOffset(UIViewController *controller) {
     return offset;
 }
 
+static UIView *SCIDirectInputViewFromController(UIViewController *controller) {
+    if (!controller) return nil;
+
+    id inputView = [SCIUtils getIvarForObj:controller name:"_inputView"];
+    if (![inputView isKindOfClass:[UIView class]]) {
+        inputView = SCIKVCObject(controller, @"inputView");
+    }
+    return [inputView isKindOfClass:[UIView class]] ? (UIView *)inputView : nil;
+}
+
+static void SCIUpdateDirectVisualButtonsAlpha(UIViewController *controller, CGFloat alpha) {
+    if (!controller) return;
+    UIView *overlay = SCIDirectOverlayViewFromController(controller);
+    if (!overlay) return;
+
+    UIButton *actionButton = (UIButton *)[overlay viewWithTag:kSCIDirectActionButtonTag];
+    if ([actionButton isKindOfClass:[UIButton class]]) {
+        actionButton.alpha = alpha;
+    }
+
+    UIButton *seenButton = (UIButton *)[overlay viewWithTag:kSCIDirectSeenButtonTag];
+    if ([seenButton isKindOfClass:[UIButton class]]) {
+        seenButton.alpha = alpha;
+    }
+}
+
+static void SCIRemoveDirectVisualInputAlphaObserverIfNeeded(UIViewController *controller) {
+    UIView *observedInputView = objc_getAssociatedObject(controller, kSCIDirectVisualObservedInputViewAssocKey);
+    BOOL hasObserver = [objc_getAssociatedObject(controller, kSCIDirectVisualHasInputObserverAssocKey) boolValue];
+    if (observedInputView && hasObserver) {
+        [observedInputView removeObserver:controller forKeyPath:@"alpha" context:kSCIDirectVisualInputAlphaObserverContext];
+    }
+
+    objc_setAssociatedObject(controller, kSCIDirectVisualObservedInputViewAssocKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(controller, kSCIDirectVisualHasInputObserverAssocKey, @NO, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static void SCIEnsureDirectVisualInputAlphaObserver(UIViewController *controller) {
+    if (!controller) return;
+
+    UIView *inputView = SCIDirectInputViewFromController(controller);
+    UIView *observedInputView = objc_getAssociatedObject(controller, kSCIDirectVisualObservedInputViewAssocKey);
+    BOOL hasObserver = [objc_getAssociatedObject(controller, kSCIDirectVisualHasInputObserverAssocKey) boolValue];
+    if (observedInputView && observedInputView != inputView && hasObserver) {
+        [observedInputView removeObserver:controller forKeyPath:@"alpha" context:kSCIDirectVisualInputAlphaObserverContext];
+        objc_setAssociatedObject(controller, kSCIDirectVisualHasInputObserverAssocKey, @NO, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        hasObserver = NO;
+    }
+
+    if (observedInputView != inputView) {
+        objc_setAssociatedObject(controller, kSCIDirectVisualObservedInputViewAssocKey, inputView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    if (inputView && !hasObserver) {
+        [inputView addObserver:controller
+                    forKeyPath:@"alpha"
+                       options:NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew
+                       context:kSCIDirectVisualInputAlphaObserverContext];
+        objc_setAssociatedObject(controller, kSCIDirectVisualHasInputObserverAssocKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
 static inline BOOL SCIShouldShowDirectVisualSeenButton(void) {
     return [SCIUtils getBoolPref:@"remove_lastseen"] || [SCIUtils getBoolPref:@"unlimited_replay"];
 }
@@ -345,34 +482,77 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         [overlay addSubview:seenButton];
     }
 
-    seenButton.translatesAutoresizingMaskIntoConstraints = YES;
+    seenButton.translatesAutoresizingMaskIntoConstraints = NO;
     SCIApplyStorySeenButtonStyle(seenButton);
 
     CGFloat size = 44.0;
     CGFloat bottomOffset = SCIDirectBottomOffset(controller);
-    [overlay layoutIfNeeded];
-
     UIButton *actionButton = (UIButton *)[overlay viewWithTag:kSCIDirectActionButtonTag];
     BOOL actionVisible = [actionButton isKindOfClass:[UIButton class]]
         && !actionButton.hidden
         && actionButton.superview == overlay
-        && CGRectGetWidth(actionButton.frame) > 0.0
-        && CGRectGetHeight(actionButton.frame) > 0.0;
+        && CGRectGetWidth(actionButton.bounds) > 0.0
+        && CGRectGetHeight(actionButton.bounds) > 0.0;
 
-    CGFloat overlayWidth = CGRectGetWidth(overlay.bounds);
-    CGFloat overlayHeight = CGRectGetHeight(overlay.bounds);
-    if (overlayWidth <= 0.0 || overlayHeight <= 0.0) {
-        overlayWidth = CGRectGetWidth(overlay.frame);
-        overlayHeight = CGRectGetHeight(overlay.frame);
+    NSLayoutConstraint *bottomConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenBottomConstraintAssocKey);
+    NSLayoutConstraint *trailingOverlayConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenTrailingOverlayConstraintAssocKey);
+    NSLayoutConstraint *trailingActionConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenTrailingActionConstraintAssocKey);
+    NSLayoutConstraint *centerYActionConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenCenterYActionConstraintAssocKey);
+    NSLayoutConstraint *widthConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenWidthConstraintAssocKey);
+    NSLayoutConstraint *heightConstraint = objc_getAssociatedObject(seenButton, kSCIDirectSeenHeightConstraintAssocKey);
+    UIButton *anchoredActionButton = objc_getAssociatedObject(seenButton, kSCIDirectSeenAnchoredActionButtonAssocKey);
+
+    if (!bottomConstraint || !trailingOverlayConstraint || !widthConstraint || !heightConstraint) {
+        bottomConstraint = [seenButton.bottomAnchor constraintEqualToAnchor:overlay.bottomAnchor constant:-bottomOffset];
+        trailingOverlayConstraint = [seenButton.trailingAnchor constraintEqualToAnchor:overlay.trailingAnchor constant:-10.0];
+        widthConstraint = [seenButton.widthAnchor constraintEqualToConstant:size];
+        heightConstraint = [seenButton.heightAnchor constraintEqualToConstant:size];
+
+        [NSLayoutConstraint activateConstraints:@[
+            bottomConstraint,
+            trailingOverlayConstraint,
+            widthConstraint,
+            heightConstraint
+        ]];
+
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenBottomConstraintAssocKey, bottomConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenTrailingOverlayConstraintAssocKey, trailingOverlayConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenWidthConstraintAssocKey, widthConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenHeightConstraintAssocKey, heightConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    CGFloat x = overlayWidth - size - 10.0;
-    CGFloat y = overlayHeight - bottomOffset - size;
-    if (actionVisible) {
-        x = CGRectGetMinX(actionButton.frame) - size - 5.0;
-        y = CGRectGetMinY(actionButton.frame);
+    if (actionVisible && (!trailingActionConstraint || anchoredActionButton != actionButton)) {
+        if (trailingActionConstraint) {
+            trailingActionConstraint.active = NO;
+        }
+        trailingActionConstraint = [seenButton.trailingAnchor constraintEqualToAnchor:actionButton.leadingAnchor constant:-5.0];
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenTrailingActionConstraintAssocKey, trailingActionConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenAnchoredActionButtonAssocKey, actionButton, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    seenButton.frame = CGRectMake(x, y, size, size);
+    if (actionVisible && (!centerYActionConstraint || anchoredActionButton != actionButton)) {
+        if (centerYActionConstraint) {
+            centerYActionConstraint.active = NO;
+        }
+        centerYActionConstraint = [seenButton.centerYAnchor constraintEqualToAnchor:actionButton.centerYAnchor];
+        objc_setAssociatedObject(seenButton, kSCIDirectSeenCenterYActionConstraintAssocKey, centerYActionConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    bottomConstraint.constant = -bottomOffset;
+    trailingOverlayConstraint.constant = -10.0;
+    widthConstraint.constant = size;
+    heightConstraint.constant = size;
+
+    if (actionVisible && trailingActionConstraint) {
+        bottomConstraint.active = NO;
+        trailingOverlayConstraint.active = NO;
+        trailingActionConstraint.active = YES;
+        if (centerYActionConstraint) centerYActionConstraint.active = YES;
+    } else {
+        if (centerYActionConstraint) centerYActionConstraint.active = NO;
+        if (trailingActionConstraint) trailingActionConstraint.active = NO;
+        trailingOverlayConstraint.active = YES;
+        bottomConstraint.active = YES;
+    }
 
     [overlay bringSubviewToFront:seenButton];
 }
@@ -439,14 +619,25 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 - (void)layoutSubviews {
     %orig;
 
+    UIView *overlayView = (UIView *)self;
+    SCIEnsureStoryOverlayAlphaObserver(overlayView);
+
     UIButton *seenButton = (UIButton *)[(UIView *)self viewWithTag:kSCIStorySeenButtonTag];
     if (SCIOverlayIsDirectVisualOverlay((UIView *)self)) {
         [seenButton removeFromSuperview];
+        UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
+        if (footerContainer) {
+            SCIUpdateStoryButtonsAlpha(overlayView, footerContainer.alpha);
+        }
         return;
     }
 
     if (!SCIManualStorySeenEnabled()) {
         [seenButton removeFromSuperview];
+        UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
+        if (footerContainer) {
+            SCIUpdateStoryButtonsAlpha(overlayView, footerContainer.alpha);
+        }
         return;
     }
 
@@ -460,7 +651,6 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 
     SCIApplyStorySeenButtonStyle(seenButton);
 
-    UIView *overlayView = (UIView *)self;
     UIButton *storyActionButton = (UIButton *)[overlayView viewWithTag:kSCIStoriesActionButtonTag];
     BOOL actionVisible = [storyActionButton isKindOfClass:[UIButton class]]
         && !storyActionButton.hidden
@@ -477,6 +667,32 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 
     seenButton.frame = seenFrame;
     [overlayView bringSubviewToFront:seenButton];
+
+    UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
+    if (footerContainer) {
+        SCIUpdateStoryButtonsAlpha(overlayView, footerContainer.alpha);
+    }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context {
+    if (context == kSCIStoryOverlayAlphaObserverContext && [keyPath isEqualToString:@"alpha"]) {
+        CGFloat alpha = 1.0;
+        id newAlphaValue = change[NSKeyValueChangeNewKey];
+        if ([newAlphaValue respondsToSelector:@selector(floatValue)]) {
+            alpha = [newAlphaValue floatValue];
+        } else if ([object isKindOfClass:[UIView class]]) {
+            alpha = ((UIView *)object).alpha;
+        }
+        SCIUpdateStoryButtonsAlpha((UIView *)self, alpha);
+        return;
+    }
+
+    %orig(keyPath, object, change, context);
+}
+
+- (void)dealloc {
+    SCIRemoveStoryOverlayAlphaObserverIfNeeded((UIView *)self);
+    %orig;
 }
 
 %new - (void)sci_storySeenButtonTapped:(UIButton *)sender {
@@ -489,13 +705,39 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 %hook IGDirectVisualMessageViewerController
 - (void)viewDidLayoutSubviews {
     %orig;
+    UIView *inputView = SCIDirectInputViewFromController((UIViewController *)self);
+    SCIEnsureDirectVisualInputAlphaObserver((UIViewController *)self);
     SCIInstallDirectSeenButton((UIViewController *)self);
+    SCIUpdateDirectVisualButtonsAlpha((UIViewController *)self, inputView ? inputView.alpha : 1.0);
     __weak UIViewController *weakController = (UIViewController *)self;
     dispatch_async(dispatch_get_main_queue(), ^{
         UIViewController *strongController = weakController;
         if (!strongController) return;
+        UIView *strongInputView = SCIDirectInputViewFromController(strongController);
         SCIInstallDirectSeenButton(strongController);
+        SCIUpdateDirectVisualButtonsAlpha(strongController, strongInputView ? strongInputView.alpha : 1.0);
     });
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context {
+    if (context == kSCIDirectVisualInputAlphaObserverContext && [keyPath isEqualToString:@"alpha"]) {
+        CGFloat alpha = 1.0;
+        id newAlphaValue = change[NSKeyValueChangeNewKey];
+        if ([newAlphaValue respondsToSelector:@selector(floatValue)]) {
+            alpha = [newAlphaValue floatValue];
+        } else if ([object isKindOfClass:[UIView class]]) {
+            alpha = ((UIView *)object).alpha;
+        }
+        SCIUpdateDirectVisualButtonsAlpha((UIViewController *)self, alpha);
+        return;
+    }
+
+    %orig(keyPath, object, change, context);
+}
+
+- (void)dealloc {
+    SCIRemoveDirectVisualInputAlphaObserverIfNeeded((UIViewController *)self);
+    %orig;
 }
 
 %new - (void)sci_didTapDirectSeenButton:(UIButton *)sender {

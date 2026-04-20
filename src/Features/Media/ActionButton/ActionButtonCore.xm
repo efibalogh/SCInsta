@@ -1098,6 +1098,7 @@ void SCIApplyButtonStyle(UIButton *button, SCIActionButtonSource source) {
 	button.tintColor = SCIActionButtonTintForSource(source);
 	button.backgroundColor = UIColor.clearColor;
 	button.layer.cornerRadius = 0.0;
+	button.layer.shadowColor = UIColor.clearColor.CGColor;
 	button.layer.shadowOpacity = 0.0;
 	button.layer.shadowRadius = 0.0;
 	button.layer.shadowOffset = CGSizeZero;
@@ -1110,10 +1111,11 @@ void SCIApplyButtonStyle(UIButton *button, SCIActionButtonSource source) {
 		button.layer.shadowRadius = 1.8;
 		button.layer.shadowOffset = CGSizeMake(0.0, 0.0);
 	} else if (source == SCIActionButtonSourceStories || source == SCIActionButtonSourceDirect) {
-		// button.layer.shadowColor = [UIColor blackColor].CGColor;
-		// button.layer.shadowOpacity = 0.40;
-		// button.layer.shadowRadius = 2.0;
-		// button.layer.shadowOffset = CGSizeMake(0.0, 2.0);
+		button.layer.cornerRadius = 8.0;
+		button.layer.shadowColor = [UIColor blackColor].CGColor;
+		button.layer.shadowOpacity = 0.5;
+		button.layer.shadowRadius = 2.0;
+		button.layer.shadowOffset = CGSizeMake(0.0, 2.0);
 	}
 }
 
