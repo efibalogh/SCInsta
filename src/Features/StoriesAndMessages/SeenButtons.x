@@ -75,6 +75,20 @@ static id SCIObjectForSelector(id target, NSString *selectorName) {
     return ((id (*)(id, SEL))objc_msgSend)(target, selector);
 }
 
+static id SCIFirstObjectForSelectors(id target, NSArray<NSString *> *selectors) {
+    if (!target || selectors.count == 0) return nil;
+    for (NSString *selectorName in selectors) {
+        id value = SCIObjectForSelector(target, selectorName);
+        if (value) return value;
+    }
+    return nil;
+}
+
+static void SCIPlayButtonTappedHaptic(void) {
+    UISelectionFeedbackGenerator *feedback = [UISelectionFeedbackGenerator new];
+    [feedback selectionChanged];
+}
+
 static UIButton *SCIStorySeenButtonWithTag(UIView *container, NSInteger tag) {
     UIView *existing = [container viewWithTag:tag];
     if ([existing isKindOfClass:[UIButton class]]) {
@@ -172,35 +186,45 @@ static id SCIStorySectionControllerFromOverlayView(UIView *overlayView) {
 static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
     if (!overlayView) return;
 
+    SEL markSelector = NSSelectorFromString(@"fullscreenSectionController:didMarkItemAsSeen:");
     UIViewController *viewerController = [SCIUtils nearestViewControllerForView:overlayView];
-    Class viewerClass = NSClassFromString(@"IGStoryViewerViewController");
-    if (!viewerController || (viewerClass && ![viewerController isKindOfClass:viewerClass])) {
-        [SCIUtils showToastForDuration:1.5 title:@"Story viewer unavailable"];
-        return;
-    }
 
     id sectionController = SCIStorySectionControllerFromOverlayView(overlayView);
-    if (!sectionController) {
-        sectionController = [SCIUtils getIvarForObj:viewerController name:"_currentSectionController"];
+    id markTarget = nil;
+    id sectionDelegate = SCIObjectForSelector(sectionController, @"delegate");
+    if (sectionDelegate && [sectionDelegate respondsToSelector:markSelector]) {
+        markTarget = sectionDelegate;
+    } else if (viewerController && [viewerController respondsToSelector:markSelector]) {
+        markTarget = viewerController;
+    } else {
+        id overlayAncestor = SCIObjectForSelector(overlayView, @"_viewControllerForAncestor");
+        if (overlayAncestor && [overlayAncestor respondsToSelector:markSelector]) {
+            markTarget = overlayAncestor;
+        }
     }
 
-    id media = nil;
-    SEL currentStorySelector = NSSelectorFromString(@"currentStoryItem");
-    if (sectionController && [sectionController respondsToSelector:currentStorySelector]) {
-        media = ((id (*)(id, SEL))objc_msgSend)(sectionController, currentStorySelector);
-    }
-    if (!media && [viewerController respondsToSelector:currentStorySelector]) {
-        media = ((id (*)(id, SEL))objc_msgSend)(viewerController, currentStorySelector);
+    if (!sectionController && markTarget) {
+        sectionController = SCIFirstObjectForSelectors(markTarget, @[@"currentSectionController"]);
+        if (!sectionController) {
+            sectionController = [SCIUtils getIvarForObj:markTarget name:"_currentSectionController"];
+        }
     }
 
-    SEL markSelector = NSSelectorFromString(@"expandSectionController:didMarkItemAsSeen:");
-    if (!sectionController || !media || ![viewerController respondsToSelector:markSelector]) {
+    id media = SCIFirstObjectForSelectors(sectionController, @[@"currentStoryItem", @"currentItem", @"item"]);
+    if (!media) {
+        media = SCIFirstObjectForSelectors(markTarget, @[@"currentStoryItem", @"currentItem", @"item"]);
+    }
+    if (!media && viewerController) {
+        media = SCIFirstObjectForSelectors(viewerController, @[@"currentStoryItem", @"currentItem", @"item"]);
+    }
+
+    if (!markTarget || !sectionController || !media) {
         [SCIUtils showToastForDuration:1.5 title:@"Unable to mark story as seen"];
         return;
     }
 
     SCIForceMarkStoryAsSeen = YES;
-    ((void (*)(id, SEL, id, id))objc_msgSend)(viewerController, markSelector, sectionController, media);
+    ((void (*)(id, SEL, id, id))objc_msgSend)(markTarget, markSelector, sectionController, media);
     SCIForceMarkStoryAsSeen = NO;
 
     [SCIUtils showToastForDuration:1.5 title:@"Marked story as seen"];
@@ -380,6 +404,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 // Messages seen button
 %new - (void)seenButtonHandler:(UIBarButtonItem *)sender {
     (void)sender;
+    SCIPlayButtonTappedHaptic();
     UIViewController *nearestVC = [SCIUtils nearestViewControllerForView:self];
     if ([nearestVC isKindOfClass:%c(IGDirectThreadViewController)]) {
         [(IGDirectThreadViewController *)nearestVC markLastMessageAsSeen];
@@ -456,6 +481,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 
 %new - (void)sci_storySeenButtonTapped:(UIButton *)sender {
     (void)sender;
+    SCIPlayButtonTappedHaptic();
     SCIMarkCurrentStoryAsSeenFromOverlay((UIView *)self);
 }
 %end
@@ -474,6 +500,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 
 %new - (void)sci_didTapDirectSeenButton:(UIButton *)sender {
     (void)sender;
+    SCIPlayButtonTappedHaptic();
     SCIMarkDirectVisualMessageAsSeen((UIViewController *)self);
 }
 %end
