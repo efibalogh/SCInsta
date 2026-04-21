@@ -98,14 +98,14 @@
                             subtitle:subtitle
                          defaultsKey:defaultsKey
                      requiresRestart:requiresRestart
-          mutuallyExclusiveDefaultsKey:nil];
+        mutuallyExclusiveDefaultsKey:nil];
 }
 
 + (instancetype)switchCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
                         defaultsKey:(NSString *)defaultsKey
                     requiresRestart:(BOOL)requiresRestart
-         mutuallyExclusiveDefaultsKey:(NSString *)exclusiveDefaultsKey
+       mutuallyExclusiveDefaultsKey:(NSString *)exclusiveDefaultsKey
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellSwitch];
     

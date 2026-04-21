@@ -85,8 +85,8 @@
                                         @{
                                             @"header": @"Appearance",
                                             @"rows": @[
-                                                [SCISetting switchCellWithTitle:@"Enable liquid glass buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],
-                                                [SCISetting switchCellWithTitle:@"Enable liquid glass surfaces" subtitle:@"Enables liquid glass for other elements, such as menus" defaultsKey:@"liquid_glass_surfaces" requiresRestart:YES],
+                                                [SCISetting menuCellWithTitle:@"Feedback pill style" subtitle:@"Neutral glass vs. tone-tinted pill chrome" menu:[self menus][@"feedback_pill_style"]],
+                                                [SCISetting switchCellWithTitle:@"Liquid glass" subtitle:@"Forces liquid glass for all possible surfaces" defaultsKey:@"liquid_glass" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Enable teen app icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Disable app haptics" subtitle:@"Disables haptics/vibrations within the Instagram app" defaultsKey:@"disable_haptics"],
                                             ]
@@ -518,7 +518,24 @@
                             ]
             ]
         ]],
-
+        @"feedback_pill_style": [UIMenu menuWithChildren:@[
+            [UICommand commandWithTitle:@"Clean"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"feedback_pill_style",
+                               @"value": @"clean"
+                           }
+            ],
+            [UICommand commandWithTitle:@"Colorful"
+                                  image:nil
+                                 action:@selector(menuChanged:)
+                           propertyList:@{
+                               @"defaultsKey": @"feedback_pill_style",
+                               @"value": @"colorful"
+                           }
+            ],
+        ]],
         @"test": [UIMenu menuWithChildren:@[
             [UIMenu menuWithTitle:@""
                             image:nil
