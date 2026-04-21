@@ -67,12 +67,22 @@ BOOL SCIForceMarkStoryAsSeen = NO;
     }
 
     // Override instagram defaults
-    if ([SCIUtils getBoolPref:@"liquid_glass_buttons"]) {
+    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
         [[NSUserDefaults standardUserDefaults] setValue:@(YES) forKey:@"instagram.override.project.lucent.navigation"];
-    }
-    else {
+    } else {
         [[NSUserDefaults standardUserDefaults] setValue:@(NO) forKey:@"instagram.override.project.lucent.navigation"];
     }
+
+    // Beegram-style liquid glass defaults (IG reads these when present)
+    NSUserDefaults *igDefaults = [NSUserDefaults standardUserDefaults];
+    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
+        [igDefaults setBool:YES forKey:@"liquid_glass_override_enabled"];
+        [igDefaults setBool:YES forKey:@"IGLiquidGlassOverrideEnabled"];
+    } else {
+        [igDefaults setBool:NO forKey:@"liquid_glass_override_enabled"];
+        [igDefaults setBool:NO forKey:@"IGLiquidGlassOverrideEnabled"];
+    }
+    [SCIUtils applyLiquidGlassNavigationExperimentOverride];
 
     return %orig;
 }
@@ -130,6 +140,12 @@ BOOL SCIForceMarkStoryAsSeen = NO;
     return [SCIUtils liquidGlassEnabledBool:%orig];
 }
 - (_Bool)isLiquidGlassAlertDialogEnabled {
+    return [SCIUtils liquidGlassEnabledBool:%orig];
+}
+- (_Bool)isLiquidGlassIconBarButtonEnabled {
+    return [SCIUtils liquidGlassEnabledBool:%orig];
+}
+- (_Bool)canUseInternalLiquidGlassDebugger {
     return [SCIUtils liquidGlassEnabledBool:%orig];
 }
 %end
