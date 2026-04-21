@@ -120,6 +120,9 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 
 @property (nonatomic, copy) NSArray<AVPlayer *> *pausedUnderlyingPlayers;
 
+/// Opaque black behind page content (letterboxing); alpha fades during dismiss so OverFullScreen content shows through.
+@property (nonatomic, strong) UIView *presentationBackdropView;
+
 @end
 
 @implementation SCIFullScreenMediaPlayer
@@ -282,11 +285,9 @@ fromViewController:(UIViewController *)presenter {
     // regardless of whether the first preview item is image or video.
     [self pauseUnderlyingPlaybackIfNeeded];
 
-    // Only force full-screen outside vault so feed/reels playback reliably stops.
-    // Keep vault previews over-full-screen to preserve existing vault presentation behavior.
-    self.modalPresentationStyle = self.isFromVault
-        ? UIModalPresentationOverFullScreen
-        : UIModalPresentationFullScreen;
+    // Over full screen so the black backdrop can fade to reveal the app during dismiss (same idea as vault).
+    // Underlying AVPlayers are still paused explicitly in pauseUnderlyingPlaybackIfNeeded.
+    self.modalPresentationStyle = UIModalPresentationOverFullScreen;
     self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [presenter presentViewController:self animated:YES completion:nil];
 }
@@ -296,7 +297,8 @@ fromViewController:(UIViewController *)presenter {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    self.view.backgroundColor = [UIColor blackColor];
+    self.view.backgroundColor = [UIColor clearColor];
+    [self setupPresentationBackdrop];
 
     [self pauseUnderlyingPlaybackIfNeeded];
     [self setupTopToolbar];
@@ -312,6 +314,21 @@ fromViewController:(UIViewController *)presenter {
 
 - (BOOL)prefersHomeIndicatorAutoHidden {
     return YES;
+}
+
+- (void)setupPresentationBackdrop {
+    _presentationBackdropView = [[UIView alloc] initWithFrame:CGRectZero];
+    _presentationBackdropView.backgroundColor = [UIColor blackColor];
+    _presentationBackdropView.translatesAutoresizingMaskIntoConstraints = NO;
+    _presentationBackdropView.alpha = 1.0;
+    [self.view addSubview:_presentationBackdropView];
+    [NSLayoutConstraint activateConstraints:@[
+        [_presentationBackdropView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_presentationBackdropView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [_presentationBackdropView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [_presentationBackdropView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+    ]];
+    [self.view sendSubviewToBack:_presentationBackdropView];
 }
 
 #pragma mark - Top Toolbar
@@ -442,7 +459,7 @@ fromViewController:(UIViewController *)presenter {
 
     [self addChildViewController:_pageViewController];
     _pageViewController.view.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view insertSubview:_pageViewController.view atIndex:0];
+    [self.view insertSubview:_pageViewController.view aboveSubview:_presentationBackdropView];
     [_pageViewController didMoveToParentViewController:self];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -967,7 +984,7 @@ fromViewController:(UIViewController *)presenter {
     switch (pan.state) {
         case UIGestureRecognizerStateChanged: {
             _pageViewController.view.transform = CGAffineTransformMakeTranslation(0, dy);
-            self.view.backgroundColor = [UIColor colorWithWhite:0 alpha:1.0 - progress * 0.92];
+            self.presentationBackdropView.alpha = MAX(0.0, 1.0 - progress * 1.05);
             CGFloat fade = (_isToolbarVisible ? 1.0 : 0.0) * (1.0 - progress * 1.35);
             _topToolbar.alpha = MAX(0.0, fade);
             if (_bottomBar) _bottomBar.alpha = MAX(0.0, fade);
@@ -984,7 +1001,7 @@ fromViewController:(UIViewController *)presenter {
 
                 [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseIn | UIViewAnimationOptionBeginFromCurrentState animations:^{
                     self->_pageViewController.view.transform = CGAffineTransformMakeTranslation(0, self.view.bounds.size.height + 60.0);
-                    self.view.backgroundColor = [UIColor clearColor];
+                    self.presentationBackdropView.alpha = 0.0;
                     self->_topToolbar.alpha = 0.0;
                     if (self->_bottomBar) self->_bottomBar.alpha = 0.0;
                 } completion:^(BOOL finished) {
@@ -1000,7 +1017,7 @@ fromViewController:(UIViewController *)presenter {
                 CGFloat springVel = (CGFloat)fmin(fmax(-velocity.y / 1200.0, -8.0), 8.0);
                 [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:kDismissCancelSpringDamping initialSpringVelocity:springVel options:UIViewAnimationOptionBeginFromCurrentState animations:^{
                     self->_pageViewController.view.transform = CGAffineTransformIdentity;
-                    self.view.backgroundColor = [UIColor blackColor];
+                    self.presentationBackdropView.alpha = 1.0;
                     CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
                     self->_topToolbar.alpha = alpha;
                     if (self->_bottomBar) self->_bottomBar.alpha = alpha;
@@ -1035,7 +1052,7 @@ fromViewController:(UIViewController *)presenter {
     _pageScrollView.scrollEnabled = YES;
     void (^animations)(void) = ^{
         self->_pageViewController.view.transform = CGAffineTransformIdentity;
-        self.view.backgroundColor = [UIColor blackColor];
+        self.presentationBackdropView.alpha = 1.0;
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
         self->_topToolbar.alpha = alpha;
         if (self->_bottomBar) self->_bottomBar.alpha = alpha;

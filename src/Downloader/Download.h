@@ -15,8 +15,6 @@
 typedef NS_ENUM(NSUInteger, DownloadAction) {
     share,
     saveToPhotos,
-    quickLook,
-    preview,
     saveToVault
 };
 @property (nonatomic, readonly) DownloadAction action;
