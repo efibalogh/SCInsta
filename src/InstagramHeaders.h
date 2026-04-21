@@ -1,7 +1,6 @@
 #import <Foundation/Foundation.h>
 #include <objc/NSObject.h>
 #import <UIKit/UIKit.h>
-#import "../modules/JGProgressHUD/JGProgressHUD.h"
 
 #ifdef __cplusplus
 #define _Bool bool
@@ -51,9 +50,21 @@
 @end
 
 @interface IGTabBar: UIView
+- (instancetype)initWithFrame:(CGRect)frame
+                defaultConfig:(id)defaultConfig
+            immersiveConfig:(id)immersiveConfig
+               backgroundView:(id)backgroundView
+                  launcherSet:(id)launcherSet;
+@end
+
+@interface IGLiquidGlassInteractiveTabBar : UIView
+- (instancetype)initWithFrame:(CGRect)frame;
+- (void)setConfig:(id)config;
+- (void)setImmersiveConfig:(id)config;
 @end
 
 @interface IGTabBarController : UIViewController
+- (NSInteger)tabBarStyle;
 @end
 
 @interface IGTableViewCell: UITableViewCell
@@ -123,7 +134,6 @@
 {
     IGImageView *_profilePictureView;
 }
-@property (nonatomic, strong) JGProgressHUD *hud;
 - (void)addHandleLongPress; // new
 - (void)handleLongPress:(UILongPressGestureRecognizer *)sender; // new
 @end
