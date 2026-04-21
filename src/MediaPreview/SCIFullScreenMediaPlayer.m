@@ -166,7 +166,12 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
     }
 
     if (items.count == 0) {
-        [SCIUtils showToastForDuration:2.0 title:@"No files found"];
+        [SCIUtils showToastForDuration:2.0
+                                 title:@"No files found"
+                              subtitle:nil
+                          iconResource:@"search"
+               fallbackSystemImageName:@"magnifyingglass"
+                                  tone:SCIFeedbackPillToneError];
         return;
     }
 
@@ -684,17 +689,32 @@ fromViewController:(UIViewController *)presenter {
     UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
     if (success) {
         [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-        [SCIUtils showToastForDuration:2.0 title:@"Saved to Photos"];
+        [SCIUtils showToastForDuration:2.0
+                                 title:@"Saved to Photos"
+                              subtitle:nil
+                          iconResource:@"circle_check_filled"
+               fallbackSystemImageName:@"checkmark.circle.fill"
+                                  tone:SCIFeedbackPillToneSuccess];
     } else {
         [haptic notificationOccurred:UINotificationFeedbackTypeError];
-        [SCIUtils showToastForDuration:3.0 title:@"Failed to save" subtitle:error.localizedDescription];
+        [SCIUtils showToastForDuration:3.0
+                                 title:@"Failed to save"
+                              subtitle:error.localizedDescription
+                          iconResource:@"error_filled"
+               fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                  tone:SCIFeedbackPillToneError];
     }
 }
 
 - (void)saveToVault {
     NSURL *targetURL = [self currentFileURL];
     if (!targetURL) {
-        [SCIUtils showToastForDuration:2.0 title:@"No media to save"];
+        [SCIUtils showToastForDuration:2.0
+                                 title:@"No media to save"
+                              subtitle:nil
+                          iconResource:@"media"
+               fallbackSystemImageName:@"photo.on.rectangle"
+                                  tone:SCIFeedbackPillToneError];
         return;
     }
 
@@ -752,11 +772,21 @@ fromViewController:(UIViewController *)presenter {
     UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
     if (file) {
         [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-        [SCIUtils showToastForDuration:2.0 title:@"Saved to Vault"];
+        [SCIUtils showToastForDuration:2.0
+                                 title:@"Saved to Vault"
+                              subtitle:nil
+                          iconResource:@"circle_check_filled"
+               fallbackSystemImageName:@"checkmark.circle.fill"
+                                  tone:SCIFeedbackPillToneSuccess];
     } else {
         [haptic notificationOccurred:UINotificationFeedbackTypeError];
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
-        [SCIUtils showToastForDuration:3.0 title:@"Failed to save" subtitle:msg];
+        [SCIUtils showToastForDuration:3.0
+                                 title:@"Failed to save"
+                              subtitle:msg
+                          iconResource:@"error_filled"
+               fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                  tone:SCIFeedbackPillToneError];
     }
 }
 
@@ -795,7 +825,12 @@ fromViewController:(UIViewController *)presenter {
             [[UIPasteboard generalPasteboard] setImage:image];
             UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
             [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-            [SCIUtils showToastForDuration:1.5 title:@"Copied"];
+            [SCIUtils showToastForDuration:1.5
+                                     title:@"Copied photo to clipboard"
+                                  subtitle:nil
+                              iconResource:@"copy_filled"
+                   fallbackSystemImageName:@"doc.on.doc.fill"
+                                      tone:SCIFeedbackPillToneSuccess];
         }
     } else {
         NSData *data = [NSData dataWithContentsOfURL:url];
@@ -803,7 +838,12 @@ fromViewController:(UIViewController *)presenter {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
             UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
             [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-            [SCIUtils showToastForDuration:1.5 title:@"Copied"];
+            [SCIUtils showToastForDuration:1.5
+                                     title:@"Copied video to clipboard"
+                                  subtitle:nil
+                              iconResource:@"copy_filled"
+                   fallbackSystemImageName:@"doc.on.doc.fill"
+                                      tone:SCIFeedbackPillToneSuccess];
         }
     }
 }
@@ -831,7 +871,12 @@ fromViewController:(UIViewController *)presenter {
     NSError *err;
     [item.vaultFile removeWithError:&err];
     if (err) {
-        [SCIUtils showToastForDuration:2.0 title:@"Failed to delete" subtitle:err.localizedDescription];
+        [SCIUtils showToastForDuration:2.0
+                                 title:@"Failed to delete"
+                              subtitle:err.localizedDescription
+                          iconResource:@"error_filled"
+               fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                  tone:SCIFeedbackPillToneError];
         return;
     }
 
