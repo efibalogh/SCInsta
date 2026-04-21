@@ -615,7 +615,12 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
             NSError *err;
             [file removeWithError:&err];
             if (err) {
-                [SCIUtils showToastForDuration:2.0 title:@"Failed to delete" subtitle:err.localizedDescription];
+                [SCIUtils showToastForDuration:2.0
+                                         title:@"Failed to delete"
+                                      subtitle:err.localizedDescription
+                                  iconResource:@"error_filled"
+                       fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                          tone:SCIFeedbackPillToneError];
             }
         }]];
         [weakSelf presentViewController:alert animated:YES completion:nil];

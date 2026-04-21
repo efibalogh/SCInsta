@@ -294,7 +294,12 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
     }
 
     if (!markTarget || !sectionController || !media) {
-        [SCIUtils showToastForDuration:1.5 title:@"Unable to mark story as seen"];
+        [SCIUtils showToastForDuration:1.5
+                                 title:@"Unable to mark story as seen"
+                              subtitle:nil
+                          iconResource:@"error_filled"
+               fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                  tone:SCIFeedbackPillToneError];
         return;
     }
 
@@ -302,7 +307,12 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
     ((void (*)(id, SEL, id, id))objc_msgSend)(markTarget, markSelector, sectionController, media);
     SCIForceMarkStoryAsSeen = NO;
 
-    [SCIUtils showToastForDuration:1.5 title:@"Marked story as seen"];
+    [SCIUtils showToastForDuration:1.5
+                             title:@"Marked story as seen"
+                          subtitle:nil
+                      iconResource:@"circle_check_filled"
+           fallbackSystemImageName:@"checkmark.circle.fill"
+                              tone:SCIFeedbackPillToneSuccess];
 }
 
 static UIView *SCIDirectOverlayViewFromController(UIViewController *controller) {
@@ -429,7 +439,12 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
 
     id message = SCIDirectCurrentMessageFromController(controller);
     if (!message) {
-        [SCIUtils showToastForDuration:1.5 title:@"Message not found"];
+        [SCIUtils showToastForDuration:1.5
+                                 title:@"Message not found"
+                              subtitle:nil
+                          iconResource:@"error_filled"
+               fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                  tone:SCIFeedbackPillToneError];
         return;
     }
 
@@ -450,7 +465,12 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
 
     SCIPendingDirectVisualMessageToMarkSeen = nil;
     if (!dispatched) {
-        [SCIUtils showToastForDuration:1.5 title:@"Unable to mark as seen"];
+        [SCIUtils showToastForDuration:1.5
+                                 title:@"Unable to mark as seen"
+                              subtitle:nil
+                          iconResource:@"error_filled"
+               fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                  tone:SCIFeedbackPillToneError];
         return;
     }
 
@@ -459,7 +479,12 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
         ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
     }
 
-    [SCIUtils showToastForDuration:1.5 title:@"Marked as seen"];
+    [SCIUtils showToastForDuration:1.5
+                             title:@"Marked as seen"
+                          subtitle:nil
+                      iconResource:@"circle_check_filled"
+           fallbackSystemImageName:@"checkmark.circle.fill"
+                              tone:SCIFeedbackPillToneSuccess];
 }
 
 static void SCIInstallDirectSeenButton(UIViewController *controller) {
@@ -589,7 +614,12 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     if ([nearestVC isKindOfClass:%c(IGDirectThreadViewController)]) {
         [(IGDirectThreadViewController *)nearestVC markLastMessageAsSeen];
 
-        [SCIUtils showToastForDuration:2.5 title:@"Marked messages as seen"];
+        [SCIUtils showToastForDuration:2.5
+                                 title:@"Marked messages as seen"
+                              subtitle:nil
+                          iconResource:@"circle_check_filled"
+               fallbackSystemImageName:@"checkmark.circle.fill"
+                                  tone:SCIFeedbackPillToneSuccess];
     }
 }
 %end

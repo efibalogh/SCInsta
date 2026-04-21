@@ -1,6 +1,5 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
-#import "../../../modules/JGProgressHUD/JGProgressHUD.h"
 
 %hook IGCoreTextView
 - (void)didMoveToSuperview {
@@ -39,12 +38,14 @@
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
     pasteboard.string = result;
 
-    // Notify user
-    JGProgressHUD *HUD = [[JGProgressHUD alloc] init];
-    HUD.textLabel.text = @"Copied text to clipboard";
-    HUD.indicatorView = [[JGProgressHUDSuccessIndicatorView alloc] init];
-    
-    [HUD showInView:topMostController().view];
-    [HUD dismissAfterDelay:2.0];
+    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
+    [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
+
+    [SCIUtils showToastForDuration:2.0
+                             title:@"Copied text to clipboard"
+                          subtitle:nil
+                      iconResource:@"copy_filled"
+           fallbackSystemImageName:@"doc.on.doc.fill"
+                              tone:SCIFeedbackPillToneSuccess];
 }
 %end
