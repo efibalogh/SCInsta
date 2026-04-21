@@ -1,4 +1,6 @@
 #import "Utils.h"
+#import <objc/runtime.h>
+#import <objc/message.h>
 
 static NSNumber *SCINumericValueForSelector(id target, NSString *selectorName) {
     if (!target || !selectorName.length) return nil;
@@ -131,6 +133,72 @@ static NSArray *SCIArrayFromCollection(id collection) {
     }
 
     return nil;
+}
+
+static UIWindow *SCIFeedbackPresentationWindow(void) {
+    UIViewController *topController = topMostController();
+    UIWindow *window = topController.view.window;
+    if (window && !window.hidden) {
+        return window;
+    }
+
+    UIApplication *application = [UIApplication sharedApplication];
+    if (application.keyWindow && !application.keyWindow.hidden) {
+        return application.keyWindow;
+    }
+
+    for (UIWindow *candidate in [application.windows reverseObjectEnumerator]) {
+        if (!candidate.hidden && candidate.alpha > 0.01 && candidate.windowLevel <= UIWindowLevelAlert) {
+            return candidate;
+        }
+    }
+
+    return application.windows.firstObject;
+}
+
+static UIView *SCIFeedbackPresentationView(void) {
+    UIWindow *window = SCIFeedbackPresentationWindow();
+    if (window) {
+        return window;
+    }
+
+    UIViewController *topController = topMostController();
+    return topController.view;
+}
+
+static NSTimeInterval const kSCISuccessToastDuration = 1.8;
+
+static SCIFeedbackPillStyle SCIFeedbackPillStyleFromPreferenceString(NSString *stylePreference) {
+    if ([stylePreference isEqualToString:@"colorful"]) {
+        return SCIFeedbackPillStyleColorful;
+    }
+
+    return SCIFeedbackPillStyleClean;
+}
+
+static void SCIApplyFeedbackPillStylePreference(void) {
+    NSString *stylePreference = [SCIUtils getStringPref:@"feedback_pill_style"];
+    [SCIFeedbackPillView setDefaultStyle:SCIFeedbackPillStyleFromPreferenceString(stylePreference)];
+}
+
+static void SCIMigrateLiquidGlassPrefsIfNeeded(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+        if ([ud objectForKey:@"liquid_glass"] != nil) {
+            return;
+        }
+        BOOL on = NO;
+        if ([ud objectForKey:@"liquid_glass_surfaces"] != nil && [ud boolForKey:@"liquid_glass_surfaces"]) {
+            on = YES;
+        }
+        if ([ud objectForKey:@"liquid_glass_buttons"] != nil && [ud boolForKey:@"liquid_glass_buttons"]) {
+            on = YES;
+        }
+        [ud setBool:on forKey:@"liquid_glass"];
+        [ud removeObjectForKey:@"liquid_glass_surfaces"];
+        [ud removeObjectForKey:@"liquid_glass_buttons"];
+    });
 }
 
 static NSArray *SCIImageVersionsFromPhoto(IGPhoto *photo) {
@@ -368,9 +436,28 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     return NO;
 }
 
++ (BOOL)sci_anyLiquidGlassEnabled {
+    SCIMigrateLiquidGlassPrefsIfNeeded();
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"liquid_glass"];
+}
+
 + (_Bool)liquidGlassEnabledBool:(_Bool)fallback {
-    BOOL setting = [SCIUtils getBoolPref:@"liquid_glass_surfaces"];
-    return setting ? true : fallback;
+    return [SCIUtils sci_anyLiquidGlassEnabled] ? true : fallback;
+}
+
++ (void)applyLiquidGlassNavigationExperimentOverride {
+    Class navHelper = objc_getClass("IGLiquidGlassExperimentHelper.IGLiquidGlassNavigationExperimentHelper");
+    if (!navHelper || ![navHelper respondsToSelector:@selector(shared)]) {
+        return;
+    }
+
+    id shared = ((id (*)(id, SEL))objc_msgSend)(navHelper, @selector(shared));
+    if (!shared || ![shared respondsToSelector:@selector(overrideIsEnabled:)]) {
+        return;
+    }
+
+    BOOL on = [SCIUtils sci_anyLiquidGlassEnabled];
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(shared, @selector(overrideIsEnabled:), on);
 }
 
 + (void)cleanCache {
@@ -454,20 +541,6 @@ static NSURL *SCIThumbProfilePicURL(id user) {
 + (NSError *)errorWithDescription:(NSString *)errorDesc code:(NSInteger)errorCode {
     NSError *error = [ NSError errorWithDomain:@"com.socuul.scinsta" code:errorCode userInfo:@{ NSLocalizedDescriptionKey: errorDesc } ];
     return error;
-}
-
-+ (JGProgressHUD *)showErrorHUDWithDescription:(NSString *)errorDesc {
-    return [self showErrorHUDWithDescription:errorDesc dismissAfterDelay:4.0];
-}
-+ (JGProgressHUD *)showErrorHUDWithDescription:(NSString *)errorDesc dismissAfterDelay:(CGFloat)dismissDelay {
-    JGProgressHUD *hud = [[JGProgressHUD alloc] init];
-    hud.textLabel.text = errorDesc;
-    hud.indicatorView = [[JGProgressHUDErrorIndicatorView alloc] init];
-
-    [hud showInView:topMostController().view];
-    [hud dismissAfterDelay:4.0];
-
-    return hud;
 }
 
 // MARK: Media
@@ -597,31 +670,82 @@ static NSURL *SCIThumbProfilePicURL(id user) {
 
 // MARK: Toasts
 + (void)showToastForDuration:(double)duration title:(NSString *)title {
-    [SCIUtils showToastForDuration:duration title:title subtitle:nil];
+    [SCIUtils showToastForDuration:duration
+                             title:title
+                          subtitle:nil
+                      iconResource:@"info"
+           fallbackSystemImageName:@"info.circle.fill"
+                              tone:SCIFeedbackPillToneInfo];
 }
 + (void)showToastForDuration:(double)duration title:(NSString *)title subtitle:(NSString *)subtitle {
-    // Root VC
-    Class rootVCClass = NSClassFromString(@"IGRootViewController");
+    [SCIUtils showToastForDuration:duration
+                             title:title
+                          subtitle:subtitle
+                      iconResource:@"info"
+           fallbackSystemImageName:@"info.circle.fill"
+                              tone:SCIFeedbackPillToneInfo];
+}
 
-    UIViewController *topMostVC = topMostController();
-    if (![topMostVC isKindOfClass:rootVCClass]) return;
++ (void)showToastForDuration:(double)duration
+                       title:(NSString *)title
+                    subtitle:(NSString *)subtitle
+                iconResource:(NSString *)iconResource
+     fallbackSystemImageName:(NSString *)fallbackSystemImageName
+                        tone:(SCIFeedbackPillTone)tone {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [SCIUtils showToastForDuration:duration
+                                     title:title
+                                  subtitle:subtitle
+                              iconResource:iconResource
+                   fallbackSystemImageName:fallbackSystemImageName
+                                      tone:tone];
+        });
+        return;
+    }
 
-    IGRootViewController *rootVC = (IGRootViewController *)topMostVC;
+    UIView *hostView = SCIFeedbackPresentationView();
+    if (!hostView) {
+        SCILog(@"No feedback host view available for title=%@", title);
+        return;
+    }
+    SCIApplyFeedbackPillStylePreference();
 
-    // Presenter
-    IGActionableConfirmationToastPresenter *toastPresenter = [rootVC toastPresenter];
-    if (toastPresenter == nil) return;
+    UIImage *icon = nil;
+    if (iconResource.length > 0) {
+        icon = [SCIUtils sci_resourceImageNamed:iconResource template:YES maxPointSize:16.0];
+    }
+    if (!icon && fallbackSystemImageName.length > 0) {
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightSemibold];
+        icon = [UIImage systemImageNamed:fallbackSystemImageName withConfiguration:config];
+    }
 
-    // View Model
-    Class modelClass = NSClassFromString(@"IGActionableConfirmationToastViewModel");
-    IGActionableConfirmationToastViewModel *model = [modelClass new];
-    
-    [model setValue:title forKey:@"text_annotatedTitleText"];
-    [model setValue:subtitle forKey:@"text_annotatedSubtitleText"];
+    NSTimeInterval effectiveDuration = (tone != SCIFeedbackPillToneError) ? kSCISuccessToastDuration : duration;
+    [SCIFeedbackPillView showToastInView:hostView
+                                duration:effectiveDuration
+                                   title:title
+                                subtitle:subtitle
+                                    icon:icon
+                                    tone:tone];
+}
 
-    // Show new toast, after clearing existing one
-    [toastPresenter hideAlert];
-    [toastPresenter showAlertWithViewModel:model isAnimated:true animationDuration:duration presentationPriority:0 tapActionBlock:nil presentedHandler:nil dismissedHandler:nil];
++ (SCIFeedbackPillView *)showProgressPill {
+    if (![NSThread isMainThread]) {
+        __block SCIFeedbackPillView *pill = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            pill = [SCIUtils showProgressPill];
+        });
+        return pill;
+    }
+
+    UIView *hostView = SCIFeedbackPresentationView();
+    if (!hostView) {
+        SCILog(@"No feedback host view available for progress pill");
+        return nil;
+    }
+    SCIApplyFeedbackPillStylePreference();
+
+    return [SCIFeedbackPillView showInView:hostView];
 }
 
 // MARK: Math

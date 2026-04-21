@@ -3,10 +3,9 @@
 #import <os/log.h>
 #import <objc/message.h>
 
-#import "../modules/JGProgressHUD/JGProgressHUD.h"
-
 #import "InstagramHeaders.h"
 #import "MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "MediaPreview/SCIFeedbackPillView.h"
 
 #import "Settings/SCISettingsViewController.h"
 
@@ -33,6 +32,12 @@
 
 + (_Bool)liquidGlassEnabledBool:(_Bool)fallback;
 
+/// True when either liquid glass surfaces or liquid glass buttons preference is enabled (Beegram-style master gate).
++ (BOOL)sci_anyLiquidGlassEnabled;
+
+/// Calls Instagram navigation experiment override when the helper class exists.
++ (void)applyLiquidGlassNavigationExperimentOverride;
+
 + (void)cleanCache;
 
 // Display View Controllers
@@ -46,9 +51,6 @@
 // Errors
 + (NSError *)errorWithDescription:(NSString *)errorDesc;
 + (NSError *)errorWithDescription:(NSString *)errorDesc code:(NSInteger)errorCode;
-
-+ (JGProgressHUD *)showErrorHUDWithDescription:(NSString *)errorDesc;
-+ (JGProgressHUD *)showErrorHUDWithDescription:(NSString *)errorDesc dismissAfterDelay:(CGFloat)dismissDelay;
 
 // Media
 + (NSURL *)getPhotoUrl:(IGPhoto *)photo;
@@ -73,6 +75,14 @@
 // Toasts
 + (void)showToastForDuration:(double)duration title:(NSString *)title;
 + (void)showToastForDuration:(double)duration title:(NSString *)title subtitle:(NSString *)subtitle;
++ (void)showToastForDuration:(double)duration
+                       title:(NSString *)title
+                    subtitle:(NSString *)subtitle
+                iconResource:(nullable NSString *)iconResource
+     fallbackSystemImageName:(nullable NSString *)fallbackSystemImageName
+                        tone:(SCIFeedbackPillTone)tone;
+
++ (SCIFeedbackPillView *)showProgressPill;
 
 // Math
 + (NSUInteger)decimalPlacesInDouble:(double)value;
