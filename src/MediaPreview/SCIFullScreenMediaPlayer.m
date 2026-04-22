@@ -2,10 +2,10 @@
 #import <AVFoundation/AVFoundation.h>
 
 #import "SCIFullScreenMediaPlayer.h"
+#import "SCIUnderlyingPlaybackController.h"
 #import "SCIMediaItem.h"
 #import "SCIFullScreenImageViewController.h"
 #import "SCIFullScreenVideoViewController.h"
-#import "../InstagramHeaders.h"
 #import "../Utils.h"
 #import "../Shared/SCIMediaChrome.h"
 #import "../Vault/SCIVaultFile.h"
@@ -46,51 +46,7 @@ static CGFloat const kDismissProgressCommit = 0.28;
 static CGFloat const kDismissVelocityCommit = 650.0;
 static CGFloat const kDismissFinishDuration = 0.32;
 static CGFloat const kDismissCancelSpringDamping = 0.82;
-
-static void SCICollectAVPlayersFromLayer(CALayer *layer, NSMutableSet<AVPlayer *> *players) {
-    if (!layer || !players) return;
-
-    if ([layer isKindOfClass:[AVPlayerLayer class]]) {
-        AVPlayer *player = ((AVPlayerLayer *)layer).player;
-        if (player) {
-            [players addObject:player];
-        }
-    }
-
-    for (CALayer *sublayer in layer.sublayers) {
-        SCICollectAVPlayersFromLayer(sublayer, players);
-    }
-}
-
-static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
-    UIApplication *app = [UIApplication sharedApplication];
-    NSMutableArray<UIWindow *> *windows = [NSMutableArray array];
-
-    for (UIScene *scene in app.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-        UIWindowScene *windowScene = (UIWindowScene *)scene;
-        [windows addObjectsFromArray:windowScene.windows];
-    }
-
-    if (windows.count == 0) {
-        [windows addObjectsFromArray:app.windows];
-    }
-
-    NSMutableSet<AVPlayer *> *players = [NSMutableSet set];
-    for (UIWindow *window in windows) {
-        SCICollectAVPlayersFromLayer(window.layer, players);
-    }
-
-    NSMutableArray<AVPlayer *> *playingPlayers = [NSMutableArray array];
-    for (AVPlayer *player in players) {
-        BOOL isPlaying = (player.rate > 0.0) || (player.timeControlStatus == AVPlayerTimeControlStatusPlaying);
-        if (isPlaying) {
-            [playingPlayers addObject:player];
-        }
-    }
-
-    return playingPlayers;
-}
+static NSTimeInterval const kUnderlyingPlaybackMonitorInterval = 0.20;
 
 @interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
 
@@ -118,7 +74,8 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 @property (nonatomic, assign) BOOL dismissPanIsVertical;
 @property (nonatomic, weak) UIScrollView *pageScrollView;
 
-@property (nonatomic, copy) NSArray<AVPlayer *> *pausedUnderlyingPlayers;
+@property (nonatomic, strong) SCIUnderlyingPlaybackController *underlyingPlaybackController;
+@property (nonatomic, strong) NSTimer *underlyingPlaybackMonitorTimer;
 
 /// Opaque black behind page content (letterboxing); alpha fades during dismiss so OverFullScreen content shows through.
 @property (nonatomic, strong) UIView *presentationBackdropView;
@@ -207,6 +164,20 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 }
 
 + (void)showMediaItems:(NSArray<SCIMediaItem *> *)items startingAtIndex:(NSInteger)index metadata:(SCIVaultSaveMetadata *)metadata {
+    [self showMediaItems:items
+         startingAtIndex:index
+                metadata:metadata
+          playbackSource:SCIFullScreenPlaybackSourceUnknown
+              sourceView:nil
+              controller:nil];
+}
+
++ (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
+       startingAtIndex:(NSInteger)index
+              metadata:(SCIVaultSaveMetadata *)metadata
+        playbackSource:(SCIFullScreenPlaybackSource)playbackSource
+            sourceView:(UIView *)sourceView
+            controller:(UIViewController *)controller {
     if (items.count == 0) return;
 
     if (metadata) {
@@ -221,6 +192,7 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     player.isFromVault = NO;
+    [player configurePlaybackContextWithSource:playbackSource sourceView:sourceView controller:controller];
     UIViewController *presenter = topMostController();
     [player playItems:items startingAtIndex:adjustedIndex fromViewController:presenter];
 }
@@ -230,6 +202,18 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 }
 
 + (void)showImage:(UIImage *)image metadata:(SCIVaultSaveMetadata *)metadata {
+    [self showImage:image
+           metadata:metadata
+     playbackSource:SCIFullScreenPlaybackSourceUnknown
+         sourceView:nil
+         controller:nil];
+}
+
++ (void)showImage:(UIImage *)image
+         metadata:(SCIVaultSaveMetadata *)metadata
+   playbackSource:(SCIFullScreenPlaybackSource)playbackSource
+       sourceView:(UIView *)sourceView
+       controller:(UIViewController *)controller {
     if (!image) return;
     SCIMediaItem *item = [SCIMediaItem itemWithImage:image];
     item.vaultMetadata = metadata;
@@ -239,6 +223,7 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
     item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
+    [player configurePlaybackContextWithSource:playbackSource sourceView:sourceView controller:controller];
     [player playItems:@[item] startingAtIndex:0 fromViewController:topMostController()];
 }
 
@@ -247,6 +232,18 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
 }
 
 + (void)showRemoteImageURL:(NSURL *)url metadata:(SCIVaultSaveMetadata *)metadata {
+    [self showRemoteImageURL:url
+                    metadata:metadata
+              playbackSource:SCIFullScreenPlaybackSourceUnknown
+                  sourceView:nil
+                  controller:nil];
+}
+
++ (void)showRemoteImageURL:(NSURL *)url
+                  metadata:(SCIVaultSaveMetadata *)metadata
+            playbackSource:(SCIFullScreenPlaybackSource)playbackSource
+                sourceView:(UIView *)sourceView
+                controller:(UIViewController *)controller {
     if (!url) return;
 
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
@@ -257,6 +254,7 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
     item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
+    [player configurePlaybackContextWithSource:playbackSource sourceView:sourceView controller:controller];
     UIViewController *presenter = topMostController();
     [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
 }
@@ -271,6 +269,16 @@ static NSArray<AVPlayer *> *SCIPlayingPlayersInAppWindows(void) {
     [self showRemoteImageURL:url metadata:meta];
 }
 
+#pragma mark - Playback Context
+
+- (void)configurePlaybackContextWithSource:(SCIFullScreenPlaybackSource)playbackSource
+                                sourceView:(UIView *)sourceView
+                                controller:(UIViewController *)controller {
+    self.underlyingPlaybackController = [[SCIUnderlyingPlaybackController alloc] initWithPlaybackSource:playbackSource
+                                                                                              sourceView:sourceView
+                                                                                              controller:controller];
+}
+
 #pragma mark - Present
 
 - (void)playItems:(NSArray<SCIMediaItem *> *)items
@@ -281,12 +289,9 @@ fromViewController:(UIViewController *)presenter {
     _isSingleItemMode = (items.count <= 1);
     _isToolbarVisible = YES;
 
-    // Pause any currently-playing in-app AVPlayers before presenting the preview,
-    // regardless of whether the first preview item is image or video.
-    [self pauseUnderlyingPlaybackIfNeeded];
+    [self beginUnderlyingPlaybackSuppression];
 
     // Over full screen so the black backdrop can fade to reveal the app during dismiss (same idea as vault).
-    // Underlying AVPlayers are still paused explicitly in pauseUnderlyingPlaybackIfNeeded.
     self.modalPresentationStyle = UIModalPresentationOverFullScreen;
     self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [presenter presentViewController:self animated:YES completion:nil];
@@ -300,12 +305,24 @@ fromViewController:(UIViewController *)presenter {
     self.view.backgroundColor = [UIColor clearColor];
     [self setupPresentationBackdrop];
 
-    [self pauseUnderlyingPlaybackIfNeeded];
+    [self startUnderlyingPlaybackMonitorIfNeeded];
+    [self refreshUnderlyingPlaybackSuppression];
     [self setupTopToolbar];
     [self setupBottomBar];
     [self setupPageViewController];
     [self setupDismissGesture];
     [self updateUI];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self refreshUnderlyingPlaybackSuppression];
+    });
+}
+
+- (void)dealloc {
+    [self stopUnderlyingPlaybackMonitor];
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -618,33 +635,61 @@ fromViewController:(UIViewController *)presenter {
     return [self currentItem].fileURL;
 }
 
+#pragma mark - Playback Suppression
+
+- (void)ensureUnderlyingPlaybackController {
+    if (!self.underlyingPlaybackController) {
+        self.underlyingPlaybackController = [[SCIUnderlyingPlaybackController alloc] initWithPlaybackSource:SCIFullScreenPlaybackSourceUnknown
+                                                                                                  sourceView:nil
+                                                                                                  controller:nil];
+    }
+}
+
+- (void)beginUnderlyingPlaybackSuppression {
+    [self ensureUnderlyingPlaybackController];
+    [self.underlyingPlaybackController beginSuppressionExcludingPreviewView:self.isViewLoaded ? self.view : nil];
+}
+
+- (void)refreshUnderlyingPlaybackSuppression {
+    [self ensureUnderlyingPlaybackController];
+    [self.underlyingPlaybackController refreshAndApplySuppressionExcludingPreviewView:self.isViewLoaded ? self.view : nil];
+}
+
+- (void)restoreUnderlyingPlaybackIfNeeded {
+    [self stopUnderlyingPlaybackMonitor];
+    [self.underlyingPlaybackController restorePlaybackIfNeeded];
+}
+
+- (void)handleUnderlyingPlaybackMonitorTick:(NSTimer *)timer {
+    if (!self.view.window) return;
+    [self refreshUnderlyingPlaybackSuppression];
+}
+
+- (void)startUnderlyingPlaybackMonitorIfNeeded {
+    if (self.underlyingPlaybackMonitorTimer) return;
+
+    self.underlyingPlaybackMonitorTimer = [NSTimer timerWithTimeInterval:kUnderlyingPlaybackMonitorInterval
+                                                                  target:self
+                                                                selector:@selector(handleUnderlyingPlaybackMonitorTick:)
+                                                                userInfo:nil
+                                                                 repeats:YES];
+    self.underlyingPlaybackMonitorTimer.tolerance = 0.05;
+    [[NSRunLoop mainRunLoop] addTimer:self.underlyingPlaybackMonitorTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopUnderlyingPlaybackMonitor {
+    [self.underlyingPlaybackMonitorTimer invalidate];
+    self.underlyingPlaybackMonitorTimer = nil;
+}
+
 #pragma mark - Actions
-
-- (void)pauseUnderlyingPlaybackIfNeeded {
-    if (self.pausedUnderlyingPlayers.count > 0) return;
-
-    NSArray<AVPlayer *> *playing = SCIPlayingPlayersInAppWindows();
-    if (playing.count == 0) return;
-
-    for (AVPlayer *player in playing) {
-        [player pause];
-    }
-    self.pausedUnderlyingPlayers = playing;
-}
-
-- (void)resumeUnderlyingPlaybackIfNeeded {
-    if (self.pausedUnderlyingPlayers.count == 0) return;
-
-    for (AVPlayer *player in self.pausedUnderlyingPlayers) {
-        [player play];
-    }
-    self.pausedUnderlyingPlayers = nil;
-}
 
 - (void)closeTapped {
     [self cleanupAll];
     [self dismissViewControllerAnimated:YES completion:^{
-        [self resumeUnderlyingPlaybackIfNeeded];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self restoreUnderlyingPlaybackIfNeeded];
+        });
         if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
             [self.delegate fullScreenMediaPlayerDidDismiss];
         }
@@ -1007,7 +1052,9 @@ fromViewController:(UIViewController *)presenter {
                 } completion:^(BOOL finished) {
                     [self cleanupAll];
                     [self dismissViewControllerAnimated:NO completion:^{
-                        [self resumeUnderlyingPlaybackIfNeeded];
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [self restoreUnderlyingPlaybackIfNeeded];
+                        });
                         if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
                             [self.delegate fullScreenMediaPlayerDidDismiss];
                         }

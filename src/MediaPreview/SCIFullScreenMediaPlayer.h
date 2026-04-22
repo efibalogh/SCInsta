@@ -4,6 +4,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef NS_ENUM(NSInteger, SCIFullScreenPlaybackSource) {
+    SCIFullScreenPlaybackSourceUnknown = 0,
+    SCIFullScreenPlaybackSourceFeed = 1,
+    SCIFullScreenPlaybackSourceReels = 2,
+    SCIFullScreenPlaybackSourceStories = 3,
+    SCIFullScreenPlaybackSourceDirect = 4,
+};
+
 @protocol SCIFullScreenMediaPlayerDelegate <NSObject>
 @optional
 - (void)fullScreenMediaPlayerDidDismiss;
@@ -34,11 +42,27 @@ fromViewController:(UIViewController *)presenter;
 + (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
        startingAtIndex:(NSInteger)index
               metadata:(nullable SCIVaultSaveMetadata *)metadata;
++ (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
+       startingAtIndex:(NSInteger)index
+              metadata:(nullable SCIVaultSaveMetadata *)metadata
+        playbackSource:(SCIFullScreenPlaybackSource)playbackSource
+            sourceView:(nullable UIView *)sourceView
+            controller:(nullable UIViewController *)controller;
 
 + (void)showImage:(UIImage *)image;
 + (void)showImage:(UIImage *)image metadata:(nullable SCIVaultSaveMetadata *)metadata;
++ (void)showImage:(UIImage *)image
+         metadata:(nullable SCIVaultSaveMetadata *)metadata
+   playbackSource:(SCIFullScreenPlaybackSource)playbackSource
+       sourceView:(nullable UIView *)sourceView
+       controller:(nullable UIViewController *)controller;
 + (void)showRemoteImageURL:(NSURL *)url;
 + (void)showRemoteImageURL:(NSURL *)url metadata:(nullable SCIVaultSaveMetadata *)metadata;
++ (void)showRemoteImageURL:(NSURL *)url
+                  metadata:(nullable SCIVaultSaveMetadata *)metadata
+            playbackSource:(SCIFullScreenPlaybackSource)playbackSource
+                sourceView:(nullable UIView *)sourceView
+                controller:(nullable UIViewController *)controller;
 /// Profile / avatar long-press: sets vault source + optional username for “Save to Vault”.
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(nullable NSString *)username;
 

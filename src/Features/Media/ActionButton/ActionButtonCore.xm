@@ -795,7 +795,9 @@ static NSArray<SCIMediaItem *> *SCIPlayerItemsFromEntries(NSArray<SCIResolvedMed
 	return items;
 }
 
-static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *metadata) {
+static void SCIShowExtractedVideoCover(NSURL *videoURL,
+									   SCIVaultSaveMetadata *metadata,
+									   SCIActionButtonContext *context) {
 	if (!videoURL) {
 		[SCIUtils showToastForDuration:2.0
 								 title:@"Cover unavailable"
@@ -832,7 +834,11 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *me
 		CGImageRelease(imageRef);
 
 		dispatch_async(dispatch_get_main_queue(), ^{
-			[SCIFullScreenMediaPlayer showImage:image metadata:metadata];
+			[SCIFullScreenMediaPlayer showImage:image
+									  metadata:metadata
+								playbackSource:(SCIFullScreenPlaybackSource)context.source
+									sourceView:context.view
+									controller:context.controller];
 		});
 	});
 }
@@ -989,7 +995,12 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 		}
 
 		NSInteger clampedIndex = SCIClampedIndex(resolvedIndex, (NSInteger)playerItems.count);
-		[SCIFullScreenMediaPlayer showMediaItems:playerItems startingAtIndex:clampedIndex metadata:meta];
+		[SCIFullScreenMediaPlayer showMediaItems:playerItems
+								 startingAtIndex:clampedIndex
+										metadata:meta
+								  playbackSource:(SCIFullScreenPlaybackSource)context.source
+									  sourceView:context.view
+									  controller:context.controller];
 		return;
 	}
 
@@ -1008,7 +1019,11 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 			SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
 			thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
 			thumbnailMeta.sourceUsername = meta.sourceUsername;
-			[SCIFullScreenMediaPlayer showRemoteImageURL:currentEntry.photoURL metadata:thumbnailMeta];
+			[SCIFullScreenMediaPlayer showRemoteImageURL:currentEntry.photoURL
+											 metadata:thumbnailMeta
+									   playbackSource:(SCIFullScreenPlaybackSource)context.source
+										   sourceView:context.view
+										   controller:context.controller];
 			return;
 		}
 
@@ -1016,7 +1031,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 			SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
 			thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
 			thumbnailMeta.sourceUsername = meta.sourceUsername;
-			SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta);
+			SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
 			return;
 		}
 
