@@ -24,7 +24,7 @@ static NSString * const kViewModeKey    = @"scinsta_vault_view_mode"; // 0 = gri
 
 static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
-static CGFloat const kVaultMenuIconPointSize = 18.0;
+static CGFloat const kVaultMenuIconPointSize = 24.0;
 
 static UIImage *SCIVaultMenuActionIcon(NSString *resourceName, NSString *systemName) {
     UIImage *img = resourceName.length > 0

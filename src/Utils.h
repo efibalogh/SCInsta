@@ -30,9 +30,17 @@
 
 + (BOOL)existingLongPressGestureRecognizerForView:(UIView *)view;
 
-+ (_Bool)liquidGlassEnabledBool:(_Bool)fallback;
+/// Normalizes legacy `liquid_glass` into `liquid_glass_surfaces` / `liquid_glass_buttons` (runs once).
++ (void)sci_normalizeLiquidGlassPreferences;
 
-/// True when either liquid glass surfaces or liquid glass buttons preference is enabled (Beegram-style master gate).
+/// IGDSLauncherConfig hooks: when the per-key pref is set and on, returns YES; when set and off, returns `fallback` (stock). When unset, the five legacy launcher keys follow Core “Enable liquid glass surfaces” like `origin/main`’s `liquidGlassEnabledBool:`; icon bar and internal debugger unset always use `fallback`.
++ (_Bool)sci_liquidGlassLauncherPrefKey:(NSString *)key orig:(_Bool)fallback;
+
+typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
+/// Runtime hooks: unset uses `orig`; when the pref exists and is on, returns YES.
++ (BOOL)sci_liquidGlassHookPrefKey:(NSString *)key orig:(SCILiquidGlassBoolMsg)orig selfPtr:(id)selfPtr sel:(SEL)sel;
+
+/// True when any liquid-glass-related preference is explicitly enabled.
 + (BOOL)sci_anyLiquidGlassEnabled;
 
 /// Calls Instagram navigation experiment override when the helper class exists.

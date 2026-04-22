@@ -55,6 +55,8 @@ BOOL SCIForceMarkStoryAsSeen = NO;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:sciDefaults];
 
+    [SCIUtils sci_normalizeLiquidGlassPreferences];
+
     // Migrate old download-button preference keys to action-button keys.
     id legacyShowActionButton = [defaults objectForKey:@"show_download_button"];
     if ([defaults objectForKey:@"show_action_button"] == nil && legacyShowActionButton != nil) {
@@ -66,8 +68,8 @@ BOOL SCIForceMarkStoryAsSeen = NO;
         [defaults setObject:legacyDefaultAction forKey:@"action_button_default_action"];
     }
 
-    // Override instagram defaults
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
+    // Override instagram defaults (surfaces vs lucent navigation bar experiment)
+    if ([SCIUtils getBoolPref:@"liquid_glass_buttons"]) {
         [[NSUserDefaults standardUserDefaults] setValue:@(YES) forKey:@"instagram.override.project.lucent.navigation"];
     } else {
         [[NSUserDefaults standardUserDefaults] setValue:@(NO) forKey:@"instagram.override.project.lucent.navigation"];
@@ -75,7 +77,7 @@ BOOL SCIForceMarkStoryAsSeen = NO;
 
     // Beegram-style liquid glass defaults (IG reads these when present)
     NSUserDefaults *igDefaults = [NSUserDefaults standardUserDefaults];
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
+    if ([SCIUtils getBoolPref:@"liquid_glass_surfaces"]) {
         [igDefaults setBool:YES forKey:@"liquid_glass_override_enabled"];
         [igDefaults setBool:YES forKey:@"IGLiquidGlassOverrideEnabled"];
     } else {
@@ -128,25 +130,25 @@ BOOL SCIForceMarkStoryAsSeen = NO;
 
 %hook IGDSLauncherConfig
 - (_Bool)isLiquidGlassInAppNotificationEnabled {
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_in_app_notifications" orig:%orig];
 }
 - (_Bool)isLiquidGlassContextMenuEnabled{
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_context_menus" orig:%orig];
 }
 - (_Bool)isLiquidGlassToastEnabled {
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_toasts" orig:%orig];
 }
 - (_Bool)isLiquidGlassToastPeekEnabled {
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_toast_peek" orig:%orig];
 }
 - (_Bool)isLiquidGlassAlertDialogEnabled {
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_alert_dialogs" orig:%orig];
 }
 - (_Bool)isLiquidGlassIconBarButtonEnabled {
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_icon_bar_buttons" orig:%orig];
 }
 - (_Bool)canUseInternalLiquidGlassDebugger {
-    return [SCIUtils liquidGlassEnabledBool:%orig];
+    return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_internal_debugger" orig:%orig];
 }
 %end
 

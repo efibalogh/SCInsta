@@ -10,74 +10,47 @@ typedef BOOL (*SCI_BOOL_MSG)(id self, SEL _cmd);
 
 static SCI_BOOL_MSG orig_liquidGlass_class_isEnabled;
 static BOOL hook_liquidGlass_class_isEnabled(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_liquidGlass_class_isEnabled ? orig_liquidGlass_class_isEnabled(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_core_class" orig:(SCILiquidGlassBoolMsg)orig_liquidGlass_class_isEnabled selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_nav_isEnabled;
 static BOOL hook_nav_isEnabled(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_nav_isEnabled ? orig_nav_isEnabled(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_nav_is_enabled" orig:(SCILiquidGlassBoolMsg)orig_nav_isEnabled selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_nav_isDefaultValueSet;
 static BOOL hook_nav_isDefaultValueSet(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_nav_isDefaultValueSet ? orig_nav_isDefaultValueSet(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_nav_default_value_set" orig:(SCILiquidGlassBoolMsg)orig_nav_isDefaultValueSet selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_nav_isHomeFeedHeaderEnabled;
 static BOOL hook_nav_isHomeFeedHeaderEnabled(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_nav_isHomeFeedHeaderEnabled ? orig_nav_isHomeFeedHeaderEnabled(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_nav_home_feed_header" orig:(SCILiquidGlassBoolMsg)orig_nav_isHomeFeedHeaderEnabled selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_swizzle_isEnabled;
 static BOOL hook_swizzle_isEnabled(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_swizzle_isEnabled ? orig_swizzle_isEnabled(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_swizzle_toggle" orig:(SCILiquidGlassBoolMsg)orig_swizzle_isEnabled selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_badged_isLiquidGlass;
 static BOOL hook_badged_isLiquidGlass(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_badged_isLiquidGlass ? orig_badged_isLiquidGlass(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_badged_nav_button" orig:(SCILiquidGlassBoolMsg)orig_badged_isLiquidGlass selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_videoBack_isLiquidGlass;
 static BOOL hook_videoBack_isLiquidGlass(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_videoBack_isLiquidGlass ? orig_videoBack_isLiquidGlass(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_video_back_button" orig:(SCILiquidGlassBoolMsg)orig_videoBack_isLiquidGlass selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_videoCam_isLiquidGlass;
 static BOOL hook_videoCam_isLiquidGlass(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_videoCam_isLiquidGlass ? orig_videoCam_isLiquidGlass(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_video_camera_button" orig:(SCILiquidGlassBoolMsg)orig_videoCam_isLiquidGlass selfPtr:self sel:_cmd];
 }
 
 static SCI_BOOL_MSG orig_alert_enableLiquidGlass;
 static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
-        return YES;
-    }
-    return orig_alert_enableLiquidGlass ? orig_alert_enableLiquidGlass(self, _cmd) : NO;
+    return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_alert_dialog_actions" orig:(SCILiquidGlassBoolMsg)orig_alert_enableLiquidGlass selfPtr:self sel:_cmd];
 }
 
 %hook IGTabBar
@@ -86,7 +59,9 @@ static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
             immersiveConfig:(id)immersiveConfig
                backgroundView:(id)backgroundView
                   launcherSet:(id)launcherSet {
-    if (![SCIUtils sci_anyLiquidGlassEnabled]) {
+    [SCIUtils sci_normalizeLiquidGlassPreferences];
+    NSUserDefaults *sciLGDefaults = [NSUserDefaults standardUserDefaults];
+    if ([sciLGDefaults objectForKey:@"liquid_glass_interactive_tab_bar"] == nil || ![sciLGDefaults boolForKey:@"liquid_glass_interactive_tab_bar"]) {
         return %orig;
     }
 
@@ -113,7 +88,9 @@ static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
 
 %hook IGTabBarController
 - (NSInteger)tabBarStyle {
-    if ([SCIUtils sci_anyLiquidGlassEnabled]) {
+    [SCIUtils sci_normalizeLiquidGlassPreferences];
+    NSUserDefaults *sciLGTabDefaults = [NSUserDefaults standardUserDefaults];
+    if ([sciLGTabDefaults objectForKey:@"liquid_glass_interactive_tab_bar"] != nil && [sciLGTabDefaults boolForKey:@"liquid_glass_interactive_tab_bar"]) {
         return 1;
     }
     return %orig;

@@ -42,6 +42,8 @@
                                                 [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the meta ai buttons/functionality within the app" defaultsKey:@"hide_meta_ai"],
                                                 [SCISetting switchCellWithTitle:@"Copy description" subtitle:@"Copy description text fields by long-pressing on them" defaultsKey:@"copy_description"],
                                                 [SCISetting switchCellWithTitle:@"Do not save recent searches" subtitle:@"Search bars will no longer save your recent searches" defaultsKey:@"no_recent_searches"],
+                                                [SCISetting switchCellWithTitle:@"Enable liquid glass buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],
+                                                [SCISetting switchCellWithTitle:@"Enable liquid glass surfaces" subtitle:@"Enables liquid glass for other elements, such as menus. When on, also sets Instagram's liquid glass override defaults (liquid_glass_override_enabled / IGLiquidGlassOverrideEnabled)." defaultsKey:@"liquid_glass_surfaces" requiresRestart:YES],
                                             ]
                                         },
                                         @{
@@ -86,9 +88,39 @@
                                             @"header": @"Appearance",
                                             @"rows": @[
                                                 [SCISetting menuCellWithTitle:@"Feedback pill style" subtitle:@"Neutral glass vs. tone-tinted pill chrome" menu:[self menus][@"feedback_pill_style"]],
-                                                [SCISetting switchCellWithTitle:@"Liquid glass" subtitle:@"Forces liquid glass for all possible surfaces" defaultsKey:@"liquid_glass" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Enable teen app icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Disable app haptics" subtitle:@"Disables haptics/vibrations within the Instagram app" defaultsKey:@"disable_haptics"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"",
+                                            @"rows": @[
+                                                [SCISetting navigationCellWithTitle:@"Liquid glass (experimental)"
+                                                                           subtitle:@"Unsafe per-hook overrides; use General → Core for normal options"
+                                                                               icon:[SCISymbol symbolWithName:@"exclamationmark.triangle.fill" color:[UIColor systemOrangeColor] size:22]
+                                                                        navSections:@[@{
+                                                    @"header": @"Unsafe / experimental",
+                                                    @"footer": @"Restart Instagram after changes. These override Instagram's internal liquid-glass gates and may crash or mis-render UI. Prefer “Enable liquid glass surfaces / buttons” under General → Core. For the five launcher-driven surfaces below, leaving a switch unset follows Core “surfaces” (same as stock SCInsta before granular toggles). Icon bar and internal debugger unset always follow Instagram's stock value unless you override them here.",
+                                                    @"rows": @[
+                                                        [SCISetting switchCellWithTitle:@"In-app notifications (launcher)" subtitle:@"Forces liquid-glass styling for in-app notification surfaces when enabled; unset follows Core “surfaces”." defaultsKey:@"liquid_glass_in_app_notifications" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Context menus (launcher)" subtitle:@"Forces liquid-glass styling for context menus when enabled; unset follows Core “surfaces”." defaultsKey:@"liquid_glass_context_menus" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Toasts (launcher)" subtitle:@"Toast chrome from launcher config; unset follows Core “surfaces”." defaultsKey:@"liquid_glass_toasts" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Toast peek (launcher)" subtitle:@"Peek-style toast treatment; unset follows Core “surfaces”." defaultsKey:@"liquid_glass_toast_peek" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Alert dialogs (launcher)" subtitle:@"System-style alert dialogs gated by launcher; unset follows Core “surfaces”." defaultsKey:@"liquid_glass_alert_dialogs" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Icon bar buttons (launcher)" subtitle:@"Small icon strip / accessory controls; unset keeps Instagram's default (not tied to Core surfaces)." defaultsKey:@"liquid_glass_icon_bar_buttons" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Internal liquid glass debugger" subtitle:@"Enables Instagram's internal debugger entry points; unset keeps stock. High risk." defaultsKey:@"liquid_glass_internal_debugger" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"IGLiquidGlass +isEnabled" subtitle:@"Global IGLiquidGlass class gate; may affect many surfaces at once." defaultsKey:@"liquid_glass_core_class" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Navigation experiment: isEnabled" subtitle:@"IGLiquidGlassNavigationExperimentHelper shared state." defaultsKey:@"liquid_glass_nav_is_enabled" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Navigation experiment: isDefaultValueSet" subtitle:@"Whether IG considers the nav experiment default applied." defaultsKey:@"liquid_glass_nav_default_value_set" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Navigation experiment: home feed header" subtitle:@"Liquid glass on the main feed header chrome." defaultsKey:@"liquid_glass_nav_home_feed_header" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Internal swizzle toggle" subtitle:@"IGLiquidGlassSwizzleToggle; affects method swizzling used for liquid glass rollout." defaultsKey:@"liquid_glass_swizzle_toggle" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Badged navigation buttons" subtitle:@"Tab / nav buttons that show notification badges." defaultsKey:@"liquid_glass_badged_nav_button" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Unified video back button" subtitle:@"Back control in unified video viewer." defaultsKey:@"liquid_glass_video_back_button" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Unified video camera entry" subtitle:@"Camera entry control in unified video flow." defaultsKey:@"liquid_glass_video_camera_button" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Alert dialog action buttons" subtitle:@"Primary/secondary actions on IGDS alert dialogs." defaultsKey:@"liquid_glass_alert_dialog_actions" requiresRestart:YES],
+                                                        [SCISetting switchCellWithTitle:@"Interactive liquid tab bar" subtitle:@"Replaces IGTabBar with IGLiquidGlassInteractiveTabBar and forces tab bar style; can break navigation." defaultsKey:@"liquid_glass_interactive_tab_bar" requiresRestart:YES],
+                                                    ]
+                                                }]]
                                             ]
                                         },
                                         @{

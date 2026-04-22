@@ -185,20 +185,63 @@ static void SCIMigrateLiquidGlassPrefsIfNeeded(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-        if ([ud objectForKey:@"liquid_glass"] != nil) {
+        if ([ud objectForKey:@"liquid_glass"] == nil) {
             return;
         }
-        BOOL on = NO;
-        if ([ud objectForKey:@"liquid_glass_surfaces"] != nil && [ud boolForKey:@"liquid_glass_surfaces"]) {
-            on = YES;
+        BOOL unified = [ud boolForKey:@"liquid_glass"];
+        if ([ud objectForKey:@"liquid_glass_surfaces"] == nil) {
+            [ud setBool:unified forKey:@"liquid_glass_surfaces"];
         }
-        if ([ud objectForKey:@"liquid_glass_buttons"] != nil && [ud boolForKey:@"liquid_glass_buttons"]) {
-            on = YES;
+        if ([ud objectForKey:@"liquid_glass_buttons"] == nil) {
+            [ud setBool:unified forKey:@"liquid_glass_buttons"];
         }
-        [ud setBool:on forKey:@"liquid_glass"];
-        [ud removeObjectForKey:@"liquid_glass_surfaces"];
-        [ud removeObjectForKey:@"liquid_glass_buttons"];
+        [ud removeObjectForKey:@"liquid_glass"];
     });
+}
+
+/// Launcher keys that mirror `origin/main`’s `liquidGlassEnabledBool:` when the per-key pref is unset.
+static NSSet<NSString *> *SCILiquidGlassLauncherKeysUsingSurfacesFallback(void) {
+    static NSSet<NSString *> *set;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        set = [NSSet setWithArray:@[
+            @"liquid_glass_in_app_notifications",
+            @"liquid_glass_context_menus",
+            @"liquid_glass_toasts",
+            @"liquid_glass_toast_peek",
+            @"liquid_glass_alert_dialogs",
+        ]];
+    });
+    return set;
+}
+
+static NSArray<NSString *> *SCIAllLiquidGlassPreferenceKeys(void) {
+    static NSArray<NSString *> *keys;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        keys = @[
+            @"liquid_glass_surfaces",
+            @"liquid_glass_buttons",
+            @"liquid_glass_in_app_notifications",
+            @"liquid_glass_context_menus",
+            @"liquid_glass_toasts",
+            @"liquid_glass_toast_peek",
+            @"liquid_glass_alert_dialogs",
+            @"liquid_glass_icon_bar_buttons",
+            @"liquid_glass_internal_debugger",
+            @"liquid_glass_core_class",
+            @"liquid_glass_nav_is_enabled",
+            @"liquid_glass_nav_default_value_set",
+            @"liquid_glass_nav_home_feed_header",
+            @"liquid_glass_swizzle_toggle",
+            @"liquid_glass_badged_nav_button",
+            @"liquid_glass_video_back_button",
+            @"liquid_glass_video_camera_button",
+            @"liquid_glass_alert_dialog_actions",
+            @"liquid_glass_interactive_tab_bar",
+        ];
+    });
+    return keys;
 }
 
 static NSArray *SCIImageVersionsFromPhoto(IGPhoto *photo) {
@@ -436,13 +479,47 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     return NO;
 }
 
-+ (BOOL)sci_anyLiquidGlassEnabled {
++ (void)sci_normalizeLiquidGlassPreferences {
     SCIMigrateLiquidGlassPrefsIfNeeded();
-    return [[NSUserDefaults standardUserDefaults] boolForKey:@"liquid_glass"];
 }
 
-+ (_Bool)liquidGlassEnabledBool:(_Bool)fallback {
-    return [SCIUtils sci_anyLiquidGlassEnabled] ? true : fallback;
++ (_Bool)sci_liquidGlassLauncherPrefKey:(NSString *)key orig:(_Bool)fallback {
+    SCIMigrateLiquidGlassPrefsIfNeeded();
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    if ([ud objectForKey:key] != nil) {
+        if ([ud boolForKey:key]) {
+            return YES;
+        }
+        return fallback;
+    }
+    if ([SCILiquidGlassLauncherKeysUsingSurfacesFallback() containsObject:key]) {
+        BOOL surfaces = [SCIUtils getBoolPref:@"liquid_glass_surfaces"];
+        return surfaces ? YES : fallback;
+    }
+    return fallback;
+}
+
++ (BOOL)sci_liquidGlassHookPrefKey:(NSString *)key orig:(SCILiquidGlassBoolMsg)orig selfPtr:(id)selfPtr sel:(SEL)sel {
+    SCIMigrateLiquidGlassPrefsIfNeeded();
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    BOOL origVal = orig ? orig(selfPtr, sel) : NO;
+    if ([ud objectForKey:key] == nil) {
+        return origVal;
+    }
+    if ([ud boolForKey:key]) {
+        return YES;
+    }
+    return origVal;
+}
+
++ (BOOL)sci_anyLiquidGlassEnabled {
+    SCIMigrateLiquidGlassPrefsIfNeeded();
+    for (NSString *key in SCIAllLiquidGlassPreferenceKeys()) {
+        if ([SCIUtils getBoolPref:key]) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 + (void)applyLiquidGlassNavigationExperimentOverride {

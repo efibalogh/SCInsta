@@ -1248,7 +1248,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	NSMutableArray<UIMenuElement *> *menuElements = [NSMutableArray arrayWithCapacity:visibleActions.count];
 	for (NSString *identifier in visibleActions) {
 		UIAction *menuAction = [UIAction actionWithTitle:SCITitleForActionIdentifier(identifier)
-												   image:SCIIconForActionIdentifier(identifier, 18.0)
+												   image:SCIIconForActionIdentifier(identifier, 24.0)
 											  identifier:nil
 												 handler:^(__unused UIAction *action) {
 			SCIExecuteActionIdentifier(identifier, context, NO);
