@@ -121,27 +121,30 @@ static UIColor *SCIActionButtonTintForSource(SCIActionButtonSource source) {
 	}
 }
 
-static UIImage *SCIIconForActionIdentifier(NSString *identifier, CGFloat size) {
+
+
+static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButtonSource source, CGFloat size) {
+	NSString *append = (source == SCIActionButtonSourceReels) ? @"_reels" : @"";
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) {
-		return SCIActionButtonImage(@"download", @"arrow.down.to.line", size);
+		return SCIActionButtonImage([NSString stringWithFormat:@"download%@", append], @"arrow.down.to.line", size);
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadShare]) {
-		return SCIActionButtonImage(@"share", @"square.and.arrow.up", size);
+		return SCIActionButtonImage([NSString stringWithFormat:@"share%@", append], @"square.and.arrow.up", size);
 	}
 	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) {
-		return SCIActionButtonImage(@"link", @"link", size);
+		return SCIActionButtonImage([NSString stringWithFormat:@"link%@", append], @"link", size);
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadVault]) {
-		return SCIActionButtonImage(@"chest", @"tray.and.arrow.down", size);
+		return SCIActionButtonImage([NSString stringWithFormat:@"media%@", append], @"tray.and.arrow.down", size);
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
-		return SCIActionButtonImage(@"expand", @"arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", size);
+		return SCIActionButtonImage([NSString stringWithFormat:@"expand_alt%@", append], @"arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", size);
 	}
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
-		return SCIActionButtonImage(@"photo_gallery", @"photo.on.rectangle", size);
+		return SCIActionButtonImage([NSString stringWithFormat:@"photo%@", append], @"photo.on.rectangle", size);
 	}
 
-	return SCIActionButtonImage(@"action_alt", @"option", size);
+	return SCIActionButtonImage([NSString stringWithFormat:@"action_alt%@", append], @"option", size);
 }
 
 static NSString *SCITitleForActionIdentifier(NSString *identifier) {
@@ -702,19 +705,21 @@ static NSString *SCIResolvedDefaultActionIdentifier(NSArray<NSString *> *visible
 }
 
 static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSource source) {
+	CGFloat size = source == SCIActionButtonSourceReels ? 44.0 : 22.0;
+
 	if ([identifier isEqualToString:kSCIActionNone]) {
-		return SCIActionButtonImage(@"action_alt", @"option", 22.0);
+		return source == SCIActionButtonSourceReels
+			? SCIActionButtonImage(@"action_alt_reels", @"option", size)
+			: SCIActionButtonImage(@"action_alt", @"option", size);
 	}
 
 	if (identifier.length > 0) {
-		return SCIIconForActionIdentifier(identifier, 22.0);
+		return SCIIconForActionIdentifier(identifier, source, size);
 	}
 
-	if (source == SCIActionButtonSourceFeed) {
-		return SCIActionButtonImage(@"action_alt", @"option", 22.0);
-	}
-
-	return SCIActionButtonImage(@"action_alt", @"option", 22.0);
+	return source == SCIActionButtonSourceReels
+		? SCIActionButtonImage(@"action_alt_reels", @"option", size)
+		: SCIActionButtonImage(@"action_alt", @"option", size);
 }
 
 static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
@@ -1244,7 +1249,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	NSMutableArray<UIMenuElement *> *menuElements = [NSMutableArray arrayWithCapacity:visibleActions.count];
 	for (NSString *identifier in visibleActions) {
 		UIAction *menuAction = [UIAction actionWithTitle:SCITitleForActionIdentifier(identifier)
-												   image:SCIIconForActionIdentifier(identifier, 24.0)
+												   image:SCIIconForActionIdentifier(identifier, SCIActionButtonSourceFeed, 18.0)
 											  identifier:nil
 												 handler:^(__unused UIAction *action) {
 			SCIExecuteActionIdentifier(identifier, context, NO);

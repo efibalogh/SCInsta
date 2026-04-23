@@ -34,7 +34,7 @@
             @"rows": @[
                 [SCISetting navigationCellWithTitle:@"General"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"settings" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"settings" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"Core",
                                             @"rows": @[
@@ -77,7 +77,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Interface"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"interface" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"interface" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"Navigation",
                                             @"rows": @[
@@ -98,7 +98,7 @@
                                             @"rows": @[
                                                 [SCISetting navigationCellWithTitle:@"Liquid glass (experimental)"
                                                                            subtitle:@"Unsafe per-hook overrides; use General → Core for normal options"
-                                                                               icon:[SCISymbol symbolWithName:@"exclamationmark.triangle.fill" color:[UIColor systemOrangeColor] size:22]
+                                                                               icon:[SCISymbol symbolWithName:@"exclamationmark.triangle.fill" color:[UIColor systemOrangeColor] size:24]
                                                                         navSections:@[@{
                                                     @"header": @"Unsafe / experimental",
                                                     @"footer": @"Restart Instagram after changes. These override Instagram's internal liquid-glass gates and may crash or mis-render UI. Prefer “Enable liquid glass surfaces / buttons” under General → Core. For the five launcher-driven surfaces below, leaving a switch unset follows Core “surfaces” (same as stock SCInsta before granular toggles). Icon bar and internal debugger unset always follow Instagram's stock value unless you override them here.",
@@ -144,7 +144,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Feed"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"feed" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"feed" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"Content",
                                             @"rows": @[
@@ -172,7 +172,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Reels"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"reels" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"reels_prism" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"Behavior",
                                             @"rows": @[
@@ -208,7 +208,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Stories"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"story" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"story" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"Privacy & visibility",
                                             @"rows": @[
@@ -249,7 +249,7 @@
                 ],
                 [SCISetting navigationCellWithTitle:@"Messages"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"messages" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"messages" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"Messages",
                                             @"rows": @[
@@ -294,12 +294,12 @@
                 ],
                 [SCISetting buttonCellWithTitle:@"Media Vault"
                                        subtitle:@""
-                                           icon:[SCISymbol resourceSymbolWithName:@"chest" color:[UIColor labelColor] size:22]
+                                           icon:[SCISymbol resourceSymbolWithName:@"media" color:[UIColor labelColor] size:24]
                                          action:^(void) { [SCIVaultViewController presentVault]; }
                 ],
                 [SCISetting navigationCellWithTitle:@"Debug"
                                            subtitle:@""
-                                               icon:[SCISymbol resourceSymbolWithName:@"toolbox" color:[UIColor labelColor] size:22]
+                                               icon:[SCISymbol resourceSymbolWithName:@"toolbox" color:[UIColor labelColor] size:24]
                                         navSections:@[@{
                                             @"header": @"FLEX",
                                             @"rows": @[
@@ -429,7 +429,7 @@
                             }
             ],
             [UICommand commandWithTitle:@"Download to Vault"
-                                  image:[[SCISymbol resourceSymbolWithName:@"chest" color:[UIColor labelColor] size:18] image]
+                                  image:[[SCISymbol resourceSymbolWithName:@"media" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
                                 @"defaultsKey": @"action_button_default_action",
@@ -437,7 +437,7 @@
                             }
             ],
             [UICommand commandWithTitle:@"Expand"
-                                  image:[[SCISymbol resourceSymbolWithName:@"expand" color:[UIColor labelColor] size:18] image]
+                                  image:[[SCISymbol resourceSymbolWithName:@"expand_alt" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
                                 @"defaultsKey": @"action_button_default_action",
@@ -445,7 +445,7 @@
                             }
             ],
             [UICommand commandWithTitle:@"View Thumbnail"
-                                  image:[[SCISymbol resourceSymbolWithName:@"photo_gallery" color:[UIColor labelColor] size:18] image]
+                                  image:[[SCISymbol resourceSymbolWithName:@"photo" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
                                 @"defaultsKey": @"action_button_default_action",

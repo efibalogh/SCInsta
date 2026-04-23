@@ -73,7 +73,7 @@ void SCIInstallReelsActionButton(UIView *verticalUFIView) {
 	SCIConfigureActionButton(button, context);
 	if (button.hidden) return;
 
-	CGFloat size = 52.0;
+	CGFloat size = 44.0;
 	button.translatesAutoresizingMaskIntoConstraints = NO;
 
 	NSLayoutConstraint *bottomConstraint = objc_getAssociatedObject(button, kSCIReelsActionBottomConstraintAssocKey);

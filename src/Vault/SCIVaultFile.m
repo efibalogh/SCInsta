@@ -447,14 +447,14 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
 
 + (NSString *)symbolNameForSource:(SCIVaultSource)source {
     switch (source) {
-        case SCIVaultSourceFeed:    return @"feed";//@"rectangle.stack";
-        case SCIVaultSourceStories: return @"story";//@"rectangle.portrait.on.rectangle.portrait.angled";
-        case SCIVaultSourceReels:   return @"reels";//@"film.stack";
-        case SCIVaultSourceProfile: return @"profile";//@"person.crop.circle";
-        case SCIVaultSourceDMs:     return @"messages";//@"bubble.left.and.bubble.right";
-        case SCIVaultSourceThumbnail: return @"photo_gallery";//@"photo.on.rectangle";
+        case SCIVaultSourceFeed:    return @"feed";
+        case SCIVaultSourceStories: return @"story";
+        case SCIVaultSourceReels:   return @"reels_prism";
+        case SCIVaultSourceProfile: return @"profile";
+        case SCIVaultSourceDMs:     return @"messages";
+        case SCIVaultSourceThumbnail: return @"photo";
         case SCIVaultSourceOther:
-        default:                    return @"chest";//@"tray";
+        default:                    return @"media";
     }
 }
 

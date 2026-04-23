@@ -292,7 +292,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     _emptyStateView.hidden = YES;
     [self.view addSubview:_emptyStateView];
 
-    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"chest" template:YES];
+    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"media" template:YES];
     if (!emptyIconImage) {
         UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:56 weight:UIImageSymbolWeightLight];
         emptyIconImage = [UIImage systemImageNamed:@"tray" withConfiguration:cfg];

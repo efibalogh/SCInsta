@@ -457,7 +457,7 @@ fromViewController:(UIViewController *)presenter {
         [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteVaultButton];
     } else {
-        _saveVaultButton = SCIMediaChromeBottomButton(@"tray.and.arrow.down", @"chest", @"Save to Vault");
+        _saveVaultButton = SCIMediaChromeBottomButton(@"tray.and.arrow.down", @"media", @"Save to Vault");
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveVaultButton];
     }
