@@ -46,12 +46,14 @@ static CGFloat const kDismissProgressCommit = 0.28;
 static CGFloat const kDismissVelocityCommit = 650.0;
 static CGFloat const kDismissFinishDuration = 0.32;
 static CGFloat const kDismissCancelSpringDamping = 0.82;
-static NSTimeInterval const kUnderlyingPlaybackMonitorInterval = 0.20;
+static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshShortDelay = 0.18;
+static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
 
 @interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
 
 @property (nonatomic, strong) NSArray<SCIMediaItem *> *items;
 @property (nonatomic, assign) NSInteger currentIndex;
+@property (nonatomic, strong) NSMutableDictionary<NSNumber *, UIViewController *> *controllerCache;
 
 @property (nonatomic, strong) UIPageViewController *pageViewController;
 
@@ -75,7 +77,7 @@ static NSTimeInterval const kUnderlyingPlaybackMonitorInterval = 0.20;
 @property (nonatomic, weak) UIScrollView *pageScrollView;
 
 @property (nonatomic, strong) SCIUnderlyingPlaybackController *underlyingPlaybackController;
-@property (nonatomic, strong) NSTimer *underlyingPlaybackMonitorTimer;
+@property (nonatomic, assign) NSInteger underlyingPlaybackRefreshGeneration;
 
 /// Opaque black behind page content (letterboxing); alpha fades during dismiss so OverFullScreen content shows through.
 @property (nonatomic, strong) UIView *presentationBackdropView;
@@ -286,6 +288,7 @@ static NSTimeInterval const kUnderlyingPlaybackMonitorInterval = 0.20;
 fromViewController:(UIViewController *)presenter {
     _items = [items copy];
     _currentIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
+    _controllerCache = [NSMutableDictionary dictionary];
     _isSingleItemMode = (items.count <= 1);
     _isToolbarVisible = YES;
 
@@ -305,8 +308,6 @@ fromViewController:(UIViewController *)presenter {
     self.view.backgroundColor = [UIColor clearColor];
     [self setupPresentationBackdrop];
 
-    [self startUnderlyingPlaybackMonitorIfNeeded];
-    [self refreshUnderlyingPlaybackSuppression];
     [self setupTopToolbar];
     [self setupBottomBar];
     [self setupPageViewController];
@@ -316,13 +317,16 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self refreshUnderlyingPlaybackSuppression];
-    });
+    [self refreshUnderlyingPlaybackSuppression];
+    if (![self.underlyingPlaybackController hasSuppressedSessions]) {
+        [self scheduleDeferredUnderlyingPlaybackRefreshes];
+    }
+    [self prepareViewControllerForDisplay:self.pageViewController.viewControllers.firstObject];
+    [self prepareAdjacentViewControllersAroundIndex:self.currentIndex];
 }
 
 - (void)dealloc {
-    [self stopUnderlyingPlaybackMonitor];
+    [self cancelDeferredUnderlyingPlaybackRefreshes];
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -502,7 +506,7 @@ fromViewController:(UIViewController *)presenter {
     }
 }
 
-- (UIViewController *)viewControllerForIndex:(NSInteger)index {
+- (UIViewController *)createViewControllerForIndex:(NSInteger)index {
     if (index < 0 || index >= (NSInteger)_items.count) return nil;
 
     SCIMediaItem *item = _items[index];
@@ -510,13 +514,28 @@ fromViewController:(UIViewController *)presenter {
     if (item.mediaType == SCIMediaItemTypeVideo) {
         SCIFullScreenVideoViewController *vc = [[SCIFullScreenVideoViewController alloc] initWithMediaItem:item];
         vc.delegate = self;
-        [vc preloadContent];
         return vc;
     }
 
     SCIFullScreenImageViewController *vc = [[SCIFullScreenImageViewController alloc] initWithMediaItem:item];
     vc.delegate = self;
     return vc;
+}
+
+- (UIViewController *)viewControllerForIndex:(NSInteger)index {
+    if (index < 0 || index >= (NSInteger)_items.count) return nil;
+
+    NSNumber *cacheKey = @(index);
+    UIViewController *cachedController = self.controllerCache[cacheKey];
+    if (cachedController) {
+        return cachedController;
+    }
+
+    UIViewController *controller = [self createViewControllerForIndex:index];
+    if (controller) {
+        self.controllerCache[cacheKey] = controller;
+    }
+    return controller;
 }
 
 - (NSInteger)indexOfViewController:(UIViewController *)vc {
@@ -528,6 +547,44 @@ fromViewController:(UIViewController *)presenter {
     }
     if (!item) return NSNotFound;
     return [_items indexOfObjectIdenticalTo:item];
+}
+
+- (void)prepareViewControllerForDisplay:(UIViewController *)controller {
+    if ([controller isKindOfClass:[SCIFullScreenVideoViewController class]]) {
+        [(SCIFullScreenVideoViewController *)controller prepareForDisplay];
+    } else if ([controller isKindOfClass:[SCIFullScreenImageViewController class]]) {
+        [(SCIFullScreenImageViewController *)controller preloadContent];
+    }
+}
+
+- (void)prepareAdjacentViewControllersAroundIndex:(NSInteger)index {
+    for (NSNumber *adjacentIndex in @[@(index - 1), @(index + 1)]) {
+        NSInteger resolvedIndex = adjacentIndex.integerValue;
+        if (resolvedIndex < 0 || resolvedIndex >= (NSInteger)self.items.count) continue;
+
+        UIViewController *controller = [self viewControllerForIndex:resolvedIndex];
+        if ([controller isKindOfClass:[SCIFullScreenVideoViewController class]]) {
+            [(SCIFullScreenVideoViewController *)controller preloadContent];
+        } else if ([controller isKindOfClass:[SCIFullScreenImageViewController class]]) {
+            [(SCIFullScreenImageViewController *)controller preloadContent];
+        }
+    }
+
+    [self trimControllerCacheAroundIndex:index];
+}
+
+- (void)trimControllerCacheAroundIndex:(NSInteger)index {
+    NSArray<NSNumber *> *cachedIndexes = self.controllerCache.allKeys.copy;
+    for (NSNumber *cachedIndex in cachedIndexes) {
+        NSInteger value = cachedIndex.integerValue;
+        if (ABS(value - index) <= 1) continue;
+
+        UIViewController *controller = self.controllerCache[cachedIndex];
+        if ([controller respondsToSelector:@selector(cleanup)]) {
+            [(id)controller cleanup];
+        }
+        [self.controllerCache removeObjectForKey:cachedIndex];
+    }
 }
 
 #pragma mark - UIPageViewControllerDataSource
@@ -555,6 +612,8 @@ fromViewController:(UIViewController *)presenter {
 
     _currentIndex = newIndex;
     [self updateUI];
+    [self prepareViewControllerForDisplay:currentVC];
+    [self prepareAdjacentViewControllersAroundIndex:newIndex];
 
     for (UIViewController *prevVC in previousViewControllers) {
         if ([prevVC isKindOfClass:[SCIFullScreenVideoViewController class]]) {
@@ -650,36 +709,37 @@ fromViewController:(UIViewController *)presenter {
     [self.underlyingPlaybackController beginSuppressionExcludingPreviewView:self.isViewLoaded ? self.view : nil];
 }
 
+- (void)cancelDeferredUnderlyingPlaybackRefreshes {
+    self.underlyingPlaybackRefreshGeneration++;
+}
+
 - (void)refreshUnderlyingPlaybackSuppression {
     [self ensureUnderlyingPlaybackController];
     [self.underlyingPlaybackController refreshAndApplySuppressionExcludingPreviewView:self.isViewLoaded ? self.view : nil];
 }
 
+- (void)scheduleDeferredUnderlyingPlaybackRefreshes {
+    [self cancelDeferredUnderlyingPlaybackRefreshes];
+    NSInteger generation = self.underlyingPlaybackRefreshGeneration;
+    __weak typeof(self) weakSelf = self;
+
+    void (^scheduleRefresh)(NSTimeInterval) = ^(NSTimeInterval delay) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf || strongSelf.underlyingPlaybackRefreshGeneration != generation || !strongSelf.view.window) {
+                return;
+            }
+            [strongSelf refreshUnderlyingPlaybackSuppression];
+        });
+    };
+
+    scheduleRefresh(kUnderlyingPlaybackDeferredRefreshShortDelay);
+    scheduleRefresh(kUnderlyingPlaybackDeferredRefreshLongDelay);
+}
+
 - (void)restoreUnderlyingPlaybackIfNeeded {
-    [self stopUnderlyingPlaybackMonitor];
+    [self cancelDeferredUnderlyingPlaybackRefreshes];
     [self.underlyingPlaybackController restorePlaybackIfNeeded];
-}
-
-- (void)handleUnderlyingPlaybackMonitorTick:(NSTimer *)timer {
-    if (!self.view.window) return;
-    [self refreshUnderlyingPlaybackSuppression];
-}
-
-- (void)startUnderlyingPlaybackMonitorIfNeeded {
-    if (self.underlyingPlaybackMonitorTimer) return;
-
-    self.underlyingPlaybackMonitorTimer = [NSTimer timerWithTimeInterval:kUnderlyingPlaybackMonitorInterval
-                                                                  target:self
-                                                                selector:@selector(handleUnderlyingPlaybackMonitorTick:)
-                                                                userInfo:nil
-                                                                 repeats:YES];
-    self.underlyingPlaybackMonitorTimer.tolerance = 0.05;
-    [[NSRunLoop mainRunLoop] addTimer:self.underlyingPlaybackMonitorTimer forMode:NSRunLoopCommonModes];
-}
-
-- (void)stopUnderlyingPlaybackMonitor {
-    [self.underlyingPlaybackMonitorTimer invalidate];
-    self.underlyingPlaybackMonitorTimer = nil;
 }
 
 #pragma mark - Actions
@@ -956,6 +1016,13 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
+    for (UIViewController *controller in self.controllerCache.allValues) {
+        if ([controller respondsToSelector:@selector(cleanup)]) {
+            [(id)controller cleanup];
+        }
+    }
+    [self.controllerCache removeAllObjects];
+
     _currentIndex = MIN(deletedIndex, (NSInteger)_items.count - 1);
     UIViewController *newVC = [self viewControllerForIndex:_currentIndex];
     if (newVC) {
@@ -964,6 +1031,8 @@ fromViewController:(UIViewController *)presenter {
                                        animated:YES
                                      completion:nil];
     }
+    [self prepareViewControllerForDisplay:newVC];
+    [self prepareAdjacentViewControllersAroundIndex:_currentIndex];
     [self updateUI];
 }
 
@@ -1114,10 +1183,15 @@ fromViewController:(UIViewController *)presenter {
 #pragma mark - Cleanup
 
 - (void)cleanupAll {
-    UIViewController *currentVC = _pageViewController.viewControllers.firstObject;
-    if ([currentVC respondsToSelector:@selector(cleanup)]) {
-        [(id)currentVC cleanup];
+    [self cancelDeferredUnderlyingPlaybackRefreshes];
+
+    for (UIViewController *controller in self.controllerCache.allValues) {
+        if ([controller respondsToSelector:@selector(cleanup)]) {
+            [(id)controller cleanup];
+        }
     }
+    [self.controllerCache removeAllObjects];
+
     [[AVAudioSession sharedInstance] setActive:NO
                                    withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
                                          error:nil];

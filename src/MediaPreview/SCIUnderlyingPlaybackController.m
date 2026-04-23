@@ -5,7 +5,7 @@
 #import "../InstagramHeaders.h"
 #import "../Utils.h"
 
-static NSUInteger const kUnderlyingPlaybackDiscoveryMaxViews = 320;
+static NSUInteger const kUnderlyingPlaybackDiscoveryMaxViews = 160;
 static NSInteger const kPlaybackPauseReason = 1;
 static NSInteger const kPlaybackResumeReason = 0;
 static NSInteger const kDirectPlaybackReason = 0;
@@ -263,6 +263,7 @@ static void SCIInvokeBoolUserInitiated(id target, SEL selector, BOOL value, BOOL
 @property (nonatomic, weak) UIView *playbackSourceView;
 @property (nonatomic, weak) UIViewController *playbackSourceController;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, SCIPlaybackTargetSession *> *underlyingPlaybackSessions;
+@property (nonatomic, assign) BOOL didAttemptWindowPlayerDiscovery;
 
 @end
 
@@ -300,6 +301,11 @@ static void SCIInvokeBoolUserInitiated(id target, SEL selector, BOOL value, BOOL
     }
 
     [self.underlyingPlaybackSessions removeAllObjects];
+    self.didAttemptWindowPlayerDiscovery = NO;
+}
+
+- (BOOL)hasSuppressedSessions {
+    return self.underlyingPlaybackSessions.count > 0;
 }
 
 #pragma mark - Discovery
@@ -692,7 +698,12 @@ static void SCIInvokeBoolUserInitiated(id target, SEL selector, BOOL value, BOOL
             break;
     }
 
-    [self registerVisibleAVPlayersExcludingPreviewView:previewView];
+    BOOL shouldAttemptWindowPlayerDiscovery = !self.didAttemptWindowPlayerDiscovery &&
+        (self.playbackSource == SCIFullScreenPlaybackSourceUnknown || self.underlyingPlaybackSessions.count == 0);
+    if (shouldAttemptWindowPlayerDiscovery) {
+        self.didAttemptWindowPlayerDiscovery = YES;
+        [self registerVisibleAVPlayersExcludingPreviewView:previewView];
+    }
 }
 
 #pragma mark - Apply / Restore

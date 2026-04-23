@@ -3,6 +3,21 @@
 #import <AVFoundation/AVFoundation.h>
 #import "../Utils.h"
 
+static NSCache<NSString *, UIImage *> *SCIFullScreenVideoThumbnailCache(void) {
+    static NSCache<NSString *, UIImage *> *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [[NSCache alloc] init];
+        cache.name = @"com.scinsta.fullscreen-video-thumbnail-cache";
+        cache.countLimit = 48;
+    });
+    return cache;
+}
+
+static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
+    return url.absoluteString ?: url.path;
+}
+
 @interface SCIFullScreenVideoViewController () <AVPlayerViewControllerDelegate>
 
 @property (nonatomic, strong) AVPlayer *player;
@@ -11,8 +26,10 @@
 @property (nonatomic, strong) UIImageView *thumbnailView;
 @property (nonatomic, strong) UIActivityIndicatorView *loadingIndicator;
 @property (nonatomic, assign) BOOL isPlaying;
-@property (nonatomic, assign) BOOL hasPreloaded;
+@property (nonatomic, assign) BOOL hasPreparedPlayer;
 @property (nonatomic, assign) BOOL hasStartedPlayback;
+@property (nonatomic, assign) BOOL isLoadingThumbnail;
+@property (nonatomic, assign) BOOL isObservingPlayerItemStatus;
 
 @end
 
@@ -27,9 +44,8 @@
 }
 
 - (void)dealloc {
+    [self tearDownPlayer];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [_player pause];
-    [_playerItem removeObserver:self forKeyPath:@"status" context:nil];
 }
 
 - (void)viewDidLoad {
@@ -37,9 +53,10 @@
     self.view.backgroundColor = [UIColor clearColor];
 
     [self setupThumbnailView];
-    [self setupPlayerViewController];
     [self setupLoadingIndicator];
-    [self loadThumbnail];
+    if (self.mediaItem.thumbnail) {
+        self.thumbnailView.image = self.mediaItem.thumbnail;
+    }
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -53,11 +70,12 @@
 
 #pragma mark - Setup
 
-- (void)setupPlayerViewController {
+- (void)ensurePlayerViewControllerIfNeeded {
+    if (_playerViewController) return;
+
     _playerViewController = [[AVPlayerViewController alloc] init];
     _playerViewController.showsPlaybackControls = YES;
     _playerViewController.allowsPictureInPicturePlayback = NO;
-    // _playerViewController.allows
     _playerViewController.delegate = self;
     _playerViewController.view.backgroundColor = [UIColor clearColor];
 
@@ -105,7 +123,7 @@
 
 #pragma mark - Thumbnail
 
-- (void)loadThumbnail {
+- (void)preloadThumbnailIfNeeded {
     if (self.mediaItem.thumbnail) {
         _thumbnailView.image = self.mediaItem.thumbnail;
         return;
@@ -114,6 +132,17 @@
     NSURL *url = self.mediaItem.fileURL;
     if (!url) return;
 
+    NSString *cacheKey = SCIVideoThumbnailCacheKeyForURL(url);
+    UIImage *cachedThumbnail = cacheKey.length ? [SCIFullScreenVideoThumbnailCache() objectForKey:cacheKey] : nil;
+    if (cachedThumbnail) {
+        self.mediaItem.thumbnail = cachedThumbnail;
+        _thumbnailView.image = cachedThumbnail;
+        return;
+    }
+
+    if (self.isLoadingThumbnail) return;
+
+    self.isLoadingThumbnail = YES;
     __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         AVAsset *asset = [AVAsset assetWithURL:url];
@@ -123,24 +152,34 @@
 
         NSError *error = nil;
         CGImageRef cgImage = [gen copyCGImageAtTime:kCMTimeZero actualTime:NULL error:&error];
-        if (!cgImage) return;
-
-        UIImage *thumb = [UIImage imageWithCGImage:cgImage];
-        CGImageRelease(cgImage);
+        UIImage *thumb = cgImage ? [UIImage imageWithCGImage:cgImage] : nil;
+        if (cgImage) {
+            CGImageRelease(cgImage);
+        }
 
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf || strongSelf.hasStartedPlayback) return;
-            strongSelf.thumbnailView.image = thumb;
+            if (!strongSelf) return;
+
+            strongSelf.isLoadingThumbnail = NO;
+            if (!thumb) return;
+
+            strongSelf.mediaItem.thumbnail = thumb;
+            if (cacheKey.length) {
+                [SCIFullScreenVideoThumbnailCache() setObject:thumb forKey:cacheKey];
+            }
+            if (!strongSelf.hasStartedPlayback) {
+                strongSelf.thumbnailView.image = thumb;
+            }
         });
     });
 }
 
-#pragma mark - Preload & Playback
+#pragma mark - Player Preparation
 
-- (void)preloadContent {
-    if (_hasPreloaded) return;
-    _hasPreloaded = YES;
+- (void)ensurePlayerPrepared {
+    if (_hasPreparedPlayer) return;
+    _hasPreparedPlayer = YES;
 
     NSURL *url = self.mediaItem.fileURL;
     if (!url) return;
@@ -151,6 +190,7 @@
     _player.muted = [SCIUtils getBoolPref:@"expanded_video_start_muted"];
 
     [item addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:nil];
+    self.isObservingPlayerItemStatus = YES;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(playerItemDidReachEnd:)
@@ -158,13 +198,21 @@
                                                object:item];
 }
 
+#pragma mark - Preload & Playback
+
+- (void)preloadContent {
+    [self preloadThumbnailIfNeeded];
+}
+
 - (void)prepareForDisplay {
-    if (!_hasPreloaded) {
-        [self preloadContent];
-    }
+    [self preloadThumbnailIfNeeded];
+    [self ensurePlayerPrepared];
+    [self ensurePlayerViewControllerIfNeeded];
 
     if (_playerItem && !_hasStartedPlayback) {
         [self startPlayback];
+    } else if (_player && !_isPlaying) {
+        [self play];
     }
 }
 
@@ -173,6 +221,7 @@
     _hasStartedPlayback = YES;
 
     [_loadingIndicator startAnimating];
+    [self ensurePlayerViewControllerIfNeeded];
 
     NSError *audioErr = nil;
     AVAudioSession *session = [AVAudioSession sharedInstance];
@@ -250,10 +299,32 @@
 
 #pragma mark - Cleanup
 
-- (void)cleanup {
+- (void)tearDownPlayer {
+    if (self.playerItem) {
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                        name:AVPlayerItemDidPlayToEndTimeNotification
+                                                      object:self.playerItem];
+    }
+    if (self.isObservingPlayerItemStatus && self.playerItem) {
+        [self.playerItem removeObserver:self forKeyPath:@"status" context:nil];
+        self.isObservingPlayerItemStatus = NO;
+    }
+
     [_player pause];
-    _isPlaying = NO;
     _playerViewController.player = nil;
+    _player = nil;
+    _playerItem = nil;
+    _hasPreparedPlayer = NO;
+    _hasStartedPlayback = NO;
+    _isPlaying = NO;
+}
+
+- (void)cleanup {
+    [self tearDownPlayer];
+    [_loadingIndicator stopAnimating];
+    _thumbnailView.hidden = NO;
+    _thumbnailView.alpha = 1.0;
+    _thumbnailView.image = self.mediaItem.thumbnail;
 }
 
 @end

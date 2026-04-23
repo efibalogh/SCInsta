@@ -5,6 +5,21 @@ static CGFloat const kMaxZoom = 5.0;
 static CGFloat const kMinZoom = 1.0;
 static CGFloat const kZoomEpsilon = 0.02;
 
+static NSCache<NSString *, UIImage *> *SCIFullScreenImageCache(void) {
+    static NSCache<NSString *, UIImage *> *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [[NSCache alloc] init];
+        cache.name = @"com.scinsta.fullscreen-image-cache";
+        cache.countLimit = 48;
+    });
+    return cache;
+}
+
+static NSString *SCIImageCacheKeyForURL(NSURL *url) {
+    return url.absoluteString ?: url.path;
+}
+
 @interface SCIFullScreenImageViewController () <UIScrollViewDelegate>
 
 @property (nonatomic, strong) UIScrollView *scrollView;
@@ -14,6 +29,7 @@ static CGFloat const kZoomEpsilon = 0.02;
 @property (nonatomic, strong) UILabel *errorLabel;
 @property (nonatomic, strong) UIButton *retryButton;
 @property (nonatomic, strong) UITapGestureRecognizer *doubleTapGesture;
+@property (nonatomic, assign) BOOL isLoadingImage;
 
 @end
 
@@ -36,7 +52,7 @@ static CGFloat const kZoomEpsilon = 0.02;
     [self setupLoadingIndicator];
     [self setupErrorView];
     [self setupGestures];
-    [self loadImage];
+    [self preloadContent];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -140,20 +156,45 @@ static CGFloat const kZoomEpsilon = 0.02;
 
 #pragma mark - Image Loading
 
-- (void)loadImage {
+- (void)preloadContent {
     if (self.mediaItem.image) {
-        [self displayImage:self.mediaItem.image];
+        if (self.isViewLoaded) {
+            [self displayImage:self.mediaItem.image];
+        }
         return;
     }
 
     NSURL *url = self.mediaItem.fileURL;
     if (!url) {
-        [self showError:@"No image URL"];
+        if (self.isViewLoaded) {
+            [self showError:@"No image URL"];
+        }
         return;
     }
 
-    [_loadingIndicator startAnimating];
-    _errorView.hidden = YES;
+    NSString *cacheKey = SCIImageCacheKeyForURL(url);
+    UIImage *cachedImage = cacheKey.length ? [SCIFullScreenImageCache() objectForKey:cacheKey] : nil;
+    if (cachedImage) {
+        self.mediaItem.image = cachedImage;
+        if (self.isViewLoaded) {
+            [self displayImage:cachedImage];
+        }
+        return;
+    }
+
+    if (self.isLoadingImage) {
+        if (self.isViewLoaded) {
+            [_loadingIndicator startAnimating];
+            _errorView.hidden = YES;
+        }
+        return;
+    }
+
+    self.isLoadingImage = YES;
+    if (self.isViewLoaded) {
+        [_loadingIndicator startAnimating];
+        _errorView.hidden = YES;
+    }
 
     __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
@@ -164,18 +205,29 @@ static CGFloat const kZoomEpsilon = 0.02;
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
 
-            [strongSelf.loadingIndicator stopAnimating];
             if (image) {
-                [strongSelf displayImage:image];
+                strongSelf.mediaItem.image = image;
+                if (cacheKey.length) {
+                    [SCIFullScreenImageCache() setObject:image forKey:cacheKey];
+                }
+                if (strongSelf.isViewLoaded) {
+                    [strongSelf.loadingIndicator stopAnimating];
+                    [strongSelf displayImage:image];
+                }
             } else {
-                [strongSelf showError:@"Failed to load image"];
+                if (strongSelf.isViewLoaded) {
+                    [strongSelf.loadingIndicator stopAnimating];
+                    [strongSelf showError:@"Failed to load image"];
+                }
             }
+            strongSelf.isLoadingImage = NO;
         });
     });
 }
 
 - (void)retryLoading {
-    [self loadImage];
+    self.isLoadingImage = NO;
+    [self preloadContent];
 }
 
 - (void)displayImage:(UIImage *)image {

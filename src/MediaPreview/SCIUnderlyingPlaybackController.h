@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)beginSuppressionExcludingPreviewView:(nullable UIView *)previewView;
 - (void)refreshAndApplySuppressionExcludingPreviewView:(nullable UIView *)previewView;
 - (void)restorePlaybackIfNeeded;
+- (BOOL)hasSuppressedSessions;
 
 @end
 

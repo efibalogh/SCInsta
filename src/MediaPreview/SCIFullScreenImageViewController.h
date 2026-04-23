@@ -17,6 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) BOOL isZoomed;
 
 - (instancetype)initWithMediaItem:(SCIMediaItem *)item;
+- (void)preloadContent;
 - (void)cleanup;
 - (void)resetZoomIfNeeded;
 - (void)forceResetZoom;
