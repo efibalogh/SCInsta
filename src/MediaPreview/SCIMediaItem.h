@@ -13,6 +13,7 @@ typedef NS_ENUM(NSInteger, SCIMediaItemType) {
 
 @property (nonatomic) SCIMediaItemType mediaType;
 @property (nonatomic, strong, nullable) NSURL *fileURL;
+@property (nonatomic, strong, nullable) NSURL *resolvedFileURL;
 @property (nonatomic, strong, nullable) UIImage *image;
 @property (nonatomic, strong, nullable) UIImage *thumbnail;
 @property (nonatomic, copy, nullable) NSString *title;

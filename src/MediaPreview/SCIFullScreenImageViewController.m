@@ -1,24 +1,10 @@
 #import "SCIFullScreenImageViewController.h"
 #import "SCIMediaItem.h"
+#import "SCIMediaCacheManager.h"
 
 static CGFloat const kMaxZoom = 5.0;
 static CGFloat const kMinZoom = 1.0;
 static CGFloat const kZoomEpsilon = 0.02;
-
-static NSCache<NSString *, UIImage *> *SCIFullScreenImageCache(void) {
-    static NSCache<NSString *, UIImage *> *cache = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        cache = [[NSCache alloc] init];
-        cache.name = @"com.scinsta.fullscreen-image-cache";
-        cache.countLimit = 48;
-    });
-    return cache;
-}
-
-static NSString *SCIImageCacheKeyForURL(NSURL *url) {
-    return url.absoluteString ?: url.path;
-}
 
 @interface SCIFullScreenImageViewController () <UIScrollViewDelegate>
 
@@ -172,16 +158,6 @@ static NSString *SCIImageCacheKeyForURL(NSURL *url) {
         return;
     }
 
-    NSString *cacheKey = SCIImageCacheKeyForURL(url);
-    UIImage *cachedImage = cacheKey.length ? [SCIFullScreenImageCache() objectForKey:cacheKey] : nil;
-    if (cachedImage) {
-        self.mediaItem.image = cachedImage;
-        if (self.isViewLoaded) {
-            [self displayImage:cachedImage];
-        }
-        return;
-    }
-
     if (self.isLoadingImage) {
         if (self.isViewLoaded) {
             [_loadingIndicator startAnimating];
@@ -197,32 +173,24 @@ static NSString *SCIImageCacheKeyForURL(NSURL *url) {
     }
 
     __weak typeof(self) weakSelf = self;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSData *data = [NSData dataWithContentsOfURL:url];
-        UIImage *image = data ? [UIImage imageWithData:data] : nil;
+    [[SCIMediaCacheManager sharedManager] loadImageForItem:self.mediaItem completion:^(UIImage * _Nullable image, NSError * _Nullable error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
 
-        dispatch_async(dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
+        [strongSelf.loadingIndicator stopAnimating];
+        strongSelf.isLoadingImage = NO;
 
-            if (image) {
-                strongSelf.mediaItem.image = image;
-                if (cacheKey.length) {
-                    [SCIFullScreenImageCache() setObject:image forKey:cacheKey];
-                }
-                if (strongSelf.isViewLoaded) {
-                    [strongSelf.loadingIndicator stopAnimating];
-                    [strongSelf displayImage:image];
-                }
-            } else {
-                if (strongSelf.isViewLoaded) {
-                    [strongSelf.loadingIndicator stopAnimating];
-                    [strongSelf showError:@"Failed to load image"];
-                }
+        if (image) {
+            if (strongSelf.isViewLoaded) {
+                [strongSelf displayImage:image];
             }
-            strongSelf.isLoadingImage = NO;
-        });
-    });
+            return;
+        }
+
+        if (strongSelf.isViewLoaded) {
+            [strongSelf showError:error.localizedDescription.length > 0 ? error.localizedDescription : @"Failed to load image"];
+        }
+    }];
 }
 
 - (void)retryLoading {

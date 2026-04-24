@@ -4,6 +4,7 @@
 #import "SCIFullScreenMediaPlayer.h"
 #import "SCIUnderlyingPlaybackController.h"
 #import "SCIMediaItem.h"
+#import "SCIMediaCacheManager.h"
 #import "SCIFullScreenImageViewController.h"
 #import "SCIFullScreenVideoViewController.h"
 #import "../Utils.h"
@@ -40,12 +41,13 @@ static SCIDownloadDelegate *SCIMediaPlayerSaveVaultDelegate(void) {
     return delegate;
 }
 
-static CGFloat const kDismissAxisLockSlop = 14.0;
-static CGFloat const kDismissProgressDenominator = 320.0;
-static CGFloat const kDismissProgressCommit = 0.28;
-static CGFloat const kDismissVelocityCommit = 650.0;
-static CGFloat const kDismissFinishDuration = 0.32;
-static CGFloat const kDismissCancelSpringDamping = 0.82;
+static CGFloat const kDismissAxisLockSlop = 20.0;
+static CGFloat const kDismissProgressDenominator = 520.0;
+static CGFloat const kDismissProgressCommit = 0.34;
+static CGFloat const kDismissVelocityCommit = 980.0;
+static CGFloat const kDismissFinishDuration = 0.24;
+static CGFloat const kDismissCancelSpringDamping = 0.9;
+static CGFloat const kDismissMinScale = 0.92;
 static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshShortDelay = 0.18;
 static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
 
@@ -295,7 +297,7 @@ fromViewController:(UIViewController *)presenter {
     [self beginUnderlyingPlaybackSuppression];
 
     // Over full screen so the black backdrop can fade to reveal the app during dismiss (same idea as vault).
-    self.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    self.modalPresentationStyle = self.isFromVault ? UIModalPresentationOverFullScreen : UIModalPresentationCurrentContext;
     self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [presenter presentViewController:self animated:YES completion:nil];
 }
@@ -550,6 +552,16 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)prepareViewControllerForDisplay:(UIViewController *)controller {
+    SCIMediaItem *item = nil;
+    if ([controller isKindOfClass:[SCIFullScreenImageViewController class]]) {
+        item = ((SCIFullScreenImageViewController *)controller).mediaItem;
+    } else if ([controller isKindOfClass:[SCIFullScreenVideoViewController class]]) {
+        item = ((SCIFullScreenVideoViewController *)controller).mediaItem;
+    }
+    if (item) {
+        [[SCIMediaCacheManager sharedManager] prefetchItem:item];
+    }
+
     if ([controller isKindOfClass:[SCIFullScreenVideoViewController class]]) {
         [(SCIFullScreenVideoViewController *)controller prepareForDisplay];
     } else if ([controller isKindOfClass:[SCIFullScreenImageViewController class]]) {
@@ -558,10 +570,11 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)prepareAdjacentViewControllersAroundIndex:(NSInteger)index {
-    for (NSNumber *adjacentIndex in @[@(index - 1), @(index + 1)]) {
-        NSInteger resolvedIndex = adjacentIndex.integerValue;
+    for (NSInteger resolvedIndex = index - 2; resolvedIndex <= index + 2; resolvedIndex++) {
+        if (resolvedIndex == index) continue;
         if (resolvedIndex < 0 || resolvedIndex >= (NSInteger)self.items.count) continue;
 
+        [[SCIMediaCacheManager sharedManager] prefetchItem:self.items[resolvedIndex]];
         UIViewController *controller = [self viewControllerForIndex:resolvedIndex];
         if ([controller isKindOfClass:[SCIFullScreenVideoViewController class]]) {
             [(SCIFullScreenVideoViewController *)controller preloadContent];
@@ -577,7 +590,7 @@ fromViewController:(UIViewController *)presenter {
     NSArray<NSNumber *> *cachedIndexes = self.controllerCache.allKeys.copy;
     for (NSNumber *cachedIndex in cachedIndexes) {
         NSInteger value = cachedIndex.integerValue;
-        if (ABS(value - index) <= 1) continue;
+        if (ABS(value - index) <= 2) continue;
 
         UIViewController *controller = self.controllerCache[cachedIndex];
         if ([controller respondsToSelector:@selector(cleanup)]) {
@@ -672,9 +685,6 @@ fromViewController:(UIViewController *)presenter {
 #pragma mark - Toolbar Toggle
 
 - (void)toggleToolbar {
-    UIViewController *currentVC = _pageViewController.viewControllers.firstObject;
-    if ([currentVC isKindOfClass:[SCIFullScreenVideoViewController class]]) return;
-
     _isToolbarVisible = !_isToolbarVisible;
     [UIView animateWithDuration:0.25 animations:^{
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
@@ -691,7 +701,9 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (NSURL *)currentFileURL {
-    return [self currentItem].fileURL;
+    SCIMediaItem *item = [self currentItem];
+    NSURL *bestURL = [[SCIMediaCacheManager sharedManager] bestAvailableFileURLForItem:item];
+    return bestURL ?: item.fileURL;
 }
 
 #pragma mark - Playback Suppression
@@ -770,13 +782,12 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)saveToPhotos {
     NSURL *url = [self currentFileURL];
-    if (!url) return;
-
     SCIMediaItem *item = [self currentItem];
+    if (!url && !item.image) return;
 
-    if (url.isFileURL) {
-        if (item.mediaType == SCIMediaItemTypeImage) {
-            NSData *imageData = [NSData dataWithContentsOfURL:url];
+    if (url.isFileURL || (!url && item.image)) {
+        if (item.mediaType == SCIMediaItemTypeImage || item.image) {
+            NSData *imageData = url ? [NSData dataWithContentsOfURL:url] : nil;
             UIImage *image = item.image ?: [UIImage imageWithData:imageData];
             if (image) {
                 [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
@@ -830,7 +841,9 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)saveToVault {
     NSURL *targetURL = [self currentFileURL];
-    if (!targetURL) {
+    SCIMediaItem *item = [self currentItem];
+
+    if (!targetURL && !item.image) {
         [SCIUtils showToastForDuration:2.0
                                  title:@"No media to save"
                               subtitle:nil
@@ -840,12 +853,21 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    SCIMediaItem *item = [self currentItem];
-    SCIVaultMediaType vaultType = (item.mediaType == SCIMediaItemTypeVideo) ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
+    SCIVaultMediaType vaultType = (item.mediaType == SCIMediaItemTypeVideo && targetURL) ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
 
     if (targetURL.isFileURL && [[NSFileManager defaultManager] fileExistsAtPath:targetURL.path]) {
         [self vaultSaveLocalFile:targetURL mediaType:vaultType];
         return;
+    } else if (!targetURL && item.image) {
+        NSData *jpegData = UIImageJPEGRepresentation(item.image, 0.95);
+        if (jpegData) {
+            NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID].UUIDString stringByAppendingPathExtension:@"jpg"]];
+            NSURL *tempURL = [NSURL fileURLWithPath:tempPath];
+            [jpegData writeToURL:tempURL atomically:YES];
+            [self vaultSaveLocalFile:tempURL mediaType:SCIVaultMediaTypeImage];
+            [[NSFileManager defaultManager] removeItemAtURL:tempURL error:nil];
+            return;
+        }
     }
 
     NSString *ext = targetURL.pathExtension;
@@ -914,11 +936,12 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)shareMedia {
     NSURL *url = [self currentFileURL];
-    if (!url) return;
     SCIMediaItem *item = [self currentItem];
+    if (!url && !item.image) return;
 
-    if (url.isFileURL) {
-        UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
+    if (url.isFileURL || (!url && item.image)) {
+        id activityItem = url.isFileURL ? url : item.image;
+        UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[activityItem] applicationActivities:nil];
         if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && _shareButton) {
             acVC.popoverPresentationController.sourceView = _shareButton;
             acVC.popoverPresentationController.sourceRect = _shareButton.bounds;
@@ -938,10 +961,10 @@ fromViewController:(UIViewController *)presenter {
 - (void)copyMedia {
     SCIMediaItem *item = [self currentItem];
     NSURL *url = [self currentFileURL];
-    if (!url) return;
+    if (!url && !item.image) return;
 
-    if (item.mediaType == SCIMediaItemTypeImage) {
-        NSData *imageData = [NSData dataWithContentsOfURL:url];
+    if (item.mediaType == SCIMediaItemTypeImage || (!url && item.image)) {
+        NSData *imageData = url ? [NSData dataWithContentsOfURL:url] : nil;
         UIImage *image = item.image ?: [UIImage imageWithData:imageData];
         if (image) {
             [[UIPasteboard generalPasteboard] setImage:image];
@@ -1092,29 +1115,35 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    CGFloat dy = MAX(0.0, ty);
-    CGFloat progress = MIN(1.0, dy / kDismissProgressDenominator);
+    CGFloat dy = ty;
+    CGFloat absDy = fabs(dy);
+    CGFloat resistedDy = dy * 0.82;
+    CGFloat progress = MIN(1.0, absDy / kDismissProgressDenominator);
+    CGFloat scale = MAX(kDismissMinScale, 1.0 - progress * (1.0 - kDismissMinScale));
 
     switch (pan.state) {
         case UIGestureRecognizerStateChanged: {
-            _pageViewController.view.transform = CGAffineTransformMakeTranslation(0, dy);
-            self.presentationBackdropView.alpha = MAX(0.0, 1.0 - progress * 1.05);
-            CGFloat fade = (_isToolbarVisible ? 1.0 : 0.0) * (1.0 - progress * 1.35);
+            CGAffineTransform translate = CGAffineTransformMakeTranslation(0, resistedDy);
+            _pageViewController.view.transform = CGAffineTransformScale(translate, scale, scale);
+            self.presentationBackdropView.alpha = MAX(0.0, 1.0 - progress * 1.1);
+            CGFloat fade = (_isToolbarVisible ? 1.0 : 0.0) * (1.0 - progress * 1.2);
             _topToolbar.alpha = MAX(0.0, fade);
             if (_bottomBar) _bottomBar.alpha = MAX(0.0, fade);
             break;
         }
         case UIGestureRecognizerStateEnded:
         case UIGestureRecognizerStateCancelled: {
-            BOOL commit = progress > kDismissProgressCommit || velocity.y > kDismissVelocityCommit;
+            BOOL commit = progress > kDismissProgressCommit || fabs(velocity.y) > kDismissVelocityCommit;
             if (commit) {
-                CGFloat vy = MAX(velocity.y, 400.0);
-                CGFloat extra = self.view.bounds.size.height - dy + 80.0;
+                CGFloat direction = dy >= 0.0 ? 1.0 : -1.0;
+                CGFloat vy = MAX(fabs(velocity.y), 400.0);
+                CGFloat extra = self.view.bounds.size.height - absDy + 80.0;
                 CGFloat duration = MIN(kDismissFinishDuration, extra / vy);
-                duration = MAX(0.22, duration);
+                duration = MAX(0.18, duration);
 
                 [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseIn | UIViewAnimationOptionBeginFromCurrentState animations:^{
-                    self->_pageViewController.view.transform = CGAffineTransformMakeTranslation(0, self.view.bounds.size.height + 60.0);
+                    CGAffineTransform translate = CGAffineTransformMakeTranslation(0, direction * (self.view.bounds.size.height + 60.0));
+                    self->_pageViewController.view.transform = CGAffineTransformScale(translate, kDismissMinScale, kDismissMinScale);
                     self.presentationBackdropView.alpha = 0.0;
                     self->_topToolbar.alpha = 0.0;
                     if (self->_bottomBar) self->_bottomBar.alpha = 0.0;
@@ -1130,8 +1159,8 @@ fromViewController:(UIViewController *)presenter {
                     }];
                 }];
             } else {
-                CGFloat springVel = (CGFloat)fmin(fmax(-velocity.y / 1200.0, -8.0), 8.0);
-                [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:kDismissCancelSpringDamping initialSpringVelocity:springVel options:UIViewAnimationOptionBeginFromCurrentState animations:^{
+                CGFloat springVel = (CGFloat)fmin(fmax(-velocity.y / 1400.0, -6.0), 6.0);
+                [UIView animateWithDuration:0.42 delay:0 usingSpringWithDamping:kDismissCancelSpringDamping initialSpringVelocity:springVel options:UIViewAnimationOptionBeginFromCurrentState animations:^{
                     self->_pageViewController.view.transform = CGAffineTransformIdentity;
                     self.presentationBackdropView.alpha = 1.0;
                     CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;

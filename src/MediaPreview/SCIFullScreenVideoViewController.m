@@ -1,22 +1,8 @@
 #import "SCIFullScreenVideoViewController.h"
 #import "SCIMediaItem.h"
+#import "SCIMediaCacheManager.h"
 #import <AVFoundation/AVFoundation.h>
 #import "../Utils.h"
-
-static NSCache<NSString *, UIImage *> *SCIFullScreenVideoThumbnailCache(void) {
-    static NSCache<NSString *, UIImage *> *cache = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        cache = [[NSCache alloc] init];
-        cache.name = @"com.scinsta.fullscreen-video-thumbnail-cache";
-        cache.countLimit = 48;
-    });
-    return cache;
-}
-
-static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
-    return url.absoluteString ?: url.path;
-}
 
 @interface SCIFullScreenVideoViewController () <AVPlayerViewControllerDelegate>
 
@@ -25,11 +11,14 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
 @property (nonatomic, strong) AVPlayerViewController *playerViewController;
 @property (nonatomic, strong) UIImageView *thumbnailView;
 @property (nonatomic, strong) UIActivityIndicatorView *loadingIndicator;
+@property (nonatomic, strong) UITapGestureRecognizer *singleTapGesture;
+@property (nonatomic, strong) NSURL *preparedPlaybackURL;
 @property (nonatomic, assign) BOOL isPlaying;
 @property (nonatomic, assign) BOOL hasPreparedPlayer;
 @property (nonatomic, assign) BOOL hasStartedPlayback;
 @property (nonatomic, assign) BOOL isLoadingThumbnail;
 @property (nonatomic, assign) BOOL isObservingPlayerItemStatus;
+@property (nonatomic, assign) NSInteger loadGeneration;
 
 @end
 
@@ -54,6 +43,7 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
 
     [self setupThumbnailView];
     [self setupLoadingIndicator];
+    [self setupTapGesture];
     if (self.mediaItem.thumbnail) {
         self.thumbnailView.image = self.mediaItem.thumbnail;
     }
@@ -121,6 +111,12 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
     ]];
 }
 
+- (void)setupTapGesture {
+    _singleTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTap:)];
+    _singleTapGesture.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:_singleTapGesture];
+}
+
 #pragma mark - Thumbnail
 
 - (void)preloadThumbnailIfNeeded {
@@ -128,61 +124,31 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
         _thumbnailView.image = self.mediaItem.thumbnail;
         return;
     }
-
-    NSURL *url = self.mediaItem.fileURL;
-    if (!url) return;
-
-    NSString *cacheKey = SCIVideoThumbnailCacheKeyForURL(url);
-    UIImage *cachedThumbnail = cacheKey.length ? [SCIFullScreenVideoThumbnailCache() objectForKey:cacheKey] : nil;
-    if (cachedThumbnail) {
-        self.mediaItem.thumbnail = cachedThumbnail;
-        _thumbnailView.image = cachedThumbnail;
-        return;
-    }
-
     if (self.isLoadingThumbnail) return;
 
     self.isLoadingThumbnail = YES;
     __weak typeof(self) weakSelf = self;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        AVAsset *asset = [AVAsset assetWithURL:url];
-        AVAssetImageGenerator *gen = [[AVAssetImageGenerator alloc] initWithAsset:asset];
-        gen.appliesPreferredTrackTransform = YES;
-        gen.maximumSize = CGSizeMake(640, 640);
+    [[SCIMediaCacheManager sharedManager] loadThumbnailForVideoItem:self.mediaItem completion:^(UIImage * _Nullable thumb) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
 
-        NSError *error = nil;
-        CGImageRef cgImage = [gen copyCGImageAtTime:kCMTimeZero actualTime:NULL error:&error];
-        UIImage *thumb = cgImage ? [UIImage imageWithCGImage:cgImage] : nil;
-        if (cgImage) {
-            CGImageRelease(cgImage);
+        strongSelf.isLoadingThumbnail = NO;
+        if (thumb && !strongSelf.hasStartedPlayback) {
+            strongSelf.thumbnailView.image = thumb;
         }
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
-
-            strongSelf.isLoadingThumbnail = NO;
-            if (!thumb) return;
-
-            strongSelf.mediaItem.thumbnail = thumb;
-            if (cacheKey.length) {
-                [SCIFullScreenVideoThumbnailCache() setObject:thumb forKey:cacheKey];
-            }
-            if (!strongSelf.hasStartedPlayback) {
-                strongSelf.thumbnailView.image = thumb;
-            }
-        });
-    });
+    }];
 }
 
 #pragma mark - Player Preparation
 
-- (void)ensurePlayerPrepared {
-    if (_hasPreparedPlayer) return;
-    _hasPreparedPlayer = YES;
-
-    NSURL *url = self.mediaItem.fileURL;
+- (void)preparePlayerWithURL:(NSURL *)url {
     if (!url) return;
+    if (_hasPreparedPlayer && [self.preparedPlaybackURL isEqual:url]) return;
+
+    [self tearDownPlayer];
+    _hasPreparedPlayer = YES;
+    self.preparedPlaybackURL = url;
+    self.mediaItem.resolvedFileURL = url;
 
     AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
     _playerItem = item;
@@ -202,26 +168,71 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
 
 - (void)preloadContent {
     [self preloadThumbnailIfNeeded];
+    [[SCIMediaCacheManager sharedManager] prefetchItem:self.mediaItem];
 }
 
 - (void)prepareForDisplay {
     [self preloadThumbnailIfNeeded];
-    [self ensurePlayerPrepared];
     [self ensurePlayerViewControllerIfNeeded];
 
-    if (_playerItem && !_hasStartedPlayback) {
-        [self startPlayback];
-    } else if (_player && !_isPlaying) {
-        [self play];
+    NSURL *resolvedURL = [[SCIMediaCacheManager sharedManager] bestAvailableFileURLForItem:self.mediaItem];
+    if (_player && _hasPreparedPlayer && resolvedURL && [self.preparedPlaybackURL isEqual:resolvedURL]) {
+        [self.loadingIndicator stopAnimating];
+        if (_playerItem.status == AVPlayerItemStatusReadyToPlay) {
+            _thumbnailView.hidden = YES;
+            _thumbnailView.alpha = 0.0;
+        }
+        if (!_isPlaying) {
+            [self play];
+        }
+        return;
     }
+
+    [self.loadingIndicator startAnimating];
+
+    NSInteger generation = self.loadGeneration + 1;
+    self.loadGeneration = generation;
+
+    __weak typeof(self) weakSelf = self;
+    [[SCIMediaCacheManager sharedManager] fetchLocalFileURLForItem:self.mediaItem completion:^(NSURL * _Nullable localURL, NSError * _Nullable error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf || strongSelf.loadGeneration != generation) return;
+
+        if (!localURL || error) {
+            [strongSelf.loadingIndicator stopAnimating];
+            if ([strongSelf.delegate respondsToSelector:@selector(mediaContent:didFailWithError:)]) {
+                NSError *resolvedError = error ?: [NSError errorWithDomain:@"SCIFullScreenVideoViewController"
+                                                                      code:-2
+                                                                  userInfo:@{NSLocalizedDescriptionKey: @"Playback failed"}];
+                [strongSelf.delegate mediaContent:strongSelf didFailWithError:resolvedError];
+            }
+            return;
+        }
+
+        if (strongSelf->_player && strongSelf->_hasPreparedPlayer && [strongSelf.preparedPlaybackURL isEqual:localURL]) {
+            [strongSelf.loadingIndicator stopAnimating];
+            if (strongSelf->_playerItem.status == AVPlayerItemStatusReadyToPlay) {
+                strongSelf->_thumbnailView.hidden = YES;
+                strongSelf->_thumbnailView.alpha = 0.0;
+            }
+            if (!strongSelf->_isPlaying) {
+                [strongSelf play];
+            }
+            return;
+        }
+
+        [strongSelf preparePlayerWithURL:localURL];
+        if (strongSelf->_playerItem && !strongSelf->_hasStartedPlayback) {
+            [strongSelf startPlayback];
+        } else if (strongSelf->_player && !strongSelf->_isPlaying) {
+            [strongSelf play];
+        }
+    }];
 }
 
 - (void)startPlayback {
     if (_hasStartedPlayback) return;
     _hasStartedPlayback = YES;
-
-    [_loadingIndicator startAnimating];
-    [self ensurePlayerViewControllerIfNeeded];
 
     NSError *audioErr = nil;
     AVAudioSession *session = [AVAudioSession sharedInstance];
@@ -238,9 +249,7 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
 - (void)hideThumbnailWhenReady {
     if (_playerItem.status == AVPlayerItemStatusReadyToPlay) {
         [self doHideThumbnail];
-        return;
     }
-    // Will be called from KVO when status changes
 }
 
 - (void)doHideThumbnail {
@@ -250,7 +259,7 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
 
     [UIView animateWithDuration:0.2 animations:^{
         self->_thumbnailView.alpha = 0;
-    } completion:^(BOOL finished) {
+    } completion:^(__unused BOOL finished) {
         self->_thumbnailView.hidden = YES;
     }];
 }
@@ -265,7 +274,9 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
             } else if (self->_playerItem.status == AVPlayerItemStatusFailed) {
                 [self->_loadingIndicator stopAnimating];
                 if ([self.delegate respondsToSelector:@selector(mediaContent:didFailWithError:)]) {
-                    NSError *err = self->_playerItem.error ?: [NSError errorWithDomain:@"SCIFullScreenVideoViewController" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"Playback failed"}];
+                    NSError *err = self->_playerItem.error ?: [NSError errorWithDomain:@"SCIFullScreenVideoViewController"
+                                                                                  code:-1
+                                                                              userInfo:@{NSLocalizedDescriptionKey: @"Playback failed"}];
                     [self.delegate mediaContent:self didFailWithError:err];
                 }
             }
@@ -281,9 +292,20 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
 
 #pragma mark - Controls
 
+- (void)handleSingleTap:(UITapGestureRecognizer *)recognizer {
+    if (recognizer.state != UIGestureRecognizerStateEnded) return;
+    if ([self.delegate respondsToSelector:@selector(mediaContentDidTap:)]) {
+        [self.delegate mediaContentDidTap:self];
+    }
+}
+
 - (void)play {
-    [_player play];
-    _isPlaying = YES;
+    if (_player) {
+        [_player play];
+        _isPlaying = YES;
+        return;
+    }
+    [self prepareForDisplay];
 }
 
 - (void)pause {
@@ -314,12 +336,14 @@ static NSString *SCIVideoThumbnailCacheKeyForURL(NSURL *url) {
     _playerViewController.player = nil;
     _player = nil;
     _playerItem = nil;
+    _preparedPlaybackURL = nil;
     _hasPreparedPlayer = NO;
     _hasStartedPlayback = NO;
     _isPlaying = NO;
 }
 
 - (void)cleanup {
+    self.loadGeneration++;
     [self tearDownPlayer];
     [_loadingIndicator stopAnimating];
     _thumbnailView.hidden = NO;
