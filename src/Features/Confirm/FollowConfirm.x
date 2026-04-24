@@ -29,6 +29,15 @@
         return %orig;
     }
 }
+
+// Unfollow from profile action sheet
+- (void)_performUnfollow {
+    if ([SCIUtils getBoolPref:@"unfollow_confirm"]) {
+        [SCIUtils showConfirmation:^(void) { %orig; } title:@"Unfollow?"];
+    } else {
+        %orig;
+    }
+}
 %end
 
 // Follow button on discover people page

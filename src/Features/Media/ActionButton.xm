@@ -6,10 +6,16 @@
 
 #import "ActionButton/ActionButtonCore.h"
 #import "ActionButton/ActionButtonLayout.h"
+#import "../../Utils.h"
 
 static const void *kSCIFeedExpandLongPressMarkerAssocKey = &kSCIFeedExpandLongPressMarkerAssocKey;
 
+static BOOL SCIFeedLongPressExpandEnabled(void) {
+	return [SCIUtils getBoolPref:@"enable_long_press_expand"];
+}
+
 static void SCIAddFeedExpandLongPressIfNeeded(UIView *view, SEL action) {
+	if (!SCIFeedLongPressExpandEnabled()) return;
 	if (!view || !action) return;
 
 	for (UIGestureRecognizer *gesture in view.gestureRecognizers) {

@@ -26,7 +26,6 @@
 #import "../../../Vault/SCIVaultSaveMetadata.h"
 
 static NSString * const kSCIDefaultActionPrefKey = @"action_button_default_action";
-static NSString * const kSCIViewThumbnailPrefKey = @"view_thumbnail";
 
 static NSString * const kSCIActionNone = @"none";
 static NSString * const kSCIActionDownloadLibrary = @"download_library";
@@ -142,7 +141,7 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, CGFloat size) {
 		return SCIActionButtonImage(@"photo_gallery", @"photo.on.rectangle", size);
 	}
 
-	return SCIActionButtonImage(@"action", @"option", size);
+	return SCIActionButtonImage(@"action_alt", @"option", size);
 }
 
 static NSString *SCITitleForActionIdentifier(NSString *identifier) {
@@ -456,23 +455,33 @@ static UIView *SCIDirectMediaView(UIViewController *controller) {
 	return [mediaView isKindOfClass:[UIView class]] ? (UIView *)mediaView : nil;
 }
 
-static void SCIPauseStoryPlaybackFromOverlaySubview(UIView *overlayView) {
+extern "C" void SCIPauseStoryPlaybackFromOverlaySubview(UIView *overlayView) {
 	UIViewController *ancestorController = SCIViewControllerForAncestorView(overlayView);
 	if (!ancestorController) return;
 
-	SEL pauseSelector = NSSelectorFromString(@"pauseWithReason:");
-	if ([ancestorController respondsToSelector:pauseSelector]) {
-		((void (*)(id, SEL, NSInteger))objc_msgSend)(ancestorController, pauseSelector, 1);
+	if ([ancestorController respondsToSelector:NSSelectorFromString(@"pauseWithReason:")]) {
+		((void (*)(id, SEL, NSInteger))objc_msgSend)(ancestorController, NSSelectorFromString(@"pauseWithReason:"), 1);
+	} else if ([ancestorController respondsToSelector:NSSelectorFromString(@"pauseWithReason:callsiteContext:")]) {
+		((void (*)(id, SEL, NSInteger, id))objc_msgSend)(ancestorController, NSSelectorFromString(@"pauseWithReason:callsiteContext:"), 1, nil);
+	} else if ([ancestorController respondsToSelector:NSSelectorFromString(@"pause")]) {
+		((void (*)(id, SEL))objc_msgSend)(ancestorController, NSSelectorFromString(@"pause"));
+	} else if ([ancestorController respondsToSelector:NSSelectorFromString(@"pausePlayback")]) {
+		((void (*)(id, SEL))objc_msgSend)(ancestorController, NSSelectorFromString(@"pausePlayback"));
 	}
 }
 
-static void SCIResumeStoryPlaybackFromOverlaySubview(UIView *overlayView) {
+extern "C" void SCIResumeStoryPlaybackFromOverlaySubview(UIView *overlayView) {
 	UIViewController *ancestorController = SCIViewControllerForAncestorView(overlayView);
 	if (!ancestorController) return;
 
-	SEL resumeSelector = NSSelectorFromString(@"tryResumePlayback");
-	if ([ancestorController respondsToSelector:resumeSelector]) {
-		((void (*)(id, SEL))objc_msgSend)(ancestorController, resumeSelector);
+	if ([ancestorController respondsToSelector:NSSelectorFromString(@"tryResumePlayback")]) {
+		((void (*)(id, SEL))objc_msgSend)(ancestorController, NSSelectorFromString(@"tryResumePlayback"));
+	} else if ([ancestorController respondsToSelector:NSSelectorFromString(@"tryResumePlaybackWithReason:")]) {
+		((void (*)(id, SEL, NSInteger))objc_msgSend)(ancestorController, NSSelectorFromString(@"tryResumePlaybackWithReason:"), 1);
+	} else if ([ancestorController respondsToSelector:NSSelectorFromString(@"resumePlayback")]) {
+		((void (*)(id, SEL))objc_msgSend)(ancestorController, NSSelectorFromString(@"resumePlayback"));
+	} else if ([ancestorController respondsToSelector:NSSelectorFromString(@"play")]) {
+		((void (*)(id, SEL))objc_msgSend)(ancestorController, NSSelectorFromString(@"play"));
 	}
 }
 
@@ -494,6 +503,11 @@ static void SCIResumeDirectPlaybackFromController(UIViewController *controller) 
 	if ([mediaView respondsToSelector:playSelector]) {
 		((void (*)(id, SEL))objc_msgSend)(mediaView, playSelector);
 	}
+}
+
+static void SCIPauseFeedPlaybackFromView(UIView *sourceView) {
+	// Obsolete: Playback suppression is now handled robustly by SCIUnderlyingPlaybackController
+	// which captures visible AVPlayers and resumes them properly.
 }
 
 static NSURL *SCIURLFromURLCollectionValue(id collection) {
@@ -689,7 +703,7 @@ static NSString *SCIResolvedDefaultActionIdentifier(NSArray<NSString *> *visible
 
 static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSource source) {
 	if ([identifier isEqualToString:kSCIActionNone]) {
-		return SCIActionButtonImage(@"action", @"option", 22.0);
+		return SCIActionButtonImage(@"action_alt", @"option", 22.0);
 	}
 
 	if (identifier.length > 0) {
@@ -697,10 +711,10 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 	}
 
 	if (source == SCIActionButtonSourceFeed) {
-		return SCIActionButtonImage(@"action", @"option", 22.0);
+		return SCIActionButtonImage(@"action_alt", @"option", 22.0);
 	}
 
-	return SCIActionButtonImage(@"action", @"option", 22.0);
+	return SCIActionButtonImage(@"action_alt", @"option", 22.0);
 }
 
 static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
@@ -751,7 +765,7 @@ static NSArray<NSString *> *SCIVisibleActionsForEntries(NSArray<SCIResolvedMedia
 		BOOL visible = YES;
 
 		if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
-			visible = [SCIUtils getBoolPref:kSCIViewThumbnailPrefKey];
+			visible = (currentEntry.videoURL != nil);
 		}
 
 		if ([identifier isEqualToString:kSCIActionExpand]) {
@@ -900,6 +914,9 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 	if (context.source == SCIActionButtonSourceDirect && isDefaultTap) {
 		SCIPauseDirectPlaybackFromController(context.controller);
 	}
+	if ((context.source == SCIActionButtonSourceFeed || context.source == SCIActionButtonSourceReels) && isDefaultTap) {
+		SCIPauseFeedPlaybackFromView(context.view);
+	}
 
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) {
 		if (!currentURL) {
@@ -1005,28 +1022,6 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 	}
 
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
-		if (![SCIUtils getBoolPref:kSCIViewThumbnailPrefKey]) {
-			[SCIUtils showToastForDuration:2.0
-									 title:@"View thumbnail is disabled in settings"
-								  subtitle:nil
-							  iconResource:@"eye"
-				   fallbackSystemImageName:@"eye.slash"
-									  tone:SCIFeedbackPillToneError];
-			return;
-		}
-
-		if (currentEntry.photoURL) {
-			SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
-			thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
-			thumbnailMeta.sourceUsername = meta.sourceUsername;
-			[SCIFullScreenMediaPlayer showRemoteImageURL:currentEntry.photoURL
-											 metadata:thumbnailMeta
-									   playbackSource:(SCIFullScreenPlaybackSource)context.source
-										   sourceView:context.view
-										   controller:context.controller];
-			return;
-		}
-
 		if (currentEntry.videoURL) {
 			SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
 			thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
@@ -1036,7 +1031,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 		}
 
 		[SCIUtils showToastForDuration:2.0
-								 title:@"Cover unavailable"
+								 title:@"Thumbnail is only available for videos"
 							  subtitle:nil
 						  iconResource:@"photo"
 			   fallbackSystemImageName:@"photo"
@@ -1102,6 +1097,7 @@ static UIView *SCIFeedActionContextViewFromMediaView(UIView *view, id targetMedi
 }
 
 void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecognizer *sender) {
+	if (![SCIUtils getBoolPref:@"enable_long_press_expand"]) return;
 	if (!view || !sender || sender.state != UIGestureRecognizerStateBegan) return;
 	if (!view.window) return;
 

@@ -18,6 +18,7 @@ NSString *SCIVersionString = @"v1.2.0-dev";
 // Variables that work across features
 __weak id SCIPendingDirectVisualMessageToMarkSeen = nil;
 BOOL SCIForceMarkStoryAsSeen = NO;
+BOOL SCIForceStoryAutoAdvance = NO;
 
 // MARK: Tweak first-time setup
 %hook IGInstagramAppDelegate
@@ -33,8 +34,9 @@ BOOL SCIForceMarkStoryAsSeen = NO;
         @"call_confirm": @(YES),
         @"keep_deleted_message": @(YES),
         @"profile_photo_zoom": @(YES),
+        @"follow_indicator": @(NO),
         @"show_action_button": @(NO),
-        @"view_thumbnail": @(NO),
+        @"enable_long_press_expand": @(NO),
         @"expanded_video_start_muted": @(NO),
         @"action_button_default_action": @"none",
         @"reels_tap_control": @"default",
@@ -46,7 +48,12 @@ BOOL SCIForceMarkStoryAsSeen = NO;
         @"hide_vanish_screenshot": @(NO),
         @"disable_auto_unmuting_reels": @(YES),
         @"doom_scrolling_reel_count": @(1),
+        @"disable_bg_refresh": @(NO),
         @"disable_home_button_refresh": @(NO),
+        @"disable_reels_tab_refresh": @(NO),
+        @"stop_story_auto_advance": @(NO),
+        @"advance_story_when_marking_seen": @(NO),
+        @"seen_auto_on_send": @(NO),
         @"repost_confirm_feed": @(NO),
         @"repost_confirm_reels": @(NO),
         @"hide_repost_button_feed": @(NO),

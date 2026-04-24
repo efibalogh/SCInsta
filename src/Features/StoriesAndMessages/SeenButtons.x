@@ -1,12 +1,15 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import <substrate.h>
 
 #import "../../InstagramHeaders.h"
 #import "../../Tweak.h"
 #import "../../Utils.h"
 
 static NSString * const kSCISeenMessagesBarIconResource = @"eye";
+static NSString * const kSCIStoryMentionsBarIconResource = @"mention";
 static NSInteger const kSCIStorySeenButtonTag = 926001;
+static NSInteger const kSCIStoryMentionsButtonTag = 926002;
 static NSInteger const kSCIStoriesActionButtonTag = 921343;
 static NSInteger const kSCIDirectActionButtonTag = 921344;
 static NSInteger const kSCIDirectSeenButtonTag = 921345;
@@ -23,6 +26,9 @@ static const void *kSCIDirectVisualObservedInputViewAssocKey = &kSCIDirectVisual
 static const void *kSCIDirectVisualHasInputObserverAssocKey = &kSCIDirectVisualHasInputObserverAssocKey;
 static void *kSCIStoryOverlayAlphaObserverContext = &kSCIStoryOverlayAlphaObserverContext;
 static void *kSCIDirectVisualInputAlphaObserverContext = &kSCIDirectVisualInputAlphaObserverContext;
+static NSInteger kSCISeenAutoBypassCount = 0;
+static void (*orig_setHasSentAMessageOrUpdate)(id, SEL, BOOL) = NULL;
+static void (*orig_setHasSentAMessage)(id, SEL, BOOL) = NULL;
 
 static inline BOOL SCIManualMessageSeenEnabled(void) {
     return [SCIUtils getBoolPref:@"remove_lastseen"];
@@ -30,6 +36,46 @@ static inline BOOL SCIManualMessageSeenEnabled(void) {
 
 static inline BOOL SCIManualStorySeenEnabled(void) {
     return [SCIUtils getBoolPref:@"no_seen_receipt"];
+}
+
+static inline BOOL SCIAutoSeenOnSendEnabled(void) {
+    return SCIManualMessageSeenEnabled() && [SCIUtils getBoolPref:@"seen_auto_on_send"];
+}
+
+static void SCITriggerAutoSeenForThreadController(id controller) {
+    if (!SCIAutoSeenOnSendEnabled() || !controller) return;
+    if (![controller respondsToSelector:@selector(markLastMessageAsSeen)]) return;
+
+    kSCISeenAutoBypassCount++;
+    ((void (*)(id, SEL))objc_msgSend)(controller, @selector(markLastMessageAsSeen));
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (kSCISeenAutoBypassCount > 0) {
+            kSCISeenAutoBypassCount--;
+        }
+    });
+}
+
+static void SCIHandleDidSendMessageState(id controller, BOOL sent) {
+    if (!sent || !SCIAutoSeenOnSendEnabled()) return;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SCITriggerAutoSeenForThreadController(controller);
+    });
+}
+
+static void SCIHooked_setHasSentAMessageOrUpdate(id self, SEL _cmd, BOOL sent) {
+    if (orig_setHasSentAMessageOrUpdate) {
+        orig_setHasSentAMessageOrUpdate(self, _cmd, sent);
+    }
+    SCIHandleDidSendMessageState(self, sent);
+}
+
+static void SCIHooked_setHasSentAMessage(id self, SEL _cmd, BOOL sent) {
+    if (orig_setHasSentAMessage) {
+        orig_setHasSentAMessage(self, _cmd, sent);
+    }
+    SCIHandleDidSendMessageState(self, sent);
 }
 
 static BOOL SCIOverlayIsDirectVisualOverlay(UIView *overlayView) {
@@ -152,6 +198,11 @@ static void SCIUpdateStoryButtonsAlpha(UIView *overlayView, CGFloat alpha) {
     if ([seenButton isKindOfClass:[UIButton class]]) {
         seenButton.alpha = alpha;
     }
+
+    UIButton *mentionsButton = (UIButton *)[overlayView viewWithTag:kSCIStoryMentionsButtonTag];
+    if ([mentionsButton isKindOfClass:[UIButton class]]) {
+        mentionsButton.alpha = alpha;
+    }
 }
 
 static void SCIRemoveStoryOverlayAlphaObserverIfNeeded(UIView *overlayView) {
@@ -258,8 +309,27 @@ static id SCIStorySectionControllerFromOverlayView(UIView *overlayView) {
     return nil;
 }
 
-static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
-    if (!overlayView) return;
+static NSString *SCIStringFromValue(id value) {
+    if (!value || value == (id)kCFNull) return nil;
+    if ([value isKindOfClass:[NSString class]]) {
+        NSString *string = (NSString *)value;
+        return string.length > 0 ? string : nil;
+    }
+    if ([value respondsToSelector:@selector(stringValue)]) {
+        NSString *string = [value stringValue];
+        return string.length > 0 ? string : nil;
+    }
+    return [[value description] length] > 0 ? [value description] : nil;
+}
+
+static id SCIStoryMediaFromAnyObject(id object) {
+    if (!object) return nil;
+    id candidate = SCIFirstObjectForSelectors(object, @[@"media", @"mediaItem", @"storyItem", @"item", @"model"]);
+    return candidate ?: object;
+}
+
+static BOOL SCIResolveStoryContextFromOverlay(UIView *overlayView, id *outMarkTarget, id *outSectionController, id *outMedia) {
+    if (!overlayView) return NO;
 
     SEL markSelector = NSSelectorFromString(@"fullscreenSectionController:didMarkItemAsSeen:");
     UIViewController *viewerController = [SCIUtils nearestViewControllerForView:overlayView];
@@ -286,13 +356,76 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
     }
 
     id media = SCIFirstObjectForSelectors(sectionController, @[@"currentStoryItem", @"currentItem", @"item"]);
-    if (!media) {
-        media = SCIFirstObjectForSelectors(markTarget, @[@"currentStoryItem", @"currentItem", @"item"]);
-    }
-    if (!media && viewerController) {
-        media = SCIFirstObjectForSelectors(viewerController, @[@"currentStoryItem", @"currentItem", @"item"]);
+    if (!media) media = SCIFirstObjectForSelectors(markTarget, @[@"currentStoryItem", @"currentItem", @"item"]);
+    if (!media && viewerController) media = SCIFirstObjectForSelectors(viewerController, @[@"currentStoryItem", @"currentItem", @"item"]);
+    media = SCIStoryMediaFromAnyObject(media);
+
+    if (outMarkTarget) *outMarkTarget = markTarget;
+    if (outSectionController) *outSectionController = sectionController;
+    if (outMedia) *outMedia = media;
+
+    return (media != nil);
+}
+
+static NSArray<NSDictionary *> *SCIStoryMentionsForOverlay(UIView *overlayView) {
+    id markTarget = nil;
+    id sectionController = nil;
+    id media = nil;
+    if (!SCIResolveStoryContextFromOverlay(overlayView, &markTarget, &sectionController, &media)) {
+        return @[];
     }
 
+    id mentionsCollection = SCIObjectForSelector(media, @"reelMentions");
+    NSArray *mentions = SCIArrayFromCollection(mentionsCollection);
+    if (mentions.count == 0) return @[];
+
+    NSMutableArray<NSDictionary *> *userInfos = [NSMutableArray array];
+    for (id mention in mentions) {
+        id user = SCIKVCObject(mention, @"user");
+        if (!user) user = SCIObjectForSelector(mention, @"user");
+        if (!user) continue;
+
+        NSString *username = SCIStringFromValue(SCIKVCObject(user, @"username"));
+        if (!username) username = SCIStringFromValue(SCIObjectForSelector(user, @"username"));
+        NSString *fullName = SCIStringFromValue(SCIKVCObject(user, @"fullName"));
+        if (!fullName) fullName = SCIStringFromValue(SCIKVCObject(user, @"full_name"));
+
+        NSMutableDictionary *entry = [NSMutableDictionary dictionary];
+        if (username.length > 0) entry[@"username"] = username;
+        if (fullName.length > 0) entry[@"fullName"] = fullName;
+        if (entry.count > 0) [userInfos addObject:entry];
+    }
+
+    return userInfos;
+}
+
+static void SCIAdvanceStoryAfterManualSeenIfNeeded(UIView *overlayView) {
+    if (![SCIUtils getBoolPref:@"advance_story_when_marking_seen"]) return;
+
+    id sectionController = SCIStorySectionControllerFromOverlayView(overlayView);
+    SEL advanceSelector = NSSelectorFromString(@"storyPlayerMediaViewDidPlayToEnd:");
+    if (!sectionController || ![sectionController respondsToSelector:advanceSelector]) return;
+
+    id mediaView = [SCIUtils getIvarForObj:sectionController name:"_mediaView"];
+    if (!mediaView) mediaView = [SCIUtils getIvarForObj:overlayView name:"_mediaView"];
+
+    SCIForceStoryAutoAdvance = YES;
+    ((void (*)(id, SEL, id))objc_msgSend)(sectionController, advanceSelector, mediaView);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        SCIForceStoryAutoAdvance = NO;
+    });
+}
+
+// Forward declaration — implemented in StoryMentions.x
+extern void SCIPresentStoryMentionsSheet(UIView *overlayView);
+
+static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
+    if (!overlayView) return;
+
+    id markTarget = nil;
+    id sectionController = nil;
+    id media = nil;
+    BOOL resolved = SCIResolveStoryContextFromOverlay(overlayView, &markTarget, &sectionController, &media);
     if (!markTarget || !sectionController || !media) {
         [SCIUtils showToastForDuration:1.5
                                  title:@"Unable to mark story as seen"
@@ -303,9 +436,14 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
         return;
     }
 
+    SEL markSelector = NSSelectorFromString(@"fullscreenSectionController:didMarkItemAsSeen:");
     SCIForceMarkStoryAsSeen = YES;
     ((void (*)(id, SEL, id, id))objc_msgSend)(markTarget, markSelector, sectionController, media);
     SCIForceMarkStoryAsSeen = NO;
+
+    if (resolved) {
+        SCIAdvanceStoryAfterManualSeenIfNeeded(overlayView);
+    }
 
     [SCIUtils showToastForDuration:1.5
                              title:@"Marked story as seen"
@@ -628,6 +766,9 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 %hook IGDirectThreadViewListAdapterDataSource
 - (BOOL)shouldUpdateLastSeenMessage {
     if (SCIManualMessageSeenEnabled()) {
+        if (kSCISeenAutoBypassCount > 0) {
+            return %orig;
+        }
         return false;
     }
     
@@ -653,8 +794,10 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     SCIEnsureStoryOverlayAlphaObserver(overlayView);
 
     UIButton *seenButton = (UIButton *)[(UIView *)self viewWithTag:kSCIStorySeenButtonTag];
+    UIButton *mentionsButton = (UIButton *)[(UIView *)self viewWithTag:kSCIStoryMentionsButtonTag];
     if (SCIOverlayIsDirectVisualOverlay((UIView *)self)) {
         [seenButton removeFromSuperview];
+        [mentionsButton removeFromSuperview];
         UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
         if (footerContainer) {
             SCIUpdateStoryButtonsAlpha(overlayView, footerContainer.alpha);
@@ -662,8 +805,10 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         return;
     }
 
-    if (!SCIManualStorySeenEnabled()) {
+    BOOL showSeenButton = SCIManualStorySeenEnabled();
+    if (!showSeenButton) {
         [seenButton removeFromSuperview];
+        [mentionsButton removeFromSuperview];
         UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
         if (footerContainer) {
             SCIUpdateStoryButtonsAlpha(overlayView, footerContainer.alpha);
@@ -671,15 +816,28 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         return;
     }
 
-    if (!seenButton) {
+    if (showSeenButton && !seenButton) {
         seenButton = SCIStorySeenButtonWithTag((UIView *)self, kSCIStorySeenButtonTag);
         [seenButton addTarget:self action:@selector(sci_storySeenButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
 
         UIImage *seenImage = [SCIUtils sci_resourceImageNamed:kSCISeenMessagesBarIconResource template:YES maxPointSize:24.0] ?: [UIImage systemImageNamed:@"eye"];
         [seenButton setImage:[seenImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     }
+    if (showSeenButton) SCIApplyStorySeenButtonStyle(seenButton);
 
-    SCIApplyStorySeenButtonStyle(seenButton);
+    NSArray<NSDictionary *> *storyMentions = SCIStoryMentionsForOverlay(overlayView);
+    BOOL showMentionsButton = storyMentions.count > 0;
+    if (showMentionsButton && !mentionsButton) {
+        mentionsButton = SCIStorySeenButtonWithTag((UIView *)self, kSCIStoryMentionsButtonTag);
+        [mentionsButton addTarget:self action:@selector(sci_storyMentionsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+
+        UIImage *mentionsImage = [SCIUtils sci_resourceImageNamed:kSCIStoryMentionsBarIconResource template:YES maxPointSize:24.0] ?: [UIImage systemImageNamed:@"at"];
+        [mentionsButton setImage:[mentionsImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+    } else if (!showMentionsButton && mentionsButton) {
+        [mentionsButton removeFromSuperview];
+        mentionsButton = nil;
+    }
+    if (showMentionsButton) SCIApplyStorySeenButtonStyle(mentionsButton);
 
     UIButton *storyActionButton = (UIButton *)[overlayView viewWithTag:kSCIStoriesActionButtonTag];
     BOOL actionVisible = [storyActionButton isKindOfClass:[UIButton class]]
@@ -688,15 +846,31 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         && CGRectGetWidth(storyActionButton.frame) > 0.0
         && CGRectGetHeight(storyActionButton.frame) > 0.0;
 
-    CGRect seenFrame = SCIStorySeenBaseFrame(overlayView);
+    CGRect baseFrame = SCIStorySeenBaseFrame(overlayView);
+    CGFloat size = CGRectGetWidth(baseFrame);
     if (actionVisible) {
-        CGFloat size = CGRectGetWidth(storyActionButton.frame);
-        if (size <= 0.0) size = CGRectGetWidth(seenFrame);
-        seenFrame = CGRectMake(CGRectGetMinX(storyActionButton.frame) - size - 5.0, CGRectGetMinY(storyActionButton.frame), size, size);
+        size = CGRectGetWidth(storyActionButton.frame);
+    }
+    if (size <= 0.0) size = 38.0;
+
+    CGFloat y = actionVisible ? CGRectGetMinY(storyActionButton.frame) : CGRectGetMinY(baseFrame);
+    CGFloat nextX = actionVisible
+        ? (CGRectGetMinX(storyActionButton.frame) - size - 5.0)
+        : CGRectGetMinX(baseFrame);
+
+    if (showSeenButton && seenButton) {
+        seenButton.frame = CGRectMake(nextX, y, size, size);
+        [overlayView bringSubviewToFront:seenButton];
+        nextX -= (size + 5.0);
+    } else if (seenButton) {
+        [seenButton removeFromSuperview];
+        seenButton = nil;
     }
 
-    seenButton.frame = seenFrame;
-    [overlayView bringSubviewToFront:seenButton];
+    if (showMentionsButton && mentionsButton) {
+        mentionsButton.frame = CGRectMake(nextX, y, size, size);
+        [overlayView bringSubviewToFront:mentionsButton];
+    }
 
     UIView *footerContainer = SCIStoryFooterContainerFromOverlay(overlayView);
     if (footerContainer) {
@@ -729,6 +903,12 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     (void)sender;
     SCIPlayButtonTappedHaptic();
     SCIMarkCurrentStoryAsSeenFromOverlay((UIView *)self);
+}
+
+%new - (void)sci_storyMentionsButtonTapped:(UIButton *)sender {
+    (void)sender;
+    SCIPlayButtonTappedHaptic();
+    SCIPresentStoryMentionsSheet((UIView *)self);
 }
 %end
 
@@ -776,3 +956,24 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     SCIMarkDirectVisualMessageAsSeen((UIViewController *)self);
 }
 %end
+
+%ctor {
+    Class threadVCClass = NSClassFromString(@"IGDirectThreadViewController");
+    if (!threadVCClass) return;
+
+    SEL setHasSentOrUpdateSelector = NSSelectorFromString(@"setHasSentAMessageOrUpdate:");
+    if (class_getInstanceMethod(threadVCClass, setHasSentOrUpdateSelector)) {
+        MSHookMessageEx(threadVCClass,
+                        setHasSentOrUpdateSelector,
+                        (IMP)SCIHooked_setHasSentAMessageOrUpdate,
+                        (IMP *)&orig_setHasSentAMessageOrUpdate);
+    }
+
+    SEL setHasSentSelector = NSSelectorFromString(@"setHasSentAMessage:");
+    if (class_getInstanceMethod(threadVCClass, setHasSentSelector)) {
+        MSHookMessageEx(threadVCClass,
+                        setHasSentSelector,
+                        (IMP)SCIHooked_setHasSentAMessage,
+                        (IMP *)&orig_setHasSentAMessage);
+    }
+}

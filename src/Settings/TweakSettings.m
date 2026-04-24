@@ -63,6 +63,7 @@
                                             @"header": @"Confirmation",
                                             @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Confirm follow" subtitle:@"Shows an alert when you click the follow button to confirm the follow" defaultsKey:@"follow_confirm"],
+                                                [SCISetting switchCellWithTitle:@"Confirm unfollow" subtitle:@"Shows an alert when you click the unfollow button to confirm" defaultsKey:@"unfollow_confirm"],
                                             ]
                                         },
                                         @{
@@ -70,7 +71,7 @@
                                             @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Show action button" subtitle:@"Adds an action button to feed posts, reels, stories, and visual messages" defaultsKey:@"show_action_button"],
                                                 [SCISetting menuCellWithTitle:@"Default tap action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:[self menus][@"action_button_default_action"]],
-                                                [SCISetting switchCellWithTitle:@"View thumbnail" subtitle:@"Adds a view thumbnail action to the action menu that shows the cover image or video thumbnail" defaultsKey:@"view_thumbnail"]
+                                                [SCISetting switchCellWithTitle:@"Enable long press to expand" subtitle:@"When enabled, long-pressing media in feed opens the expanded viewer" defaultsKey:@"enable_long_press_expand"]
                                             ]
                                         }]
                 ],
@@ -156,7 +157,8 @@
                                                 [SCISetting switchCellWithTitle:@"Disable video autoplay" subtitle:@"Prevents videos on your feed from playing automatically" defaultsKey:@"disable_feed_autoplay"],
                                                 [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from feed posts" defaultsKey:@"hide_repost_button_feed"],
                                                 [SCISetting switchCellWithTitle:@"Hide metrics" subtitle:@"Hides the metrics numbers under posts & reels (likes, comments, reshares, shares)" defaultsKey:@"hide_metrics"],
-                                                [SCISetting switchCellWithTitle:@"Disable home button refresh" subtitle:@"Prevents feed refresh when re-tapping the home tab button" defaultsKey:@"disable_home_button_refresh"]
+                                                [SCISetting switchCellWithTitle:@"Disable home tab tap refresh" subtitle:@"Prevents feed refresh when re-tapping the home tab button" defaultsKey:@"disable_home_button_refresh"],
+                                                [SCISetting switchCellWithTitle:@"Disable background feed refresh" subtitle:@"Prevents Instagram from refreshing your home feed in the background" defaultsKey:@"disable_bg_refresh"]
                                             ]
                                         },
                                         @{
@@ -178,6 +180,7 @@
                                                 [SCISetting switchCellWithTitle:@"Always show progress scrubber" subtitle:@"Forces the progress bar to appear on every reel" defaultsKey:@"reels_show_scrubber"],
                                                 [SCISetting switchCellWithTitle:@"Disable auto-unmuting reels" subtitle:@"Prevents reels from unmuting when the volume/silent button is pressed" defaultsKey:@"disable_auto_unmuting_reels" requiresRestart:YES],
                                                 [SCISetting switchCellWithTitle:@"Confirm reel refresh" subtitle:@"Shows an alert when you trigger a reels refresh" defaultsKey:@"refresh_reel_confirm"],
+                                                [SCISetting switchCellWithTitle:@"Disable reels tab tap refresh" subtitle:@"Prevents reels refresh when re-tapping the reels tab button" defaultsKey:@"disable_reels_tab_refresh"],
                                                 [SCISetting switchCellWithTitle:@"Hide repost button" subtitle:@"Removes the repost button from reels" defaultsKey:@"hide_repost_button_reels"],
                                             ]
                                         },
@@ -210,6 +213,8 @@
                                             @"header": @"Privacy & visibility",
                                             @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Disable story seen receipt" subtitle:@"Prevents automatic story seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
+                                                [SCISetting switchCellWithTitle:@"Stop story auto advance" subtitle:@"Prevents stories from automatically moving to the next item after playback ends" defaultsKey:@"stop_story_auto_advance"],
+                                                [SCISetting switchCellWithTitle:@"Advance when marked as seen" subtitle:@"After manually marking a story as seen with the eye button, advance to the next story" defaultsKey:@"advance_story_when_marking_seen"],
                                             ]
                                         },
                                         @{
@@ -226,6 +231,22 @@
                                             ]
                                         }]
                 ],
+                [SCISetting navigationCellWithTitle:@"Profile"
+                                           subtitle:@""
+                                               icon:[SCISymbol resourceSymbolWithName:@"profile" color:[UIColor labelColor] size:22]
+                                        navSections:@[@{
+                                            @"header": @"Profile picture",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Long press to expand photo" subtitle:@"When enabled, long-pressing a profile picture opens the full-size expanded view" defaultsKey:@"profile_photo_zoom"],
+                                            ]
+                                        },
+                                        @{
+                                            @"header": @"Indicators",
+                                            @"rows": @[
+                                                [SCISetting switchCellWithTitle:@"Show following indicator" subtitle:@"Shows whether the profile user follows you" defaultsKey:@"follow_indicator"],
+                                            ]
+                                        }]
+                ],
                 [SCISetting navigationCellWithTitle:@"Messages"
                                            subtitle:@""
                                                icon:[SCISymbol resourceSymbolWithName:@"messages" color:[UIColor labelColor] size:22]
@@ -234,6 +255,7 @@
                                             @"rows": @[
                                                 [SCISetting switchCellWithTitle:@"Keep deleted messages" subtitle:@"Saves deleted messages in chat conversations" defaultsKey:@"keep_deleted_message"],
                                                 [SCISetting switchCellWithTitle:@"Manually mark messages as seen" subtitle:@"Adds a button to DM threads, which will mark messages as seen" defaultsKey:@"remove_lastseen"],
+                                                [SCISetting switchCellWithTitle:@"Auto-seen on send" subtitle:@"Marks messages as seen automatically right after you send a message in the thread" defaultsKey:@"seen_auto_on_send"],
                                                 [SCISetting switchCellWithTitle:@"Disable disappearing swipe-up" subtitle:@"Blocks swipe-up gesture paths used to enter/toggle disappearing mode" defaultsKey:@"disable_disappearing_swipe_up"],
                                                 [SCISetting switchCellWithTitle:@"Disable typing status" subtitle:@"Prevents the typing indicator from being shown to others when you're typing in DMs" defaultsKey:@"disable_typing_status"],
                                                 [SCISetting switchCellWithTitle:@"No suggested chats" subtitle:@"Hides the suggested broadcast channels in direct messages" defaultsKey:@"no_suggested_chats"],
@@ -375,7 +397,7 @@
     return @{
         @"action_button_default_action": [UIMenu menuWithChildren:@[
             [UICommand commandWithTitle:@"None"
-                                  image:[[SCISymbol resourceSymbolWithName:@"action" color:[UIColor labelColor] size:18] image]
+                                  image:[[SCISymbol resourceSymbolWithName:@"action_alt" color:[UIColor labelColor] size:18] image]
                                  action:@selector(menuChanged:)
                            propertyList:@{
                                 @"defaultsKey": @"action_button_default_action",
