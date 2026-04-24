@@ -697,6 +697,11 @@ static NSString *SCIResolvedDefaultActionIdentifier(NSArray<NSString *> *visible
 		return saved;
 	}
 
+	// View thumbnail is hidden for non-video; fall back to launching menu
+	if ([saved isEqualToString:kSCIActionViewThumbnail]) {
+		return kSCIActionNone;
+	}
+
 	if ([visibleIdentifiers containsObject:kSCIActionDownloadLibrary]) {
 		return kSCIActionDownloadLibrary;
 	}
@@ -705,7 +710,14 @@ static NSString *SCIResolvedDefaultActionIdentifier(NSArray<NSString *> *visible
 }
 
 static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSource source) {
-	CGFloat size = source == SCIActionButtonSourceReels ? 44.0 : 22.0;
+	CGFloat size;
+	if (source == SCIActionButtonSourceReels) {
+		size = 44.0;
+	} else {
+		BOOL shareOrPhoto = [identifier isEqualToString:kSCIActionDownloadShare] ||
+			[identifier isEqualToString:kSCIActionViewThumbnail];
+		size = shareOrPhoto ? 23.0 : 24.0;
+	}
 
 	if ([identifier isEqualToString:kSCIActionNone]) {
 		return source == SCIActionButtonSourceReels
@@ -821,8 +833,8 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL,
 		[SCIUtils showToastForDuration:2.0
 								 title:@"Cover unavailable"
 							  subtitle:nil
-						  iconResource:@"photo"
-			   fallbackSystemImageName:@"photo"
+						  iconResource:@"photo_filled"
+			   fallbackSystemImageName:@"photo.fill"
 								  tone:SCIFeedbackPillToneError];
 		return;
 	}
@@ -842,8 +854,8 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL,
 				[SCIUtils showToastForDuration:2.0
 										 title:@"Cover unavailable"
 									  subtitle:error.localizedDescription ?: @""
-								  iconResource:@"photo"
-					   fallbackSystemImageName:@"photo"
+								  iconResource:@"photo_filled"
+					   fallbackSystemImageName:@"photo.fill"
 										  tone:SCIFeedbackPillToneError];
 			});
 			return;
@@ -875,7 +887,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 		[SCIUtils showToastForDuration:2.0
 								 title:@"Media not found"
 							  subtitle:nil
-						  iconResource:@"media"
+						  iconResource:@"media_filled"
 			   fallbackSystemImageName:@"photo.on.rectangle"
 								  tone:SCIFeedbackPillToneError];
 		if (context.source == SCIActionButtonSourceDirect) {
@@ -929,7 +941,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 									 title:@"No downloadable media"
 								  subtitle:nil
 							  iconResource:@"download"
-				   fallbackSystemImageName:@"arrow.down.circle"
+				   fallbackSystemImageName:@"arrow.down.to.line"
 									  tone:SCIFeedbackPillToneError];
 			return;
 		}
@@ -947,7 +959,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 									 title:@"No downloadable media"
 								  subtitle:nil
 							  iconResource:@"download"
-				   fallbackSystemImageName:@"arrow.down.circle"
+				   fallbackSystemImageName:@"arrow.down.to.line"
 									  tone:SCIFeedbackPillToneError];
 			return;
 		}
@@ -965,7 +977,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 									 title:@"No link available"
 								  subtitle:nil
 							  iconResource:@"link"
-				   fallbackSystemImageName:@"link.circle"
+				   fallbackSystemImageName:@"link"
 									  tone:SCIFeedbackPillToneError];
 			return;
 		}
@@ -992,7 +1004,7 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 									 title:@"No downloadable media"
 								  subtitle:nil
 							  iconResource:@"download"
-				   fallbackSystemImageName:@"arrow.down.circle"
+				   fallbackSystemImageName:@"arrow.down.to.line"
 									  tone:SCIFeedbackPillToneError];
 			return;
 		}
@@ -1038,8 +1050,8 @@ static void SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonCont
 		[SCIUtils showToastForDuration:2.0
 								 title:@"Thumbnail is only available for videos"
 							  subtitle:nil
-						  iconResource:@"photo"
-			   fallbackSystemImageName:@"photo"
+						  iconResource:@"photo_filled"
+			   fallbackSystemImageName:@"photo.fill"
 								  tone:SCIFeedbackPillToneError];
 		return;
 	}

@@ -686,7 +686,7 @@ static void SCIInvokeBoolUserInitiated(id target, SEL selector, BOOL value, BOOL
         case SCIFullScreenPlaybackSourceReels:
             [self registerContextControllerTargetsForceResume:YES excludingPreviewView:previewView];
             [self registerTargetsFromViewHierarchy:[self playbackDiscoveryRootView]
-                                       forceResume:NO
+                                       forceResume:YES
                               excludingPreviewView:previewView];
             break;
         case SCIFullScreenPlaybackSourceUnknown:
@@ -699,7 +699,10 @@ static void SCIInvokeBoolUserInitiated(id target, SEL selector, BOOL value, BOOL
     }
 
     BOOL shouldAttemptWindowPlayerDiscovery = !self.didAttemptWindowPlayerDiscovery &&
-        (self.playbackSource == SCIFullScreenPlaybackSourceUnknown || self.underlyingPlaybackSessions.count == 0);
+        (self.playbackSource == SCIFullScreenPlaybackSourceUnknown || 
+         self.playbackSource == SCIFullScreenPlaybackSourceFeed ||
+         self.playbackSource == SCIFullScreenPlaybackSourceReels ||
+         self.underlyingPlaybackSessions.count == 0);
     if (shouldAttemptWindowPlayerDiscovery) {
         self.didAttemptWindowPlayerDiscovery = YES;
         [self registerVisibleAVPlayersExcludingPreviewView:previewView];
