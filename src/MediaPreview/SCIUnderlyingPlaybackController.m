@@ -684,9 +684,9 @@ static void SCIInvokeBoolUserInitiated(id target, SEL selector, BOOL value, BOOL
             break;
         case SCIFullScreenPlaybackSourceFeed:
         case SCIFullScreenPlaybackSourceReels:
-            [self registerContextControllerTargetsForceResume:YES excludingPreviewView:previewView];
+            [self registerContextControllerTargetsForceResume:NO excludingPreviewView:previewView];
             [self registerTargetsFromViewHierarchy:[self playbackDiscoveryRootView]
-                                       forceResume:YES
+                                       forceResume:NO
                               excludingPreviewView:previewView];
             break;
         case SCIFullScreenPlaybackSourceUnknown:
