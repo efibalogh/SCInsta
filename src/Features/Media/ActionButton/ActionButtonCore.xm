@@ -39,6 +39,9 @@ static NSInteger const kSCIFeedActionButtonTag = 921341;
 static const void *kSCIActionButtonContextAssocKey = &kSCIActionButtonContextAssocKey;
 static const void *kSCIActionButtonTapActionAssocKey = &kSCIActionButtonTapActionAssocKey;
 static const void *kSCIActionButtonHapticActionAssocKey = &kSCIActionButtonHapticActionAssocKey;
+static const void *kSCIActionButtonIconImageViewAssocKey = &kSCIActionButtonIconImageViewAssocKey;
+static const void *kSCIActionButtonIconWidthConstraintAssocKey = &kSCIActionButtonIconWidthConstraintAssocKey;
+static const void *kSCIActionButtonIconHeightConstraintAssocKey = &kSCIActionButtonIconHeightConstraintAssocKey;
 
 @interface SCIResolvedMediaEntry : NSObject
 @property (nonatomic, strong, nullable) id mediaObject;
@@ -145,6 +148,10 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButton
 	}
 
 	return SCIActionButtonImage([NSString stringWithFormat:@"action_alt%@", append], @"option", size);
+}
+
+static UIImage *SCIMenuIconForActionIdentifier(NSString *identifier, CGFloat size) {
+	return SCIIconForActionIdentifier(identifier, SCIActionButtonSourceFeed, size);
 }
 
 static NSString *SCITitleForActionIdentifier(NSString *identifier) {
@@ -734,6 +741,85 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 		: SCIActionButtonImage(@"action_alt", @"option", size);
 }
 
+static CGSize SCICustomButtonIconDisplaySize(NSString *identifier, SCIActionButtonSource source, UIImage *image, UIButton *button) {
+	if (!image) return CGSizeZero;
+
+	CGFloat width = image.size.width;
+	CGFloat height = image.size.height;
+
+	if (source == SCIActionButtonSourceReels) {
+		if ([identifier isEqualToString:kSCIActionDownloadShare] ||
+			[identifier isEqualToString:kSCIActionViewThumbnail]) {
+			width = 38.0;
+			height = 38.0;
+		}
+	}
+
+	CGFloat maxWidth = CGRectGetWidth(button.bounds) > 0.0 ? CGRectGetWidth(button.bounds) : 44.0;
+	CGFloat maxHeight = CGRectGetHeight(button.bounds) > 0.0 ? CGRectGetHeight(button.bounds) : 44.0;
+	width = MAX(1.0, MIN(maxWidth, width));
+	height = MAX(1.0, MIN(maxHeight, height));
+	return CGSizeMake(width, height);
+}
+
+static UIImageView *SCIEnsureCustomIconImageView(UIButton *button) {
+	if (!button) return nil;
+
+	UIImageView *imageView = objc_getAssociatedObject(button, kSCIActionButtonIconImageViewAssocKey);
+	if ([imageView isKindOfClass:[UIImageView class]]) {
+		return imageView;
+	}
+
+	imageView = [[UIImageView alloc] initWithFrame:CGRectZero];
+	imageView.translatesAutoresizingMaskIntoConstraints = NO;
+	imageView.contentMode = UIViewContentModeScaleAspectFit;
+	imageView.userInteractionEnabled = NO;
+	[button addSubview:imageView];
+
+	[NSLayoutConstraint activateConstraints:@[
+		[imageView.centerXAnchor constraintEqualToAnchor:button.centerXAnchor],
+		[imageView.centerYAnchor constraintEqualToAnchor:button.centerYAnchor],
+		[imageView.widthAnchor constraintLessThanOrEqualToAnchor:button.widthAnchor],
+		[imageView.heightAnchor constraintLessThanOrEqualToAnchor:button.heightAnchor],
+	]];
+
+	NSLayoutConstraint *widthConstraint = [imageView.widthAnchor constraintEqualToConstant:24.0];
+	NSLayoutConstraint *heightConstraint = [imageView.heightAnchor constraintEqualToConstant:24.0];
+	widthConstraint.active = YES;
+	heightConstraint.active = YES;
+
+	objc_setAssociatedObject(button, kSCIActionButtonIconImageViewAssocKey, imageView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+	objc_setAssociatedObject(button, kSCIActionButtonIconWidthConstraintAssocKey, widthConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+	objc_setAssociatedObject(button, kSCIActionButtonIconHeightConstraintAssocKey, heightConstraint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+	return imageView;
+}
+
+static void SCISetButtonVisualImage(UIButton *button, UIImage *image, SCIActionButtonSource source, NSString *identifier) {
+	if (!button) return;
+
+	UIImage *templatedImage = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+	if (source == SCIActionButtonSourceReels) {
+		UIImageView *customIconView = SCIEnsureCustomIconImageView(button);
+		NSLayoutConstraint *widthConstraint = objc_getAssociatedObject(button, kSCIActionButtonIconWidthConstraintAssocKey);
+		NSLayoutConstraint *heightConstraint = objc_getAssociatedObject(button, kSCIActionButtonIconHeightConstraintAssocKey);
+		CGSize displaySize = SCICustomButtonIconDisplaySize(identifier, source, templatedImage, button);
+		widthConstraint.constant = displaySize.width;
+		heightConstraint.constant = displaySize.height;
+		customIconView.hidden = NO;
+		customIconView.tintColor = button.tintColor ?: SCIActionButtonTintForSource(source);
+		customIconView.image = templatedImage;
+		[button setImage:nil forState:UIControlStateNormal];
+		return;
+	}
+
+	UIImageView *customIconView = objc_getAssociatedObject(button, kSCIActionButtonIconImageViewAssocKey);
+	if ([customIconView isKindOfClass:[UIImageView class]]) {
+		customIconView.hidden = YES;
+		customIconView.image = nil;
+	}
+	[button setImage:templatedImage forState:UIControlStateNormal];
+}
+
 static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
 	if (!context) return nil;
 	if (context.mediaOverride) return context.mediaOverride;
@@ -1225,7 +1311,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 
 	NSString *defaultIdentifier = SCIResolvedDefaultActionIdentifier(visibleActions);
 	UIImage *defaultImage = SCIButtonDefaultImage(defaultIdentifier, context.source);
-	[button setImage:[defaultImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+	SCISetButtonVisualImage(button, defaultImage, context.source, defaultIdentifier);
 	BOOL shouldOpenMenuOnTap = [defaultIdentifier isEqualToString:kSCIActionNone];
 
 	__weak UIButton *weakButton = button;
@@ -1261,7 +1347,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	NSMutableArray<UIMenuElement *> *menuElements = [NSMutableArray arrayWithCapacity:visibleActions.count];
 	for (NSString *identifier in visibleActions) {
 		UIAction *menuAction = [UIAction actionWithTitle:SCITitleForActionIdentifier(identifier)
-												   image:SCIIconForActionIdentifier(identifier, SCIActionButtonSourceFeed, 18.0)
+												   image:SCIMenuIconForActionIdentifier(identifier, 24.0)
 											  identifier:nil
 												 handler:^(__unused UIAction *action) {
 			SCIExecuteActionIdentifier(identifier, context, NO);
