@@ -4,8 +4,8 @@
 #import <objc/message.h>
 
 #import "InstagramHeaders.h"
-#import "MediaPreview/SCIFullScreenMediaPlayer.h"
-#import "MediaPreview/SCIFeedbackPillView.h"
+#import "Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "Shared/UI/SCIFeedbackPillView.h"
 
 #import "Settings/SCISettingsViewController.h"
 

@@ -1,6 +1,6 @@
 #import "Download.h"
-#import "../Vault/SCIVaultFile.h"
-#import "../Vault/SCIVaultSaveMetadata.h"
+#import "../Shared/Vault/SCIVaultFile.h"
+#import "../Shared/Vault/SCIVaultSaveMetadata.h"
 #import <Photos/Photos.h>
 
 @implementation SCIDownloadDelegate

@@ -5,8 +5,8 @@
 #import "../Utils.h"
 
 #import "Manager.h"
-#import "../MediaPreview/SCIFeedbackPillView.h"
-#import "../MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "../Shared/UI/SCIFeedbackPillView.h"
+#import "../Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
 
 @class SCIVaultSaveMetadata;
 

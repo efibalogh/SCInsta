@@ -12,6 +12,36 @@ static char rowStaticRef[] = "row";
 
 ///
 
+static NSString *SCITitleCaseString(NSString *string) {
+    if (string.length == 0) return string;
+
+    NSSet<NSString *> *lowercaseWords = [NSSet setWithArray:@[@"a", @"an", @"and", @"as", @"at", @"by", @"for", @"from", @"in", @"of", @"on", @"or", @"the", @"to", @"vs."]];
+    NSArray<NSString *> *parts = [string componentsSeparatedByString:@" "];
+    NSMutableArray<NSString *> *formatted = [NSMutableArray arrayWithCapacity:parts.count];
+
+    [parts enumerateObjectsUsingBlock:^(NSString *part, NSUInteger idx, BOOL *stop) {
+        if (part.length == 0) {
+            [formatted addObject:part];
+            return;
+        }
+
+        if ([part isEqualToString:part.uppercaseString]) {
+            [formatted addObject:part];
+            return;
+        }
+
+        NSString *lower = part.lowercaseString;
+        if (idx > 0 && [lowercaseWords containsObject:lower]) {
+            [formatted addObject:lower];
+            return;
+        }
+
+        [formatted addObject:part.capitalizedString];
+    }];
+
+    return [formatted componentsJoinedByString:@" "];
+}
+
 @implementation SCISettingsViewController
 
 - (instancetype)initWithTitle:(NSString *)title sections:(NSArray *)sections reduceMargin:(BOOL)reduceMargin {
@@ -55,7 +85,7 @@ static char rowStaticRef[] = "row";
     [super viewDidLoad];
 
     self.navigationController.navigationBar.prefersLargeTitles = NO;
-    self.view.backgroundColor = UIColor.systemBackgroundColor;
+    // self.view.backgroundColor = UIColor.systemBackgroundColor;
 
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -95,7 +125,7 @@ static char rowStaticRef[] = "row";
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     UIListContentConfiguration *cellContentConfig = cell.defaultContentConfiguration;
     
-    cellContentConfig.text = row.title;
+    cellContentConfig.text = SCITitleCaseString(row.title);
     
     // Subtitle
     if (row.subtitle.length) {

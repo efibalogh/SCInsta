@@ -36,7 +36,7 @@
     if (self.usesResourceImage) {
         CGFloat maxPt = self.size > 0 ? self.size : 22.0;
         UIImage *img = [SCIUtils sci_resourceImageNamed:self.name template:YES maxPointSize:maxPt];
-        return img ?: [UIImage systemImageNamed:@"photo"];
+        return img ?: [UIImage systemImageNamed:@"questionmark.square.dashed"];
     }
 
     UIImage *symbol = [UIImage systemImageNamed:self.name];
