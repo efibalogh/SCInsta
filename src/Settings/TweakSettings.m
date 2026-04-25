@@ -24,9 +24,24 @@
                 [SCIStoriesSettingsProvider rootSetting],
                 [SCIReelsSettingsProvider rootSetting],
                 [SCIMessagesSettingsProvider rootSetting],
-                [SCIProfileSettingsProvider rootSetting],
-                [SCIMediaVaultSettingsProvider rootSetting],
-                [SCIToolsSettingsProvider rootSetting],
+                [SCIProfileSettingsProvider rootSetting]
+            ]
+        },
+        @{
+            @"header": @"",
+            @"rows": @[
+                [SCIMediaVaultSettingsProvider rootSetting]
+            ]
+        },
+        @{
+            @"header": @"",
+            @"rows": @[
+                [SCIToolsSettingsProvider rootSetting]
+            ]
+        },
+        @{
+            @"header": @"",
+            @"rows": @[
                 [SCIAboutSettingsProvider rootSetting]
             ]
         }
