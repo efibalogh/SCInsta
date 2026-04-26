@@ -207,7 +207,7 @@ static void SCIProfileExecuteCopyInfoAction(id user, NSString *identifier) {
     } else if ([identifier isEqualToString:kSCIProfileCopyInfoBio]) {
         SCIProfileCopyValue(SCIProfileBiography(user), @"Bio copied");
     } else if ([identifier isEqualToString:kSCIProfileCopyInfoLink]) {
-        SCIProfileCopyValue(SCIProfileURL(user).absoluteString, @"Profile URL copied");
+        SCIProfileCopyValue(SCIProfileURL(user).absoluteString, @"Profile link copied");
     } else {
         SCIProfileCopyValue(SCIProfileUsername(user), @"Username copied");
     }

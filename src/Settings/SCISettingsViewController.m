@@ -86,17 +86,17 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
         
         [mutableSections enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSDictionary *section, NSUInteger index, BOOL *stop) {
         
-            if ([section[@"header"] hasPrefix:@"_"] && [section[@"footer"] hasPrefix:@"_"]) {
-                if (![[SCIUtils IGVersionString] isEqualToString:@"0.0.0"]) {
-                    [mutableSections removeObjectAtIndex:index];
-                }
-            }
+            // if ([section[@"header"] hasPrefix:@"_"] && [section[@"footer"] hasPrefix:@"_"]) {
+            //     if (![[SCIUtils IGVersionString] isEqualToString:@"0.0.0"]) {
+            //         [mutableSections removeObjectAtIndex:index];
+            //     }
+            // }
 
-            else if ([section[@"header"] isEqualToString:@"Experimental"]) {
-                if (![[SCIUtils IGVersionString] hasSuffix:@"-dev"]) {
-                    [mutableSections removeObjectAtIndex:index];
-                }
-            }
+            // else if ([section[@"header"] isEqualToString:@"Experimental"]) {
+            //     if (![[SCIUtils IGVersionString] hasSuffix:@"-dev"]) {
+            //         [mutableSections removeObjectAtIndex:index];
+            //     }
+            // }
             
         }];
         
