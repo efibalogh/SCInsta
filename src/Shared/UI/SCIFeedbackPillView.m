@@ -238,7 +238,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     _iconBadgeGradientLayer.endPoint = CGPointMake(1.0, 1.0);
     [_iconBadgeView.layer insertSublayer:_iconBadgeGradientLayer atIndex:0];
 
-    UIImage *arrowImage = [self resourceIconNamed:@"download_filled"
+    UIImage *arrowImage = [self resourceIconNamed:@"download"
                           fallbackSystemImageName:@"arrow.down.to.line"
                                        pointSize:14.0];
     _iconView = [[UIImageView alloc] initWithImage:arrowImage];

@@ -1,6 +1,9 @@
 #import "SCITopicSettingsSupport.h"
+#import "SCIEditActionsListViewController.h"
 
 #import "../Utils.h"
+#import "../Shared/ActionButton/SCIActionDescriptor.h"
+#import "../Shared/ActionButton/SCIActionButtonConfiguration.h"
 
 NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString *footer) {
     NSMutableDictionary *section = [@{
@@ -45,16 +48,32 @@ static UICommand *SCIMenuCommand(NSString *title, NSString *imageName, NSString 
                           propertyList:[propertyList copy]];
 }
 
-UIMenu *SCIActionButtonDefaultActionMenu(NSString *defaultsKey) {
-    return [UIMenu menuWithChildren:@[
-        SCIMenuCommand(@"None", @"action_alt", nil, defaultsKey, @"none", NO),
-        SCIMenuCommand(@"Download", @"download", nil, defaultsKey, @"download_library", NO),
-        SCIMenuCommand(@"Share", @"share", nil, defaultsKey, @"download_share", NO),
-        SCIMenuCommand(@"Copy Link", @"link", nil, defaultsKey, @"copy_download_link", NO),
-        SCIMenuCommand(@"Download to Vault", @"media", nil, defaultsKey, @"download_vault", NO),
-        SCIMenuCommand(@"Expand", @"expand_alt", nil, defaultsKey, @"expand", NO),
-        SCIMenuCommand(@"View Thumbnail", @"photo", nil, defaultsKey, @"view_thumbnail", NO)
-    ]];
+static NSString *SCIActionButtonDisplayTitle(NSString *identifier, NSString *topicTitle) {
+    return SCIActionDescriptorDisplayTitle(identifier, topicTitle);
+}
+
+UIMenu *SCIActionButtonDefaultActionMenu(NSString *defaultsKey, NSString *topicTitle, NSArray<NSString *> *supportedActions) {
+    NSMutableArray<UIMenuElement *> *commands = [NSMutableArray array];
+    [commands addObject:SCIMenuCommand(@"None", @"action", nil, defaultsKey, kSCIActionNone, NO)];
+    for (NSString *identifier in supportedActions) {
+        [commands addObject:SCIMenuCommand(SCIActionButtonDisplayTitle(identifier, topicTitle),
+                                           SCIActionDescriptorIconName(identifier),
+                                           nil,
+                                           defaultsKey,
+                                           identifier,
+                                           NO)];
+    }
+    return [UIMenu menuWithChildren:commands];
+}
+
+SCISetting *SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSource source, NSString *topicTitle, NSArray<NSString *> *supportedActions, NSArray<SCIActionMenuSection *> *defaultSections) {
+    SCIEditActionsListViewController *controller = [[SCIEditActionsListViewController alloc] initWithSource:source topicTitle:topicTitle];
+    (void)supportedActions;
+    (void)defaultSections;
+    return [SCISetting navigationCellWithTitle:@"Configure Actions"
+                                      subtitle:@"Edit sections, ordering, and disabled actions"
+                                          icon:nil
+                                viewController:controller];
 }
 
 UIMenu *SCIReelsTapControlMenu(void) {

@@ -1,6 +1,7 @@
 #import "SCIMessagesSettingsProvider.h"
 
 #import "../SCITopicSettingsSupport.h"
+#import "../../Shared/ActionButton/SCIActionButtonConfiguration.h"
 
 static NSString * const kSCIMessagesActionButtonEnabledKey = @"action_button_messages_enabled";
 static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_button_messages_default_action";
@@ -11,7 +12,8 @@ static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_butt
     return SCITopicNavigationSetting(@"Messages", @"messages", 24.0, @[
         SCITopicSection(@"Action Button", @[
             [SCISetting switchCellWithTitle:@"Enable Action Button" subtitle:@"Adds the action button to visual messages" defaultsKey:kSCIMessagesActionButtonEnabledKey],
-            [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:SCIActionButtonDefaultActionMenu(kSCIMessagesActionButtonDefaultActionKey)]
+            [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:SCIActionButtonDefaultActionMenu(kSCIMessagesActionButtonDefaultActionKey, @"Messages", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceDirect))],
+            SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSourceDirect, @"Messages", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceDirect), SCIActionButtonDefaultSectionsForSource(SCIActionButtonSourceDirect))
         ], nil),
         SCITopicSection(@"Messages", @[
             [SCISetting switchCellWithTitle:@"Keep Deleted Messages" subtitle:@"Saves deleted messages in chat conversations" defaultsKey:@"keep_deleted_message"],

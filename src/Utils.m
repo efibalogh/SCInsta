@@ -606,6 +606,32 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     [rootController presentViewController:navigationController animated:YES completion:nil];
 }
 
++ (void)showSettingsForTopicTitle:(NSString *)title {
+    SCISettingsViewController *settingsViewController = [SCISettingsViewController new];
+    UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
+
+    NSArray *rootSections = [SCITweakSettings sections];
+    NSArray *topicRows = rootSections.count > 0 ? rootSections[0][@"rows"] : nil;
+    NSArray *targetSections = nil;
+    for (SCISetting *row in topicRows) {
+        if (![row isKindOfClass:[SCISetting class]]) continue;
+        if (![row.title isEqualToString:title]) continue;
+        if (row.navSections.count > 0) {
+            targetSections = row.navSections;
+            break;
+        }
+    }
+
+    UIViewController *presenter = topMostController();
+    [presenter presentViewController:navigationController animated:YES completion:^{
+        if (targetSections.count > 0) {
+            UIViewController *vc = [[SCISettingsViewController alloc] initWithTitle:title sections:targetSections reduceMargin:NO];
+            vc.title = title;
+            [navigationController pushViewController:vc animated:NO];
+        }
+    }];
+}
+
 // MARK: Colours
 + (UIColor *)SCIColor_Primary {
     return [UIColor colorWithRed:0/255.0 green:152/255.0 blue:254/255.0 alpha:1];

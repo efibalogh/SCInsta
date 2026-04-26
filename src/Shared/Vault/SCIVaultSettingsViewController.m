@@ -111,7 +111,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
         return @"When enabled, the Media Vault requires a passcode or biometrics to open.";
     }
     if (section == SCIVaultSettingsSectionShortcuts) {
-        return @"Quick access requires an app restart to take effect.";
+        return @"Long press Messages tab to open. Requires app restart to take effect.";
     }
     return nil;
 }
@@ -134,7 +134,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     switch (row) {
         case SCIVaultStatsRowTotal:
-            cell.textLabel.text = @"Total files";
+            cell.textLabel.text = @"Total Files";
             cell.detailTextLabel.text = [NSString stringWithFormat:@"%ld", (long)self.stats.totalFiles];
             break;
         case SCIVaultStatsRowImages:
@@ -146,7 +146,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
             cell.detailTextLabel.text = [NSString stringWithFormat:@"%ld", (long)self.stats.videoCount];
             break;
         case SCIVaultStatsRowSize:
-            cell.textLabel.text = @"Total size";
+            cell.textLabel.text = @"Total Size";
             cell.detailTextLabel.text = [self formattedSize:self.stats.totalSize];
             break;
     }
@@ -156,14 +156,14 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 - (void)configureLockCell:(UITableViewCell *)cell atRow:(NSInteger)row {
     SCIVaultManager *mgr = [SCIVaultManager sharedManager];
     if (row == 0) {
-        cell.textLabel.text = @"Enable passcode lock";
+        cell.textLabel.text = @"Enable Passcode Lock";
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         UISwitch *sw = [[UISwitch alloc] init];
         sw.on = mgr.isLockEnabled;
         [sw addTarget:self action:@selector(lockSwitchChanged:) forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = sw;
     } else {
-        cell.textLabel.text = @"Change passcode";
+        cell.textLabel.text = @"Change Passcode";
         cell.textLabel.textColor = [UIColor labelColor];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
@@ -173,14 +173,14 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     cell.textLabel.textColor = [UIColor systemRedColor];
     switch (row) {
-        case 0: cell.textLabel.text = @"Clear entire vault"; break;
-        case 1: cell.textLabel.text = @"Delete by type"; break;
-        case 2: cell.textLabel.text = @"Delete by source"; break;
+        case 0: cell.textLabel.text = @"Clear Entire Vault"; break;
+        case 1: cell.textLabel.text = @"Delete by Type"; break;
+        case 2: cell.textLabel.text = @"Delete by Source"; break;
     }
 }
 
 - (void)configureShortcutsCell:(UITableViewCell *)cell {
-    cell.textLabel.text = @"Enable quick media vault access";
+    cell.textLabel.text = @"Quick Media Vault Access";
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
     UISwitch *sw = [[UISwitch alloc] init];

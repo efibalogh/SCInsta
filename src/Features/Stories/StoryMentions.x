@@ -167,26 +167,23 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
             self.currentUsername = ((IGUserSession *)[window valueForKey:@"userSession"]).user.username;
     } @catch (__unused id e) {}
 
-    // Title
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = @"Mentions";
-    titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    titleLabel.textColor = [UIColor labelColor];
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-
-    // Close button
-    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    // Navigation-style header with a real UIBarButtonItem close affordance.
+    UINavigationBar *navBar = [[UINavigationBar alloc] init];
+    navBar.translatesAutoresizingMaskIntoConstraints = NO;
+    UINavigationItem *navItem = [[UINavigationItem alloc] initWithTitle:@"Mentions"];
     UIImage *closeImg = [SCIUtils sci_resourceImageNamed:@"xmark" template:YES];
-    [closeBtn setImage:closeImg forState:UIControlStateNormal];
-    closeBtn.tintColor = [UIColor secondaryLabelColor];
-    closeBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [closeBtn addTarget:self action:@selector(sci_closeTapped) forControlEvents:UIControlEventTouchUpInside];
-
-    // Separator
-    UIView *sep = [[UIView alloc] init];
-    sep.backgroundColor = [UIColor separatorColor];
-    sep.translatesAutoresizingMaskIntoConstraints = NO;
+    UIBarButtonItemStyle buttonStyle;
+    if (@available(iOS 26.0, *)) {
+        buttonStyle = (UIBarButtonItemStyle)2; // prominent
+    } else {
+        buttonStyle = UIBarButtonItemStylePlain;
+    }
+    navItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:closeImg
+                                                                 style:buttonStyle
+                                                                target:self
+                                                                action:@selector(sci_closeTapped:)];
+    navBar.items = @[navItem];
+    navBar.tintColor = [UIColor secondaryLabelColor];
 
     // Table view
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
@@ -199,26 +196,15 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     self.tableView.separatorInset = UIEdgeInsetsMake(0, 16 + kSCIMentionAvatarSize + 14, 0, 0);
     self.tableView.rowHeight = kSCIMentionRowHeight;
 
-    [self.view addSubview:titleLabel];
-    [self.view addSubview:closeBtn];
-    [self.view addSubview:sep];
+    [self.view addSubview:navBar];
     [self.view addSubview:self.tableView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [titleLabel.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:22],
-        [titleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [navBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [navBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [navBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
 
-        [closeBtn.centerYAnchor constraintEqualToAnchor:titleLabel.centerYAnchor],
-        [closeBtn.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
-        [closeBtn.widthAnchor constraintEqualToConstant:30],
-        [closeBtn.heightAnchor constraintEqualToConstant:30],
-
-        [sep.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:14],
-        [sep.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [sep.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [sep.heightAnchor constraintEqualToConstant:1.0 / [UIScreen mainScreen].scale],
-
-        [self.tableView.topAnchor constraintEqualToAnchor:sep.bottomAnchor],
+        [self.tableView.topAnchor constraintEqualToAnchor:navBar.bottomAnchor],
         [self.tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [self.tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [self.tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -267,7 +253,8 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     }
 }
 
-- (void)sci_closeTapped {
+- (void)sci_closeTapped:(id)sender {
+    (void)sender;
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
@@ -545,10 +532,10 @@ void SCIPresentStoryMentionsSheet(UIView *overlayView) {
         //         }];
         //     sheet.detents = @[compactDetent, UISheetPresentationControllerDetent.largeDetent];
         // } else {
-            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent, UISheetPresentationControllerDetent.largeDetent];
+            sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
         // }
 
-        sheet.prefersScrollingExpandsWhenScrolledToEdge = YES;
+        sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
         sheet.prefersEdgeAttachedInCompactHeight = YES;
         sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = YES;
         @try { [sheet setValue:@YES forKey:@"prefersGrabberIndicator"]; } @catch (__unused id e) {}

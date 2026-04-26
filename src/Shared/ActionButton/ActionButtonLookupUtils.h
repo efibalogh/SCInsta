@@ -13,6 +13,7 @@ NSString *SCIStringFromValue(id value);
 NSString *SCIClassName(id object);
 
 NSString *SCIUsernameFromMediaObject(id media);
+NSString *SCICaptionFromMediaObject(id media);
 NSString *SCISessionUsernameFromController(UIViewController *controller);
 
 id SCIDirectCurrentMessageFromController(UIViewController *controller);

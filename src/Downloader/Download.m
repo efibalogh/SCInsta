@@ -7,6 +7,27 @@
 
 static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
 
+static NSMutableSet<SCIDownloadDelegate *> *SCIActiveDownloadDelegates(void) {
+    static NSMutableSet<SCIDownloadDelegate *> *delegates = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        delegates = [NSMutableSet set];
+    });
+    return delegates;
+}
+
+static void SCIRetainActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
+    @synchronized (SCIActiveDownloadDelegates()) {
+        [SCIActiveDownloadDelegates() addObject:delegate];
+    }
+}
+
+static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
+    @synchronized (SCIActiveDownloadDelegates()) {
+        [SCIActiveDownloadDelegates() removeObject:delegate];
+    }
+}
+
 - (BOOL)isVideoFileAtURL:(NSURL *)fileURL {
     NSString *ext = fileURL.pathExtension.lowercaseString;
     NSSet<NSString *> *videoExtensions = [NSSet setWithArray:@[@"mp4", @"mov", @"m4v", @"avi", @"webm", @"mkv", @"3gp"]];
@@ -64,22 +85,24 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
 }
 
 - (void)downloadFileWithURL:(NSURL *)url fileExtension:(NSString *)fileExtension hudLabel:(NSString *)hudLabel {
-    // Show progress pill
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.progressView = [SCIUtils showProgressPill];
-        
-        // Allow cancelling
-        __weak typeof(self) weakSelf = self;
-        NSURL *retryURL = [url copy];
-        NSString *retryExtension = [fileExtension copy];
-        NSString *retryHudLabel = [hudLabel copy];
-        self.progressView.onCancel = ^{
-            [weakSelf.downloadManager cancelDownload];
-        };
-        self.progressView.onRetry = ^{
-            [weakSelf downloadFileWithURL:retryURL fileExtension:retryExtension hudLabel:retryHudLabel];
-        };
-    });
+    SCIRetainActiveDownloadDelegate(self);
+
+    if (self.showProgress) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.progressView = [SCIUtils showProgressPill];
+            
+            __weak typeof(self) weakSelf = self;
+            NSURL *retryURL = [url copy];
+            NSString *retryExtension = [fileExtension copy];
+            NSString *retryHudLabel = [hudLabel copy];
+            self.progressView.onCancel = ^{
+                [weakSelf.downloadManager cancelDownload];
+            };
+            self.progressView.onRetry = ^{
+                [weakSelf downloadFileWithURL:retryURL fileExtension:retryExtension hudLabel:retryHudLabel];
+            };
+        });
+    }
 
     NSLog(@"[SCInsta] Download: Will start download for url \"%@\" with file extension: \".%@\"", url, fileExtension);
 
@@ -100,6 +123,7 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.progressView dismiss];
     });
+    SCIReleaseActiveDownloadDelegate(self);
 
     NSLog(@"[SCInsta] Download: Download cancelled");
 }
@@ -117,9 +141,12 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (error && error.code != NSURLErrorCancelled) {
             NSLog(@"[SCInsta] Download: Download failed with error: \"%@\"", error);
-            [self.progressView showError:@"Download failed"];
+            if (self.showProgress) {
+                [self.progressView showError:@"Download failed"];
+            }
         }
     });
+    SCIReleaseActiveDownloadDelegate(self);
 }
 
 - (void)downloadDidFinishWithFileURL:(NSURL *)fileURL {
@@ -133,8 +160,30 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
     NSURL *newURL = [NSURL fileURLWithPath:newPath];
 
     if (![newURL isEqual:fileURL]) {
-        [[NSFileManager defaultManager] removeItemAtURL:newURL error:nil];
-        [[NSFileManager defaultManager] moveItemAtURL:fileURL toURL:newURL error:nil];
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSError *removeError = nil;
+        if ([fileManager fileExistsAtPath:newURL.path] && ![fileManager removeItemAtURL:newURL error:&removeError]) {
+            NSLog(@"[SCInsta] Download: Failed removing existing file at \"%@\": %@", newURL.path, removeError);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.showProgress) {
+                    [self.progressView showError:@"Failed to prepare file"];
+                }
+            });
+            SCIReleaseActiveDownloadDelegate(self);
+            return;
+        }
+
+        NSError *moveError = nil;
+        if (![fileManager moveItemAtURL:fileURL toURL:newURL error:&moveError]) {
+            NSLog(@"[SCInsta] Download: Failed renaming downloaded file to \"%@\": %@", newURL.path, moveError);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.showProgress) {
+                    [self.progressView showError:@"Failed to finalize file"];
+                }
+            });
+            SCIReleaseActiveDownloadDelegate(self);
+            return;
+        }
     } else {
         newURL = fileURL;
     }
@@ -146,6 +195,7 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
         if (self.action == share) {
             [self showCompletionPillWithSubtitle:@"Shared successfully" completionImmediately:YES completion:^{
                 [SCIUtils showShareVC:newURL];
+                SCIReleaseActiveDownloadDelegate(self);
             }];
             return;
         }
@@ -153,7 +203,9 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
         if (self.action == saveToPhotos) {
             [self saveDownloadedFileToPhotos:newURL completion:^(BOOL success, NSError *error) {
                 if (success) {
-                    [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:nil];
+                    [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:^{
+                        SCIReleaseActiveDownloadDelegate(self);
+                    }];
                 } else {
                     [self.progressView showError:@"Failed to save"];
                     [SCIUtils showToastForDuration:3.0
@@ -162,6 +214,7 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
                                       iconResource:@"error_filled"
                            fallbackSystemImageName:@"exclamationmark.circle.fill"
                                               tone:SCIFeedbackPillToneError];
+                    SCIReleaseActiveDownloadDelegate(self);
                 }
             }];
             return;
@@ -176,9 +229,12 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
                                                       metadata:vaultMeta
                                                          error:&error];
             if (file) {
-                [self showCompletionPillWithSubtitle:@"Saved to Vault successfully" completionImmediately:NO completion:nil];
+                [self showCompletionPillWithSubtitle:@"Saved to Vault successfully" completionImmediately:NO completion:^{
+                    SCIReleaseActiveDownloadDelegate(self);
+                }];
             } else {
                 [self.progressView showError:@"Failed to save to vault"];
+                SCIReleaseActiveDownloadDelegate(self);
             }
             return;
         }
@@ -186,6 +242,7 @@ static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
         [self showCompletionPillWithSubtitle:@"Opened successfully" completionImmediately:YES completion:^{
             [SCIFullScreenMediaPlayer showFileURL:newURL];
         }];
+        SCIReleaseActiveDownloadDelegate(self);
     });
 }
 

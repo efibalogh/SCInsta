@@ -248,6 +248,59 @@ static NSString *SCIUsernameFromUserObject(id user) {
 	return nil;
 }
 
+NSString *SCICaptionFromMediaObject(id media) {
+	if (!media) return nil;
+
+	for (NSString *selectorName in @[@"fullCaptionString", @"captionString", @"caption", @"captionText", @"text"]) {
+		SEL selector = NSSelectorFromString(selectorName);
+		if (![media respondsToSelector:selector]) continue;
+
+		@try {
+			id result = ((id(*)(id, SEL))objc_msgSend)(media, selector);
+			if ([result isKindOfClass:[NSString class]] && [(NSString *)result length] > 0) {
+				return result;
+			}
+			if (result && ![result isKindOfClass:[NSString class]]) {
+				for (NSString *textSelectorName in @[@"text", @"string", @"commentText", @"attributedString", @"rawText"]) {
+					SEL textSelector = NSSelectorFromString(textSelectorName);
+					if (![result respondsToSelector:textSelector]) continue;
+
+					id text = ((id(*)(id, SEL))objc_msgSend)(result, textSelector);
+					if ([text respondsToSelector:@selector(string)] && ![text isKindOfClass:[NSString class]]) {
+						text = ((id(*)(id, SEL))objc_msgSend)(text, @selector(string));
+					}
+					if ([text isKindOfClass:[NSString class]] && [(NSString *)text length] > 0) {
+						return text;
+					}
+				}
+			}
+		} @catch (__unused NSException *exception) {
+		}
+	}
+
+	id capObj = SCIKVCObject(media, @"caption");
+	if ([capObj isKindOfClass:[NSDictionary class]]) {
+		id text = ((NSDictionary *)capObj)[@"text"];
+		if ([text isKindOfClass:[NSString class]] && [(NSString *)text length] > 0) {
+			return text;
+		}
+	} else if ([capObj isKindOfClass:[NSString class]] && [(NSString *)capObj length] > 0) {
+		return capObj;
+	}
+
+	if (capObj && [capObj respondsToSelector:@selector(text)]) {
+		@try {
+			id text = ((id(*)(id, SEL))objc_msgSend)(capObj, @selector(text));
+			if ([text isKindOfClass:[NSString class]] && [(NSString *)text length] > 0) {
+				return text;
+			}
+		} @catch (__unused NSException *exception) {
+		}
+	}
+
+	return nil;
+}
+
 static NSString *SCIShallowUsernameFromObject(id object) {
 	if (!object) return nil;
 

@@ -14,33 +14,6 @@
 #import "../Vault/SCIVaultCoreDataStack.h"
 #import "../../Downloader/Download.h"
 
-static SCIDownloadDelegate *SCIMediaPlayerShareDelegate(void) {
-    static SCIDownloadDelegate *delegate = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
-    });
-    return delegate;
-}
-
-static SCIDownloadDelegate *SCIMediaPlayerSavePhotosDelegate(void) {
-    static SCIDownloadDelegate *delegate = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:YES];
-    });
-    return delegate;
-}
-
-static SCIDownloadDelegate *SCIMediaPlayerSaveVaultDelegate(void) {
-    static SCIDownloadDelegate *delegate = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:YES];
-    });
-    return delegate;
-}
-
 static CGFloat const kDismissAxisLockSlop = 20.0;
 static CGFloat const kDismissProgressDenominator = 520.0;
 static CGFloat const kDismissProgressCommit = 0.34;
@@ -813,7 +786,7 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = url.pathExtension;
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
-    SCIDownloadDelegate *delegate = SCIMediaPlayerSavePhotosDelegate();
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:YES];
     delegate.pendingVaultSaveMetadata = item.vaultMetadata;
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
@@ -886,7 +859,7 @@ fromViewController:(UIViewController *)presenter {
         }
     }
     
-    SCIDownloadDelegate *delegate = SCIMediaPlayerSaveVaultDelegate();
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:YES];
     delegate.pendingVaultSaveMetadata = meta;
     [delegate downloadFileWithURL:targetURL fileExtension:ext hudLabel:nil];
 }
@@ -953,7 +926,7 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = url.pathExtension;
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
-    SCIDownloadDelegate *delegate = SCIMediaPlayerShareDelegate();
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
     delegate.pendingVaultSaveMetadata = item.vaultMetadata;
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }

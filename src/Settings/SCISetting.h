@@ -43,6 +43,7 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 @property (nonatomic, copy) void (^action)(void);
 
 @property (nonatomic, strong) UIMenu *baseMenu;
+@property (nonatomic, strong, nullable) NSDictionary *userInfo;
 
 @property (nonatomic, strong) NSArray *navSections;
 @property (nonatomic, strong) UIViewController *navViewController;
@@ -63,6 +64,11 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 
 + (instancetype)switchCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
+                        defaultsKey:(NSString *)defaultsKey;
+
++ (instancetype)switchCellWithTitle:(NSString *)title
+                           subtitle:(NSString *)subtitle
+                               icon:(nullable SCISymbol *)icon
                         defaultsKey:(NSString *)defaultsKey;
 
 + (instancetype)switchCellWithTitle:(NSString *)title

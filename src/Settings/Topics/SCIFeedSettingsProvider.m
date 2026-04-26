@@ -1,6 +1,7 @@
 #import "SCIFeedSettingsProvider.h"
 
 #import "../SCITopicSettingsSupport.h"
+#import "../../Shared/ActionButton/SCIActionButtonConfiguration.h"
 
 static NSString * const kSCIFeedActionButtonEnabledKey = @"action_button_feed_enabled";
 static NSString * const kSCIFeedActionButtonDefaultActionKey = @"action_button_feed_default_action";
@@ -11,7 +12,8 @@ static NSString * const kSCIFeedActionButtonDefaultActionKey = @"action_button_f
     return SCITopicNavigationSetting(@"Feed", @"feed", 24.0, @[
         SCITopicSection(@"Action Button", @[
             [SCISetting switchCellWithTitle:@"Enable Action Button" subtitle:@"Adds the action button to feed posts" defaultsKey:kSCIFeedActionButtonEnabledKey],
-            [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:SCIActionButtonDefaultActionMenu(kSCIFeedActionButtonDefaultActionKey)]
+            [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:SCIActionButtonDefaultActionMenu(kSCIFeedActionButtonDefaultActionKey, @"Feed", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceFeed))],
+            SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSourceFeed, @"Feed", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceFeed), SCIActionButtonDefaultSectionsForSource(SCIActionButtonSourceFeed))
         ], nil),
         SCITopicSection(@"Content", @[
             [SCISetting switchCellWithTitle:@"Hide Stories Tray" subtitle:@"Hides the story tray at the top and within your feed" defaultsKey:@"hide_stories_tray"],

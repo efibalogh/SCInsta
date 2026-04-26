@@ -52,6 +52,7 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 + (void)showMediaPreview:(NSURL *)fileURL;
 + (void)showShareVC:(id)item;
 + (void)showSettingsVC:(UIWindow *)window;
++ (void)showSettingsForTopicTitle:(NSString *)title;
 
 // Colours
 + (UIColor *)SCIColor_Primary;

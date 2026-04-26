@@ -91,8 +91,8 @@
     [self.view addSubview:_thumbnailView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [_thumbnailView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [_thumbnailView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [_thumbnailView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:44.0],
+        [_thumbnailView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-44.0],
         [_thumbnailView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_thumbnailView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];

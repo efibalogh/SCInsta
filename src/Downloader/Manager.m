@@ -1,4 +1,5 @@
 #import "Manager.h"
+#import "../Utils.h"
 #import <math.h>
 
 @interface SCIDownloadManager ()
@@ -34,6 +35,9 @@
     [self.task cancel];
     self.lastReportedProgress = 0.0f;
     [self.delegate downloadDidCancel];
+    [self.session invalidateAndCancel];
+    self.task = nil;
+    self.session = nil;
 }
 
 - (float)normalizedProgressForBytesWritten:(int64_t)bytesWritten
@@ -79,6 +83,10 @@
 
     // Move downloaded file to cache directory
     NSURL *finalLocation = [self moveFileToCacheDir:location];
+    if (!finalLocation) {
+        [self.delegate downloadDidFinishWithError:[SCIUtils errorWithDescription:@"Failed to move downloaded file"]];
+        return;
+    }
 
     [self.delegate downloadDidFinishWithFileURL:finalLocation];
 }
@@ -87,9 +95,11 @@
     NSLog(@"Task completed with error: %@", error);
     if (error) {
         self.lastReportedProgress = 0.0f;
+        [self.delegate downloadDidFinishWithError:error];
     }
-    
-    [self.delegate downloadDidFinishWithError:error];
+    [self.session finishTasksAndInvalidate];
+    self.task = nil;
+    self.session = nil;
 }
 
 // Rename downloaded file & move from documents dir -> cache dir
@@ -108,6 +118,7 @@
     if (fileMoveError) {
         NSLog(@"[SCInsta] Download Handler: Error while moving file: %@", oldPath.absoluteString);
         NSLog(@"[SCInsta] Download Handler: %@", fileMoveError);
+        return nil;
     }
 
     return newPath;

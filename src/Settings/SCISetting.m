@@ -80,10 +80,19 @@
                            subtitle:(NSString *)subtitle
                         defaultsKey:(NSString *)defaultsKey
 {
+    return [self switchCellWithTitle:title subtitle:subtitle icon:nil defaultsKey:defaultsKey];
+}
+
++ (instancetype)switchCellWithTitle:(NSString *)title
+                           subtitle:(NSString *)subtitle
+                               icon:(SCISymbol *)icon
+                        defaultsKey:(NSString *)defaultsKey
+{
     SCISetting *setting = [[self alloc] initWithType:SCITableCellSwitch];
     
     setting.title = title;
     setting.subtitle = subtitle;
+    setting.icon = icon;
     setting.defaultsKey = defaultsKey;
     
     return setting;

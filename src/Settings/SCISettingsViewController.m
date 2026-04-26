@@ -2,15 +2,34 @@
 
 static char rowStaticRef[] = "row";
 
-@interface SCISettingsViewController () <UITableViewDataSource, UITableViewDelegate>
+@interface SCISettingsViewController () <UITableViewDataSource, UITableViewDelegate, UITableViewDragDelegate, UITableViewDropDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, copy) NSArray *sections;
+@property (nonatomic, strong) NSMutableArray *sections;
 @property (nonatomic) BOOL reduceMargin;
 
 @end
 
 ///
+
+static UIImage *SCISettingsReorderCompositeImage(UIImage *iconImage, UIColor *tintColor) {
+    UIImageSymbolConfiguration *grabberConfig = [UIImageSymbolConfiguration configurationWithPointSize:12.0 weight:UIImageSymbolWeightSemibold];
+    UIImage *grabber = [[UIImage systemImageNamed:@"line.3.horizontal" withConfiguration:grabberConfig] imageWithTintColor:[UIColor systemGray3Color] renderingMode:UIImageRenderingModeAlwaysOriginal];
+    if (!grabber || !iconImage) return iconImage ?: grabber;
+
+    CGFloat spacing = 8.0;
+    CGSize size = CGSizeMake(grabber.size.width + spacing + iconImage.size.width,
+                             MAX(grabber.size.height, iconImage.size.height));
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull context) {
+        CGFloat grabberY = floor((size.height - grabber.size.height) / 2.0);
+        [grabber drawAtPoint:CGPointMake(0.0, grabberY)];
+
+        UIImage *renderedIcon = [iconImage imageWithTintColor:tintColor ?: [UIColor labelColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
+        CGFloat iconY = floor((size.height - renderedIcon.size.height) / 2.0);
+        [renderedIcon drawAtPoint:CGPointMake(grabber.size.width + spacing, iconY)];
+    }];
+}
 
 static NSString *SCITitleCaseString(NSString *string) {
     if (string.length == 0) return string;
@@ -42,6 +61,17 @@ static NSString *SCITitleCaseString(NSString *string) {
     return [formatted componentsJoinedByString:@" "];
 }
 
+static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
+    NSMutableArray *mutableSections = [NSMutableArray array];
+    for (NSDictionary *section in sections) {
+        NSMutableDictionary *mutableSection = [section mutableCopy];
+        NSArray *rows = section[@"rows"];
+        mutableSection[@"rows"] = rows ? [rows mutableCopy] : [NSMutableArray array];
+        [mutableSections addObject:mutableSection];
+    }
+    return mutableSections;
+}
+
 @implementation SCISettingsViewController
 
 - (instancetype)initWithTitle:(NSString *)title sections:(NSArray *)sections reduceMargin:(BOOL)reduceMargin {
@@ -52,7 +82,7 @@ static NSString *SCITitleCaseString(NSString *string) {
         self.reduceMargin = reduceMargin;
         
         // Exclude development cells from release builds
-        NSMutableArray *mutableSections = [sections mutableCopy];
+        NSMutableArray *mutableSections = SCIMutableSectionsCopy(sections);
         
         [mutableSections enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSDictionary *section, NSUInteger index, BOOL *stop) {
         
@@ -70,7 +100,7 @@ static NSString *SCITitleCaseString(NSString *string) {
             
         }];
         
-        self.sections = [mutableSections copy];
+        self.sections = mutableSections;
     }
     
     
@@ -92,6 +122,9 @@ static NSString *SCITitleCaseString(NSString *string) {
     self.tableView.dataSource = self;
     self.tableView.contentInset = UIEdgeInsetsMake(self.reduceMargin ? -30 : -10, 0, 0, 0);
     self.tableView.delegate = self;
+    self.tableView.dragInteractionEnabled = [self pageAllowsReordering];
+    self.tableView.dragDelegate = self;
+    self.tableView.dropDelegate = self;
 
     [self.view addSubview:self.tableView];
 }
@@ -138,6 +171,12 @@ static NSString *SCITitleCaseString(NSString *string) {
         cellContentConfig.image = [row.icon image];
         cellContentConfig.imageProperties.tintColor = row.icon.color;
     }
+
+    if ([row.userInfo[@"showsReorderGrabber"] boolValue] && row.icon != nil) {
+        cellContentConfig.image = SCISettingsReorderCompositeImage([row.icon image], row.icon.color);
+        cellContentConfig.imageProperties.tintColor = nil;
+        cellContentConfig.imageToTextPadding = 12.0;
+    }
     
     // Image url
     if (row.imageUrl != nil) {
@@ -180,6 +219,7 @@ static NSString *SCITitleCaseString(NSString *string) {
             [toggle addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
             
             cell.accessoryView = toggle;
+            cell.editingAccessoryView = toggle;
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
             break;
         }
@@ -236,8 +276,10 @@ static NSString *SCITitleCaseString(NSString *string) {
             break;
         }
     }
-    
+
     cell.contentConfiguration = cellContentConfig;
+    cell.showsReorderControl = NO;
+    cell.shouldIndentWhileEditing = NO;
 
     return cell;
 }
@@ -284,6 +326,94 @@ static NSString *SCITitleCaseString(NSString *string) {
     }
 
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+}
+
+- (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
+    return [self.sections[indexPath.section][@"allowsReordering"] boolValue];
+}
+
+- (NSIndexPath *)tableView:(UITableView *)tableView targetIndexPathForMoveFromRowAtIndexPath:(NSIndexPath *)sourceIndexPath toProposedIndexPath:(NSIndexPath *)proposedDestinationIndexPath {
+    if (sourceIndexPath.section != proposedDestinationIndexPath.section) {
+        NSInteger rowCount = [self.sections[sourceIndexPath.section][@"rows"] count];
+        NSInteger targetRow = MIN(MAX(0, proposedDestinationIndexPath.row), MAX(0, rowCount - 1));
+        return [NSIndexPath indexPathForRow:targetRow inSection:sourceIndexPath.section];
+    }
+    return proposedDestinationIndexPath;
+}
+
+- (void)tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)sourceIndexPath toIndexPath:(NSIndexPath *)destinationIndexPath {
+    NSMutableArray *rows = self.sections[sourceIndexPath.section][@"rows"];
+    if (![rows isKindOfClass:[NSMutableArray class]]) return;
+
+    SCISetting *row = rows[sourceIndexPath.row];
+    [rows removeObjectAtIndex:sourceIndexPath.row];
+    [rows insertObject:row atIndex:destinationIndexPath.row];
+
+    NSString *reorderDefaultsKey = self.sections[sourceIndexPath.section][@"reorderDefaultsKey"];
+    if (reorderDefaultsKey.length > 0) {
+        NSMutableArray<NSString *> *order = [NSMutableArray array];
+        for (SCISetting *candidate in rows) {
+            NSString *identifier = candidate.userInfo[@"actionIdentifier"];
+            if (identifier.length > 0) [order addObject:identifier];
+        }
+        [[NSUserDefaults standardUserDefaults] setObject:[order copy] forKey:reorderDefaultsKey];
+    }
+}
+
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return UITableViewCellEditingStyleNone;
+}
+
+- (NSArray<UIDragItem *> *)tableView:(UITableView *)tableView itemsForBeginningDragSession:(id<UIDragSession>)session atIndexPath:(NSIndexPath *)indexPath {
+    if (![self tableView:tableView canMoveRowAtIndexPath:indexPath]) {
+        return @[];
+    }
+
+    SCISetting *row = self.sections[indexPath.section][@"rows"][indexPath.row];
+    NSString *identifier = row.userInfo[@"actionIdentifier"] ?: row.title ?: @"action";
+    NSItemProvider *provider = [[NSItemProvider alloc] initWithObject:identifier];
+    UIDragItem *item = [[UIDragItem alloc] initWithItemProvider:provider];
+    item.localObject = row;
+    return @[item];
+}
+
+- (BOOL)tableView:(UITableView *)tableView dragSessionAllowsMoveOperation:(id<UIDragSession>)session {
+    return YES;
+}
+
+- (BOOL)tableView:(UITableView *)tableView dragSessionIsRestrictedToDraggingApplication:(id<UIDragSession>)session {
+    return YES;
+}
+
+- (UITableViewDropProposal *)tableView:(UITableView *)tableView dropSessionDidUpdate:(id<UIDropSession>)session withDestinationIndexPath:(NSIndexPath *)destinationIndexPath {
+    if (session.localDragSession == nil || destinationIndexPath == nil) {
+        return [[UITableViewDropProposal alloc] initWithDropOperation:UIDropOperationCancel];
+    }
+    if (![self.sections[destinationIndexPath.section][@"allowsReordering"] boolValue]) {
+        return [[UITableViewDropProposal alloc] initWithDropOperation:UIDropOperationCancel];
+    }
+    return [[UITableViewDropProposal alloc] initWithDropOperation:UIDropOperationMove intent:UITableViewDropIntentInsertAtDestinationIndexPath];
+}
+
+- (void)tableView:(UITableView *)tableView performDropWithCoordinator:(id<UITableViewDropCoordinator>)coordinator {
+    NSIndexPath *destinationIndexPath = coordinator.destinationIndexPath;
+    if (destinationIndexPath == nil) return;
+
+    id<UITableViewDropItem> dropItem = coordinator.items.firstObject;
+    NSIndexPath *sourceIndexPath = dropItem.sourceIndexPath;
+    if (sourceIndexPath == nil || sourceIndexPath.section != destinationIndexPath.section) return;
+    if (![self tableView:tableView canMoveRowAtIndexPath:sourceIndexPath]) return;
+
+    NSInteger rowCount = [self.sections[sourceIndexPath.section][@"rows"] count];
+    NSInteger destinationRow = MIN(MAX(0, destinationIndexPath.row), MAX(0, rowCount - 1));
+    NSIndexPath *clampedDestination = [NSIndexPath indexPathForRow:destinationRow inSection:destinationIndexPath.section];
+
+    [tableView performBatchUpdates:^{
+        [self tableView:tableView moveRowAtIndexPath:sourceIndexPath toIndexPath:clampedDestination];
+        [tableView moveRowAtIndexPath:sourceIndexPath toIndexPath:clampedDestination];
+    } completion:nil];
+
+    [coordinator dropItem:dropItem.dragItem toRowAtIndexPath:clampedDestination];
 }
 
 // MARK: - Actions
@@ -366,6 +496,15 @@ static NSString *SCITitleCaseString(NSString *string) {
 }
 - (void)reloadCellForView:(UIView *)view {
     [self reloadCellForView:view animated:NO];
+}
+
+- (BOOL)pageAllowsReordering {
+    for (NSDictionary *section in self.sections) {
+        if ([section[@"allowsReordering"] boolValue]) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 - (void)loadImageFromURL:(NSURL *)url atIndexPath:(NSIndexPath *)indexPath forTableView:(UITableView *)tableView

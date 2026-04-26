@@ -38,6 +38,10 @@ static inline BOOL SCIManualStorySeenEnabled(void) {
     return [SCIUtils getBoolPref:@"no_seen_receipt"];
 }
 
+static inline BOOL SCIStoryMentionsButtonEnabled(void) {
+    return [SCIUtils getBoolPref:@"story_mentions_button"];
+}
+
 static inline BOOL SCIAutoSeenOnSendEnabled(void) {
     return SCIManualMessageSeenEnabled() && [SCIUtils getBoolPref:@"seen_auto_on_send"];
 }
@@ -826,7 +830,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     if (showSeenButton) SCIApplyStorySeenButtonStyle(seenButton);
 
     NSArray<NSDictionary *> *storyMentions = SCIStoryMentionsForOverlay(overlayView);
-    BOOL showMentionsButton = storyMentions.count > 0;
+    BOOL showMentionsButton = SCIStoryMentionsButtonEnabled() && storyMentions.count > 0;
     if (showMentionsButton && !mentionsButton) {
         mentionsButton = SCIStorySeenButtonWithTag((UIView *)self, kSCIStoryMentionsButtonTag);
         [mentionsButton addTarget:self action:@selector(sci_storyMentionsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
