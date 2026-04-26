@@ -23,6 +23,8 @@
         @"action_button_stories_default_action": @"none",
         @"action_button_messages_enabled": @(NO),
         @"action_button_messages_default_action": @"none",
+        @"action_button_profile_enabled": @(YES),
+        @"action_button_profile_default_action": @"none",
         @"action_button_feed_action_download_library_enabled": @(YES),
         @"action_button_feed_action_download_share_enabled": @(YES),
         @"action_button_feed_action_copy_download_link_enabled": @(YES),
@@ -68,6 +70,7 @@
         @"disable_auto_unmuting_reels": @(YES),
         @"doom_scrolling_reel_count": @(1),
         @"disable_bg_refresh": @(NO),
+        @"cache_auto_clear_mode": @"never",
         @"disable_home_button_refresh": @(NO),
         @"disable_reels_tab_refresh": @(NO),
         @"stop_story_auto_advance": @(NO),
@@ -76,7 +79,9 @@
         @"repost_confirm_feed": @(NO),
         @"repost_confirm_reels": @(NO),
         @"hide_repost_button_feed": @(NO),
-        @"hide_repost_button_reels": @(NO)
+        @"hide_repost_button_reels": @(NO),
+        @"story_poll_vote_counts": @(YES),
+        @"search_bar_open_clipboard_link": @(YES)
     };
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:sciDefaults];
@@ -116,10 +121,6 @@
             [SCIUtils showSettingsVC:[self window]];
         }
     });
-
-    NSLog(@"[SCInsta] Cleaning cache...");
-    [SCIUtils cleanCache];
-
     if ([SCIUtils getBoolPref:@"flex_app_launch"]) {
         [[objc_getClass("FLEXManager") sharedManager] showExplorer];
     }
@@ -129,6 +130,8 @@
 
 - (void)applicationDidBecomeActive:(id)arg1 {
     %orig;
+
+    [SCIUtils evaluateAutomaticCacheClearIfNeeded];
 
     if ([SCIUtils getBoolPref:@"flex_app_start"]) {
         [[objc_getClass("FLEXManager") sharedManager] showExplorer];

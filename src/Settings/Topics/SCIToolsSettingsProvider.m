@@ -2,6 +2,7 @@
 
 #import "../SCITopicSettingsSupport.h"
 #import "SCIInterfaceSettingsProvider.h"
+#import "../SCISettingsTransferManager.h"
 #import "../../Utils.h"
 
 @implementation SCIToolsSettingsProvider
@@ -23,6 +24,14 @@
         ], nil),
         SCITopicSection(@"Instagram", @[
             [SCISetting switchCellWithTitle:@"Disable Safe Mode" subtitle:@"Makes Instagram not reset settings after subsequent crashes, at your own risk" defaultsKey:@"disable_safe_mode"]
+        ], nil),
+        SCITopicSection(@"Backup & Transfer", @[
+            [SCISetting buttonCellWithTitle:@"Export Settings + Vault" subtitle:@"Create a shareable archive that includes SCInsta settings and vault media" icon:nil action:^(void) {
+                [[SCISettingsTransferManager sharedManager] exportSettingsAndVaultFromController:topMostController()];
+            }],
+            [SCISetting buttonCellWithTitle:@"Import Settings + Vault" subtitle:@"Restore settings and vault media from an exported archive. Vault lock is not restored." icon:nil action:^(void) {
+                [[SCISettingsTransferManager sharedManager] importSettingsAndVaultFromController:topMostController()];
+            }]
         ], nil),
         SCITopicSection(@"Liquid Glass", @[
             [SCIInterfaceSettingsProvider experimentalLiquidGlassSetting]

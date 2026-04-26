@@ -1,6 +1,7 @@
 #import "SCIGeneralSettingsProvider.h"
 
 #import "../SCITopicSettingsSupport.h"
+#import "../../Utils.h"
 
 @implementation SCIGeneralSettingsProvider
 
@@ -13,6 +14,13 @@
             [SCISetting switchCellWithTitle:@"Do Not Save Recent Searches" subtitle:@"Search bars will no longer save your recent searches" defaultsKey:@"no_recent_searches"],
             [SCISetting switchCellWithTitle:@"Enhanced Media Resolution" subtitle:@"Increases the screen size reported to Instagram in outgoing requests, allowing higher-resolution media in feeds and downloads." defaultsKey:@"enhanced_media_resolution"]
         ], nil),
+        SCITopicSection(@"Cache", @[
+            [SCISetting buttonCellWithTitle:@"Clear Cache Now" subtitle:@"Remove temporary caches immediately" icon:nil action:^(void) {
+                [SCIUtils cleanCache];
+                [SCIUtils showToastForDuration:2.0 title:@"Cache cleared" subtitle:nil iconResource:@"circle_check_filled" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
+            }],
+            [SCISetting menuCellWithTitle:@"Auto Clear Cache" subtitle:@"Choose when cache should be cleared automatically while using Instagram" menu:SCICacheAutoClearMenu()]
+        ], @"Automatic clearing is checked whenever Instagram becomes active. \"Always\" clears on every foreground; the other modes clear only after enough time has elapsed."),
         SCITopicSection(@"Recommendations", @[
             [SCISetting switchCellWithTitle:@"No Suggested Users" subtitle:@"Hides all suggested users for you to follow outside your feed" defaultsKey:@"no_suggested_users"]
         ], nil),

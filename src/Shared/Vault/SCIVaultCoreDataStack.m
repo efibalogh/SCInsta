@@ -85,6 +85,31 @@
     sourceUsername.attributeType = NSStringAttributeType;
     sourceUsername.optional = YES;
 
+    NSAttributeDescription *sourceUserPK = [[NSAttributeDescription alloc] init];
+    sourceUserPK.name = @"sourceUserPK";
+    sourceUserPK.attributeType = NSStringAttributeType;
+    sourceUserPK.optional = YES;
+
+    NSAttributeDescription *sourceProfileURLString = [[NSAttributeDescription alloc] init];
+    sourceProfileURLString.name = @"sourceProfileURLString";
+    sourceProfileURLString.attributeType = NSStringAttributeType;
+    sourceProfileURLString.optional = YES;
+
+    NSAttributeDescription *sourceMediaPK = [[NSAttributeDescription alloc] init];
+    sourceMediaPK.name = @"sourceMediaPK";
+    sourceMediaPK.attributeType = NSStringAttributeType;
+    sourceMediaPK.optional = YES;
+
+    NSAttributeDescription *sourceMediaCode = [[NSAttributeDescription alloc] init];
+    sourceMediaCode.name = @"sourceMediaCode";
+    sourceMediaCode.attributeType = NSStringAttributeType;
+    sourceMediaCode.optional = YES;
+
+    NSAttributeDescription *sourceMediaURLString = [[NSAttributeDescription alloc] init];
+    sourceMediaURLString.name = @"sourceMediaURLString";
+    sourceMediaURLString.attributeType = NSStringAttributeType;
+    sourceMediaURLString.optional = YES;
+
     NSAttributeDescription *pixelWidth = [[NSAttributeDescription alloc] init];
     pixelWidth.name = @"pixelWidth";
     pixelWidth.attributeType = NSInteger32AttributeType;
@@ -103,7 +128,11 @@
     durationSeconds.optional = NO;
     durationSeconds.defaultValue = @0.0;
 
-    entity.properties = @[identifier, relativePath, mediaType, source, dateAdded, fileSize, isFavorite, folderPath, customName, sourceUsername, pixelWidth, pixelHeight, durationSeconds];
+    entity.properties = @[
+        identifier, relativePath, mediaType, source, dateAdded, fileSize, isFavorite, folderPath, customName,
+        sourceUsername, sourceUserPK, sourceProfileURLString, sourceMediaPK, sourceMediaCode, sourceMediaURLString,
+        pixelWidth, pixelHeight, durationSeconds
+    ];
     model.entities = @[entity];
 
     return model;
@@ -141,6 +170,22 @@
     if (![ctx save:&error]) {
         NSLog(@"[SCInsta Vault] Failed to save context: %@", error);
     }
+}
+
+- (void)unloadPersistentStores {
+    NSPersistentStoreCoordinator *coordinator = self.persistentContainer.persistentStoreCoordinator;
+    for (NSPersistentStore *store in [coordinator.persistentStores copy]) {
+        NSError *removeError = nil;
+        [coordinator removePersistentStore:store error:&removeError];
+        if (removeError) {
+            NSLog(@"[SCInsta Vault] Failed unloading persistent store: %@", removeError);
+        }
+    }
+}
+
+- (void)reloadPersistentContainer {
+    [self unloadPersistentStores];
+    [self setupPersistentContainer];
 }
 
 @end

@@ -53,7 +53,8 @@
         ], nil),
         SCITopicSection(@"Explore", @[
             [SCISetting switchCellWithTitle:@"Hide Explore Posts Grid" subtitle:@"Hides the grid of suggested posts on the explore and search tab" defaultsKey:@"hide_explore_grid"],
-            [SCISetting switchCellWithTitle:@"Hide Trending Searches" subtitle:@"Hides the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"]
+            [SCISetting switchCellWithTitle:@"Hide Trending Searches" subtitle:@"Hides the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"],
+            [SCISetting switchCellWithTitle:@"Open Clipboard Link from Search Bar" subtitle:@"Long press a search bar to open the current clipboard URL with haptic feedback" defaultsKey:@"search_bar_open_clipboard_link"]
         ], nil)
     ]);
 }

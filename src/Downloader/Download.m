@@ -1,6 +1,7 @@
 #import "Download.h"
 #import "../Shared/Vault/SCIVaultFile.h"
 #import "../Shared/Vault/SCIVaultSaveMetadata.h"
+#import "../Shared/Vault/SCIVaultViewController.h"
 #import <Photos/Photos.h>
 
 @implementation SCIDownloadDelegate
@@ -206,6 +207,9 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                     [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:^{
                         SCIReleaseActiveDownloadDelegate(self);
                     }];
+                    self.progressView.onTapWhenCompleted = ^{
+                        [SCIUtils openPhotosApp];
+                    };
                 } else {
                     [self.progressView showError:@"Failed to save"];
                     [SCIUtils showToastForDuration:3.0
@@ -232,6 +236,9 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                 [self showCompletionPillWithSubtitle:@"Saved to Vault successfully" completionImmediately:NO completion:^{
                     SCIReleaseActiveDownloadDelegate(self);
                 }];
+                self.progressView.onTapWhenCompleted = ^{
+                    [SCIVaultViewController presentVault];
+                };
             } else {
                 [self.progressView showError:@"Failed to save to vault"];
                 SCIReleaseActiveDownloadDelegate(self);

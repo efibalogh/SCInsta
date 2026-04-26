@@ -10,6 +10,7 @@
 #import "../../Utils.h"
 #import "../UI/SCIMediaChrome.h"
 #import "../Vault/SCIVaultFile.h"
+#import "../Vault/SCIVaultOriginController.h"
 #import "../Vault/SCIVaultSaveMetadata.h"
 #import "../Vault/SCIVaultCoreDataStack.h"
 #import "../../Downloader/Download.h"
@@ -23,6 +24,19 @@ static CGFloat const kDismissCancelSpringDamping = 0.9;
 static CGFloat const kDismissMinScale = 0.92;
 static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshShortDelay = 0.18;
 static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
+static CGFloat const kVaultPreviewMenuIconPointSize = 22.0;
+
+static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName, NSString *systemName) {
+    UIImage *image = resourceName.length > 0
+        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kVaultPreviewMenuIconPointSize]
+        : nil;
+    if (!image) {
+        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:kVaultPreviewMenuIconPointSize
+                                                                                                     weight:UIImageSymbolWeightRegular];
+        image = [UIImage systemImageNamed:systemName withConfiguration:configuration];
+    }
+    return image;
+}
 
 @interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
 
@@ -43,6 +57,7 @@ static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
 @property (nonatomic, strong) UIButton *deleteVaultButton;
 @property (nonatomic, strong) UIButton *shareButton;
 @property (nonatomic, strong) UIButton *clipboardButton;
+@property (nonatomic, strong) UIButton *vaultMoreButton;
 
 @property (nonatomic, assign) BOOL isToolbarVisible;
 @property (nonatomic, assign) BOOL isSingleItemMode;
@@ -240,9 +255,7 @@ static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
     if (!url) return;
     SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
     meta.source = (int16_t)SCIVaultSourceProfile;
-    if (username.length > 0) {
-        meta.sourceUsername = username;
-    }
+    [SCIVaultOriginController populateProfileMetadata:meta username:username user:nil];
     [self showRemoteImageURL:url metadata:meta];
 }
 
@@ -431,14 +444,18 @@ fromViewController:(UIViewController *)presenter {
         _deleteVaultButton.tintColor = [UIColor systemRedColor];
         [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteVaultButton];
+
+        _vaultMoreButton = SCIMediaChromeBottomButton(@"ellipsis.circle", @"more", @"More");
+        _vaultMoreButton.showsMenuAsPrimaryAction = YES;
+        [_bottomBar addSubview:_vaultMoreButton];
     } else {
-        _saveVaultButton = SCIMediaChromeBottomButton(@"tray.and.arrow.down", @"media", @"Save to Vault");
+        _saveVaultButton = SCIMediaChromeBottomButton(@"tray.and.arrow.down", @"photo_gallery", @"Save to Vault");
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveVaultButton];
     }
 
     NSArray<UIView *> *row = _isFromVault
-        ? @[_savePhotosButton, _shareButton, _clipboardButton, _deleteVaultButton]
+        ? @[_savePhotosButton, _shareButton, _clipboardButton, _deleteVaultButton, _vaultMoreButton]
         : @[_savePhotosButton, _shareButton, _clipboardButton, _saveVaultButton];
 
     SCIMediaChromeInstallBottomRow(_bottomBar, row);
@@ -622,6 +639,7 @@ fromViewController:(UIViewController *)presenter {
 - (void)updateUI {
     [self updateCounter];
     [self updateFavoriteButton];
+    [self updateVaultMoreButton];
 }
 
 - (void)updateCounter {
@@ -653,6 +671,72 @@ fromViewController:(UIViewController *)presenter {
     _topFavoriteButton.hidden = NO;
     [_topFavoriteButton setImage:img forState:UIControlStateNormal];
     _topFavoriteButton.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
+}
+
+- (void)showVaultOpenFailureMessage:(NSString *)title {
+    [SCIUtils showToastForDuration:2.0
+                             title:title
+                          subtitle:@"The original content may no longer exist."
+                      iconResource:@"error_filled"
+           fallbackSystemImageName:@"exclamationmark.circle.fill"
+                              tone:SCIFeedbackPillToneError];
+}
+
+- (void)openOriginalPostForCurrentVaultItem {
+    SCIVaultFile *file = self.currentItem.vaultFile;
+    if (![SCIVaultOriginController openOriginalPostForVaultFile:file]) {
+        [self showVaultOpenFailureMessage:@"Unable to open original post"];
+    }
+}
+
+- (void)openProfileForCurrentVaultItem {
+    SCIVaultFile *file = self.currentItem.vaultFile;
+    if (![SCIVaultOriginController openProfileForVaultFile:file]) {
+        [self showVaultOpenFailureMessage:@"Unable to open profile"];
+    }
+}
+
+- (UIMenu *)vaultOriginMenuForCurrentItem {
+    SCIVaultFile *file = self.currentItem.vaultFile;
+    NSMutableArray<UIMenuElement *> *actions = [NSMutableArray array];
+    __weak typeof(self) weakSelf = self;
+
+    if (file.hasOpenableOriginalMedia) {
+        [actions addObject:[UIAction actionWithTitle:@"Open Original Post"
+                                               image:SCIVaultPreviewMenuIcon(@"external_link", @"arrow.up.right.square")
+                                          identifier:nil
+                                             handler:^(__unused UIAction *action) {
+            [weakSelf openOriginalPostForCurrentVaultItem];
+        }]];
+    }
+
+    if (file.hasOpenableProfile) {
+        [actions addObject:[UIAction actionWithTitle:@"Open Profile"
+                                               image:SCIVaultPreviewMenuIcon(@"profile", @"person.crop.circle")
+                                          identifier:nil
+                                             handler:^(__unused UIAction *action) {
+            [weakSelf openProfileForCurrentVaultItem];
+        }]];
+    }
+
+    if (actions.count == 0) {
+        UIAction *empty = [UIAction actionWithTitle:@"No origin actions available" image:nil identifier:nil handler:^(__unused UIAction *action) {}];
+        empty.attributes = UIMenuElementAttributesDisabled;
+        [actions addObject:empty];
+    }
+
+    return [UIMenu menuWithTitle:@"" children:actions];
+}
+
+- (void)updateVaultMoreButton {
+    if (!_vaultMoreButton) return;
+
+    SCIVaultFile *file = self.currentItem.vaultFile;
+    BOOL hasActions = file.hasOpenableOriginalMedia || file.hasOpenableProfile;
+    _vaultMoreButton.hidden = !file;
+    _vaultMoreButton.enabled = hasActions;
+    _vaultMoreButton.menu = [self vaultOriginMenuForCurrentItem];
+    _vaultMoreButton.alpha = hasActions ? 1.0 : 0.55;
 }
 
 #pragma mark - Toolbar Toggle

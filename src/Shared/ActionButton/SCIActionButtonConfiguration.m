@@ -17,6 +17,7 @@ NSString *SCIActionButtonTopicKeyForSource(SCIActionButtonSource source) {
         case SCIActionButtonSourceReels: return @"reels";
         case SCIActionButtonSourceStories: return @"stories";
         case SCIActionButtonSourceDirect: return @"messages";
+        case SCIActionButtonSourceProfile: return @"profile";
     }
 }
 
@@ -26,6 +27,7 @@ NSString *SCIActionButtonTopicTitleForSource(SCIActionButtonSource source) {
         case SCIActionButtonSourceReels: return @"Reels";
         case SCIActionButtonSourceStories: return @"Stories";
         case SCIActionButtonSourceDirect: return @"Messages";
+        case SCIActionButtonSourceProfile: return @"Profile";
     }
 }
 
@@ -53,6 +55,15 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionDownloadVault,
                 kSCIActionExpand,
                 kSCIActionViewThumbnail,
+                kSCIActionOpenTopicSettings
+            ];
+        case SCIActionButtonSourceProfile:
+            return @[
+                kSCIActionDownloadLibrary,
+                kSCIActionDownloadShare,
+                kSCIActionCopyDownloadLink,
+                kSCIActionDownloadVault,
+                kSCIActionExpand,
                 kSCIActionOpenTopicSettings
             ];
     }

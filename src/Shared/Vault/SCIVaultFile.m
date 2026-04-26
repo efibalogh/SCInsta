@@ -122,6 +122,11 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
 @dynamic folderPath;
 @dynamic customName;
 @dynamic sourceUsername;
+@dynamic sourceUserPK;
+@dynamic sourceProfileURLString;
+@dynamic sourceMediaPK;
+@dynamic sourceMediaCode;
+@dynamic sourceMediaURLString;
 @dynamic pixelWidth;
 @dynamic pixelHeight;
 @dynamic durationSeconds;
@@ -147,12 +152,22 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
     if (metadata) {
         file.source = metadata.source;
         file.sourceUsername = metadata.sourceUsername.length ? metadata.sourceUsername : nil;
+        file.sourceUserPK = metadata.sourceUserPK.length ? metadata.sourceUserPK : nil;
+        file.sourceProfileURLString = metadata.sourceProfileURLString.length ? metadata.sourceProfileURLString : nil;
+        file.sourceMediaPK = metadata.sourceMediaPK.length ? metadata.sourceMediaPK : nil;
+        file.sourceMediaCode = metadata.sourceMediaCode.length ? metadata.sourceMediaCode : nil;
+        file.sourceMediaURLString = metadata.sourceMediaURLString.length ? metadata.sourceMediaURLString : nil;
         file.pixelWidth = metadata.pixelWidth;
         file.pixelHeight = metadata.pixelHeight;
         file.durationSeconds = metadata.durationSeconds;
     } else {
         file.source = fallbackSource;
         file.sourceUsername = nil;
+        file.sourceUserPK = nil;
+        file.sourceProfileURLString = nil;
+        file.sourceMediaPK = nil;
+        file.sourceMediaCode = nil;
+        file.sourceMediaURLString = nil;
         file.pixelWidth = 0;
         file.pixelHeight = 0;
         file.durationSeconds = 0;
@@ -417,6 +432,52 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         fmt.dateFormat = @"MMM d 'at' h:mm a";
     });
     return self.dateAdded ? [fmt stringFromDate:self.dateAdded] : @"";
+}
+
+- (NSURL *)preferredProfileURL {
+    if (self.sourceProfileURLString.length > 0) {
+        NSURL *url = [NSURL URLWithString:self.sourceProfileURLString];
+        if (url) return url;
+    }
+    if (self.sourceUsername.length > 0) {
+        NSString *encodedUsername = [self.sourceUsername stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+        if (encodedUsername.length > 0) {
+            NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"instagram://user?username=%@", encodedUsername]];
+            if (url) return url;
+        }
+    }
+    return nil;
+}
+
+- (NSURL *)preferredOriginalMediaURL {
+    if (self.sourceMediaURLString.length > 0) {
+        NSURL *url = [NSURL URLWithString:self.sourceMediaURLString];
+        NSString *scheme = url.scheme.lowercaseString ?: @"";
+        if (url && ([scheme isEqualToString:@"http"] ||
+                    [scheme isEqualToString:@"https"] ||
+                    [scheme isEqualToString:@"instagram"])) {
+            return url;
+        }
+    }
+    if (self.sourceMediaCode.length > 0) {
+        NSString *pathComponent = (self.source == SCIVaultSourceReels) ? @"reel" : @"p";
+        return [NSURL URLWithString:[NSString stringWithFormat:@"https://www.instagram.com/%@/%@/", pathComponent, self.sourceMediaCode]];
+    }
+    if (self.sourceMediaPK.length > 0) {
+        NSString *encodedPK = [self.sourceMediaPK stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+        if (encodedPK.length > 0) {
+            return [NSURL URLWithString:[NSString stringWithFormat:@"instagram://media?id=%@", encodedPK]];
+        }
+    }
+    return nil;
+}
+
+- (BOOL)hasOpenableProfile {
+    return [self preferredProfileURL] != nil;
+}
+
+- (BOOL)hasOpenableOriginalMedia {
+    return [self preferredOriginalMediaURL] != nil;
 }
 
 + (NSString *)labelForSource:(SCIVaultSource)source {

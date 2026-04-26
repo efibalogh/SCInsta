@@ -1,5 +1,6 @@
 #import "SCIMediaItem.h"
 #import "../Vault/SCIVaultFile.h"
+#import "../Vault/SCIVaultSaveMetadata.h"
 
 @implementation SCIMediaItem
 
@@ -30,6 +31,15 @@
     item.isFromVault = YES;
     item.fileURL = [file fileURL];
     item.mediaType = (file.mediaType == SCIVaultMediaTypeVideo) ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
+    SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
+    meta.source = file.source;
+    meta.sourceUsername = file.sourceUsername;
+    meta.sourceUserPK = file.sourceUserPK;
+    meta.sourceProfileURLString = file.sourceProfileURLString;
+    meta.sourceMediaPK = file.sourceMediaPK;
+    meta.sourceMediaCode = file.sourceMediaCode;
+    meta.sourceMediaURLString = file.sourceMediaURLString;
+    item.vaultMetadata = meta;
 
     UIImage *thumb = [SCIVaultFile loadThumbnailForFile:file];
     if (thumb) {

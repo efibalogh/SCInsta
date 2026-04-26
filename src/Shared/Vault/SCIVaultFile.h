@@ -35,6 +35,11 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
 @property (nonatomic, copy, nullable) NSString *folderPath;
 @property (nonatomic, copy, nullable) NSString *customName;
 @property (nonatomic, copy, nullable) NSString *sourceUsername;
+@property (nonatomic, copy, nullable) NSString *sourceUserPK;
+@property (nonatomic, copy, nullable) NSString *sourceProfileURLString;
+@property (nonatomic, copy, nullable) NSString *sourceMediaPK;
+@property (nonatomic, copy, nullable) NSString *sourceMediaCode;
+@property (nonatomic, copy, nullable) NSString *sourceMediaURLString;
 @property (nonatomic) int32_t pixelWidth;
 @property (nonatomic) int32_t pixelHeight;
 @property (nonatomic) double durationSeconds;
@@ -84,6 +89,10 @@ typedef NS_ENUM(int16_t, SCIVaultSource) {
 
 /// Third line: human-readable download date (e.g. Apr 17 at 2:04 AM).
 - (NSString *)listDownloadDateString;
+- (nullable NSURL *)preferredProfileURL;
+- (nullable NSURL *)preferredOriginalMediaURL;
+- (BOOL)hasOpenableProfile;
+- (BOOL)hasOpenableOriginalMedia;
 
 + (NSString *)shortLabelForSource:(SCIVaultSource)source;
 

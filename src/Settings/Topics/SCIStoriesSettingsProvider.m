@@ -19,7 +19,8 @@ static NSString * const kSCIStoriesActionButtonDefaultActionKey = @"action_butto
             [SCISetting switchCellWithTitle:@"Disable Story Seen Receipt" subtitle:@"Prevents automatic story seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
             [SCISetting switchCellWithTitle:@"Stop Story Auto Advance" subtitle:@"Prevents stories from automatically moving to the next item after playback ends" defaultsKey:@"stop_story_auto_advance"],
             [SCISetting switchCellWithTitle:@"Advance When Marked as Seen" subtitle:@"After manually marking a story as seen with the eye button, advance to the next story" defaultsKey:@"advance_story_when_marking_seen"],
-            [SCISetting switchCellWithTitle:@"Story Mentions Button" subtitle:@"Shows the mentions button in story overlays when a story has mentions" defaultsKey:@"story_mentions_button"]
+            [SCISetting switchCellWithTitle:@"Story Mentions Button" subtitle:@"Shows the mentions button in story overlays when a story has mentions" defaultsKey:@"story_mentions_button"],
+            [SCISetting switchCellWithTitle:@"Show Poll Vote Counts" subtitle:@"Adds the current vote count next to each poll option while viewing stories" defaultsKey:@"story_poll_vote_counts"]
         ], nil),
         SCITopicSection(@"Creation", @[
             [SCISetting switchCellWithTitle:@"Use Detailed Color Picker" subtitle:@"Long press on the eyedropper tool in stories to customize text color more precisely" defaultsKey:@"detailed_color_picker"]

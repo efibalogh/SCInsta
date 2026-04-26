@@ -9,6 +9,7 @@
 #import "SCIVaultSortViewController.h"
 #import "SCIVaultFilterViewController.h"
 #import "SCIVaultSettingsViewController.h"
+#import "SCIVaultOriginController.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../UI/SCIMediaChrome.h"
 #import "../../InstagramHeaders.h"
@@ -292,7 +293,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     _emptyStateView.hidden = YES;
     [self.view addSubview:_emptyStateView];
 
-    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"media" template:YES];
+    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"photo_gallery" template:YES];
     if (!emptyIconImage) {
         UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:56 weight:UIImageSymbolWeightLight];
         emptyIconImage = [UIImage systemImageNamed:@"tray" withConfiguration:cfg];
@@ -544,11 +545,33 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     NSIndexPath *filePath = [NSIndexPath indexPathForItem:indexPath.item inSection:0];
     NSArray *allFiles = self.fetchedResultsController.fetchedObjects;
-    NSInteger idx = [allFiles indexOfObject:[self.fetchedResultsController objectAtIndexPath:filePath]];
+    SCIVaultFile *selectedFile = [self.fetchedResultsController objectAtIndexPath:filePath];
+    NSInteger idx = [allFiles indexOfObject:selectedFile];
     if (idx == NSNotFound) idx = 0;
     [SCIFullScreenMediaPlayer showVaultFiles:allFiles
                              startingAtIndex:idx
                           fromViewController:self];
+}
+
+- (void)showVaultOpenFailureMessage:(NSString *)title {
+    [SCIUtils showToastForDuration:2.0
+                             title:title
+                          subtitle:@"The original content may no longer exist."
+                      iconResource:@"error_filled"
+           fallbackSystemImageName:@"exclamationmark.circle.fill"
+                              tone:SCIFeedbackPillToneError];
+}
+
+- (void)openOriginalPostForFile:(SCIVaultFile *)file {
+    if (![SCIVaultOriginController openOriginalPostForVaultFile:file]) {
+        [self showVaultOpenFailureMessage:@"Unable to open original post"];
+    }
+}
+
+- (void)openProfileForFile:(SCIVaultFile *)file {
+    if (![SCIVaultOriginController openProfileForVaultFile:file]) {
+        [self showVaultOpenFailureMessage:@"Unable to open profile"];
+    }
 }
 
 - (UIContextMenuConfiguration *)collectionView:(UICollectionView *)cv
@@ -602,6 +625,26 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [weakSelf presentViewController:acVC animated:YES completion:nil];
     }];
 
+    UIAction *openOriginalAction = nil;
+    if (file.hasOpenableOriginalMedia) {
+        openOriginalAction = [UIAction actionWithTitle:@"Open Original Post"
+                                                 image:SCIVaultMenuActionIcon(@"external_link", @"arrow.up.right.square")
+                                            identifier:nil
+                                               handler:^(__unused UIAction *a) {
+            [weakSelf openOriginalPostForFile:file];
+        }];
+    }
+
+    UIAction *openProfileAction = nil;
+    if (file.hasOpenableProfile) {
+        openProfileAction = [UIAction actionWithTitle:@"Open Profile"
+                                                image:SCIVaultMenuActionIcon(@"profile", @"person.crop.circle")
+                                           identifier:nil
+                                              handler:^(__unused UIAction *a) {
+            [weakSelf openProfileForFile:file];
+        }];
+    }
+
     UIImage *deleteImg = SCIVaultMenuActionIcon(@"trash", @"trash");
     UIAction *deleteAction = [UIAction actionWithTitle:@"Delete"
                                                  image:deleteImg
@@ -627,7 +670,14 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     }];
     deleteAction.attributes = UIMenuElementAttributesDestructive;
 
-    return [UIMenu menuWithTitle:@"" children:@[favoriteAction, renameAction, moveAction, shareAction, deleteAction]];
+    NSMutableArray<UIMenuElement *> *children = [NSMutableArray array];
+    if (openOriginalAction) [children addObject:openOriginalAction];
+    if (openProfileAction) [children addObject:openProfileAction];
+    if (children.count > 0) {
+        [children addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[]]];
+    }
+    [children addObjectsFromArray:@[favoriteAction, renameAction, moveAction, shareAction, deleteAction]];
+    return [UIMenu menuWithTitle:@"" children:children];
 }
 
 - (UIContextMenuConfiguration *)contextMenuForFile:(SCIVaultFile *)file {

@@ -7,6 +7,11 @@ NS_ASSUME_NONNULL_BEGIN
 @interface SCIVaultSaveMetadata : NSObject
 
 @property (nonatomic, copy, nullable) NSString *sourceUsername;
+@property (nonatomic, copy, nullable) NSString *sourceUserPK;
+@property (nonatomic, copy, nullable) NSString *sourceProfileURLString;
+@property (nonatomic, copy, nullable) NSString *sourceMediaPK;
+@property (nonatomic, copy, nullable) NSString *sourceMediaCode;
+@property (nonatomic, copy, nullable) NSString *sourceMediaURLString;
 @property (nonatomic, assign) int16_t source;
 
 /// If > 0, overrides probed dimensions from the file.

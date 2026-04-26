@@ -126,6 +126,16 @@ UIMenu *SCIFeedbackPillStyleMenu(void) {
     ]];
 }
 
+UIMenu *SCICacheAutoClearMenu(void) {
+    return [UIMenu menuWithChildren:@[
+        SCIMenuCommand(@"Never", nil, nil, @"cache_auto_clear_mode", @"never", NO),
+        SCIMenuCommand(@"Always", nil, nil, @"cache_auto_clear_mode", @"always", NO),
+        SCIMenuCommand(@"Daily", nil, nil, @"cache_auto_clear_mode", @"daily", NO),
+        SCIMenuCommand(@"Weekly", nil, nil, @"cache_auto_clear_mode", @"weekly", NO),
+        SCIMenuCommand(@"Monthly", nil, nil, @"cache_auto_clear_mode", @"monthly", NO)
+    ]];
+}
+
 NSArray *SCIDevExampleSections(void) {
     return @[
         SCITopicSection(@"_ Example", @[

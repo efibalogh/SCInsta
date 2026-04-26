@@ -1,6 +1,8 @@
 #import "Utils.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import "Shared/MediaPreview/SCIMediaCacheManager.h"
+#import "Shared/Vault/SCIVaultPaths.h"
 
 static NSNumber *SCINumericValueForSelector(id target, NSString *selectorName) {
     if (!target || !selectorName.length) return nil;
@@ -134,6 +136,9 @@ static NSArray *SCIArrayFromCollection(id collection) {
 
     return nil;
 }
+
+static NSString * const kSCICacheAutoClearModeKey = @"cache_auto_clear_mode";
+static NSString * const kSCICacheLastClearedAtKey = @"cache_last_cleared_at";
 
 static UIWindow *SCIFeedbackPresentationWindow(void) {
     UIViewController *topController = topMostController();
@@ -575,6 +580,13 @@ static NSURL *SCIThumbProfilePicURL(id user) {
         if (cacheItemDeletionError) [deletionErrors addObject:cacheItemDeletionError];
     }
 
+    NSURL *previewCacheURL = [[[SCIMediaCacheManager sharedManager] valueForKey:@"cacheRootURL"] copy];
+    if (previewCacheURL) {
+        NSError *previewCacheDeletionError = nil;
+        [fileManager removeItemAtURL:previewCacheURL error:&previewCacheDeletionError];
+        if (previewCacheDeletionError) [deletionErrors addObject:previewCacheDeletionError];
+    }
+
     // Log errors
     if (deletionErrors.count > 1) {
 
@@ -584,6 +596,39 @@ static NSURL *SCIThumbProfilePicURL(id user) {
 
     }
 
+    [SCIUtils markCacheClearedNow];
+}
+
++ (NSString *)cacheAutoClearMode {
+    NSString *mode = [SCIUtils getStringPref:kSCICacheAutoClearModeKey];
+    return mode.length > 0 ? mode : @"never";
+}
+
++ (BOOL)shouldAutomaticallyClearCacheNow {
+    NSString *mode = [self cacheAutoClearMode];
+    if ([mode isEqualToString:@"never"]) return NO;
+    if ([mode isEqualToString:@"always"]) return YES;
+
+    NSDate *lastClearedAt = [[NSUserDefaults standardUserDefaults] objectForKey:kSCICacheLastClearedAtKey];
+    if (![lastClearedAt isKindOfClass:[NSDate class]]) return YES;
+
+    NSTimeInterval interval = 0.0;
+    if ([mode isEqualToString:@"daily"]) interval = 24.0 * 60.0 * 60.0;
+    else if ([mode isEqualToString:@"weekly"]) interval = 7.0 * 24.0 * 60.0 * 60.0;
+    else if ([mode isEqualToString:@"monthly"]) interval = 30.0 * 24.0 * 60.0 * 60.0;
+    else return NO;
+
+    return [[NSDate date] timeIntervalSinceDate:lastClearedAt] >= interval;
+}
+
++ (void)markCacheClearedNow {
+    [[NSUserDefaults standardUserDefaults] setObject:[NSDate date] forKey:kSCICacheLastClearedAtKey];
+}
+
++ (void)evaluateAutomaticCacheClearIfNeeded {
+    if (![self shouldAutomaticallyClearCacheNow]) return;
+    NSLog(@"[SCInsta] Automatically clearing cache...");
+    [self cleanCache];
 }
 
 // MARK: Display View Controllers
@@ -644,6 +689,57 @@ static NSURL *SCIThumbProfilePicURL(id user) {
 + (NSError *)errorWithDescription:(NSString *)errorDesc code:(NSInteger)errorCode {
     NSError *error = [ NSError errorWithDomain:@"com.socuul.scinsta" code:errorCode userInfo:@{ NSLocalizedDescriptionKey: errorDesc } ];
     return error;
+}
++ (BOOL)openURL:(NSURL *)url {
+    if (!url) return NO;
+    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    return YES;
+}
+
++ (BOOL)openInstagramProfileForUsername:(NSString *)username {
+    NSString *encodedUsername = [username stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+    if (encodedUsername.length == 0) return NO;
+
+    NSURL *appURL = [NSURL URLWithString:[NSString stringWithFormat:@"instagram://user?username=%@", encodedUsername]];
+    if (appURL && [[UIApplication sharedApplication] canOpenURL:appURL]) {
+        return [self openURL:appURL];
+    }
+
+    NSURL *webURL = [NSURL URLWithString:[NSString stringWithFormat:@"https://www.instagram.com/%@/", encodedUsername]];
+    return [self openInstagramMediaURL:webURL];
+}
+
++ (BOOL)openInstagramMediaURL:(NSURL *)url {
+    if (!url) return NO;
+    NSString *scheme = url.scheme.lowercaseString ?: @"";
+    UIApplication *application = [UIApplication sharedApplication];
+    id<UIApplicationDelegate> delegate = application.delegate;
+
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+        NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:NSUserActivityTypeBrowsingWeb];
+        activity.webpageURL = url;
+        SEL continueSelector = @selector(application:continueUserActivity:restorationHandler:);
+        if ([delegate respondsToSelector:continueSelector]) {
+            BOOL handled = [delegate application:application
+                            continueUserActivity:activity
+                              restorationHandler:^(__unused NSArray<id<UIUserActivityRestoring>> *restorableObjects) {}];
+            if (handled) return YES;
+        }
+    } else if ([scheme isEqualToString:@"instagram"] &&
+               [delegate respondsToSelector:@selector(application:openURL:options:)]) {
+        [delegate application:application openURL:url options:@{}];
+        return YES;
+    }
+
+    return [self openURL:url];
+}
+
++ (BOOL)openPhotosApp {
+    NSURL *url = [NSURL URLWithString:@"photos-redirect://"];
+    if (url && [[UIApplication sharedApplication] canOpenURL:url]) {
+        return [self openURL:url];
+    }
+    return NO;
 }
 
 // MARK: Media

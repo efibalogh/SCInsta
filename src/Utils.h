@@ -47,6 +47,10 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 + (void)applyLiquidGlassNavigationExperimentOverride;
 
 + (void)cleanCache;
++ (NSString *)cacheAutoClearMode;
++ (BOOL)shouldAutomaticallyClearCacheNow;
++ (void)markCacheClearedNow;
++ (void)evaluateAutomaticCacheClearIfNeeded;
 
 // Display View Controllers
 + (void)showMediaPreview:(NSURL *)fileURL;
@@ -60,6 +64,10 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 // Errors
 + (NSError *)errorWithDescription:(NSString *)errorDesc;
 + (NSError *)errorWithDescription:(NSString *)errorDesc code:(NSInteger)errorCode;
++ (BOOL)openURL:(NSURL *)url;
++ (BOOL)openInstagramProfileForUsername:(NSString *)username;
++ (BOOL)openInstagramMediaURL:(NSURL *)url;
++ (BOOL)openPhotosApp;
 
 // Media
 + (NSURL *)getPhotoUrl:(IGPhoto *)photo;

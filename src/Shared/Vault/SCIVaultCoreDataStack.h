@@ -11,6 +11,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) NSManagedObjectContext *viewContext;
 
 - (void)saveContext;
+- (void)unloadPersistentStores;
+- (void)reloadPersistentContainer;
 
 @end
 

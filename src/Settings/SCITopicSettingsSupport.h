@@ -15,6 +15,7 @@ UIMenu *SCIReelsTapControlMenu(void);
 UIMenu *SCINavigationIconOrderingMenu(void);
 UIMenu *SCISwipeBetweenTabsMenu(void);
 UIMenu *SCIFeedbackPillStyleMenu(void);
+UIMenu *SCICacheAutoClearMenu(void);
 NSArray *SCIDevExampleSections(void);
 
 NS_ASSUME_NONNULL_END
