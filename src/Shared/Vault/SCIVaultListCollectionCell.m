@@ -15,6 +15,8 @@
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UIImageView *favoriteIcon;
 @property (nonatomic, strong) UIButton *moreButton;
+@property (nonatomic, strong) UIImageView *selectionIndicator;
+@property (nonatomic, strong) NSLayoutConstraint *thumbnailLeadingConstraint;
 
 @end
 
@@ -94,6 +96,13 @@
     self.favoriteIcon.hidden = YES;
     [self.contentView addSubview:self.favoriteIcon];
 
+    self.selectionIndicator = [[UIImageView alloc] init];
+    self.selectionIndicator.translatesAutoresizingMaskIntoConstraints = NO;
+    self.selectionIndicator.contentMode = UIViewContentModeScaleAspectFit;
+    self.selectionIndicator.tintColor = [UIColor secondaryLabelColor];
+    self.selectionIndicator.hidden = YES;
+    [self.contentView addSubview:self.selectionIndicator];
+
     UIImage *moreImg = [SCIUtils sci_resourceImageNamed:@"more" template:YES maxPointSize:22];
     if (!moreImg) {
         UIImageSymbolConfiguration *moreCfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
@@ -109,8 +118,14 @@
     [self.contentView addSubview:self.moreButton];
 
     UILayoutGuide *margin = self.contentView.layoutMarginsGuide;
+    self.thumbnailLeadingConstraint = [self.thumbnailView.leadingAnchor constraintEqualToAnchor:margin.leadingAnchor constant:8];
     [NSLayoutConstraint activateConstraints:@[
-        [self.thumbnailView.leadingAnchor constraintEqualToAnchor:margin.leadingAnchor constant:8],
+        [self.selectionIndicator.leadingAnchor constraintEqualToAnchor:margin.leadingAnchor constant:8],
+        [self.selectionIndicator.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.selectionIndicator.widthAnchor constraintEqualToConstant:20],
+        [self.selectionIndicator.heightAnchor constraintEqualToConstant:20],
+
+        self.thumbnailLeadingConstraint,
         [self.thumbnailView.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
         [self.thumbnailView.widthAnchor constraintEqualToConstant:56],
         [self.thumbnailView.heightAnchor constraintEqualToConstant:56],
@@ -162,9 +177,27 @@
     self.file = nil;
     self.moreButton.menu = nil;
     self.moreButton.showsMenuAsPrimaryAction = NO;
+    self.selectionIndicator.hidden = YES;
+    self.selectionIndicator.image = nil;
+    self.selectionIndicator.alpha = 0.0;
+    self.thumbnailLeadingConstraint.constant = 8;
+    self.moreButton.hidden = NO;
+    self.moreButton.alpha = 1.0;
 }
 
-- (void)configureWithVaultFile:(SCIVaultFile *)file {
+- (UIImage *)selectionIndicatorImageSelected:(BOOL)selected {
+    NSString *resourceName = selected ? @"circle_check_filled" : @"circle";
+    UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:20.0];
+    if (image) {
+        return image;
+    }
+    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+    return [UIImage systemImageNamed:(selected ? @"checkmark.circle.fill" : @"circle") withConfiguration:cfg];
+}
+
+- (void)configureWithVaultFile:(SCIVaultFile *)file
+                 selectionMode:(BOOL)selectionMode
+                      selected:(BOOL)selected {
     self.file = file;
     self.titleLabel.text = [file listPrimaryTitle];
     self.technicalLabel.text = [file listTechnicalLine];
@@ -183,6 +216,8 @@
 
     self.favoriteIcon.hidden = !file.isFavorite;
 
+    [self setSelectionMode:selectionMode selected:selected animated:NO];
+
     UIImage *thumb = [SCIVaultFile loadThumbnailForFile:file];
     if (thumb) {
         self.thumbnailView.image = thumb;
@@ -194,6 +229,41 @@
             UIImage *img = [SCIVaultFile loadThumbnailForFile:file];
             if (img) weakSelf.thumbnailView.image = img;
         }];
+    }
+}
+
+- (void)setSelectionMode:(BOOL)selectionMode selected:(BOOL)selected animated:(BOOL)animated {
+    self.selectionIndicator.image = selectionMode ? [self selectionIndicatorImageSelected:selected] : nil;
+    if (selectionMode) {
+        self.selectionIndicator.hidden = NO;
+    }
+    if (!selectionMode) {
+        self.moreButton.hidden = NO;
+    }
+
+    self.thumbnailLeadingConstraint.constant = selectionMode ? 40.0 : 8.0;
+
+    void (^applyState)(void) = ^{
+        self.selectionIndicator.alpha = selectionMode ? 1.0 : 0.0;
+        self.moreButton.alpha = selectionMode ? 0.0 : 1.0;
+        [self.contentView layoutIfNeeded];
+    };
+    void (^finishState)(void) = ^{
+        self.selectionIndicator.hidden = !selectionMode;
+        self.moreButton.hidden = selectionMode;
+    };
+
+    if (animated) {
+        [UIView animateWithDuration:0.22
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionBeginFromCurrentState
+                         animations:applyState
+                         completion:^(__unused BOOL finished) {
+            finishState();
+        }];
+    } else {
+        applyState();
+        finishState();
     }
 }
 

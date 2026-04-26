@@ -9,6 +9,7 @@
 #import "SCIVaultSortViewController.h"
 #import "SCIVaultFilterViewController.h"
 #import "SCIVaultSettingsViewController.h"
+#import "SCIVaultDeleteViewController.h"
 #import "SCIVaultOriginController.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../UI/SCIMediaChrome.h"
@@ -22,6 +23,7 @@ static NSString * const kFolderCellID = @"SCIVaultFolderCell";
 
 static NSString * const kSortModeKey    = @"scinsta_vault_sort_mode";
 static NSString * const kViewModeKey    = @"scinsta_vault_view_mode"; // 0 = grid, 1 = list
+static NSString * const kFavoritesAtTopKey = @"show_favorites_at_top";
 
 static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
@@ -73,6 +75,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *filterTypes;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *filterSources;
 @property (nonatomic, assign) BOOL filterFavoritesOnly;
+@property (nonatomic, assign) BOOL selectionMode;
+@property (nonatomic, strong) NSMutableSet<NSString *> *selectedFileIDs;
 
 @end
 
@@ -116,6 +120,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         _filterTypes = [NSMutableSet set];
         _filterSources = [NSMutableSet set];
         _filterFavoritesOnly = NO;
+        _selectedFileIDs = [NSMutableSet set];
 
         NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
         _sortMode = (SCIVaultSortMode)[d integerForKey:kSortModeKey];
@@ -130,6 +135,10 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [super viewDidLoad];
 
     self.view.backgroundColor = [UIColor systemBackgroundColor];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleVaultPreferencesChanged:)
+                                                 name:@"SCIVaultFavoritesSortPreferenceChanged"
+                                               object:nil];
 
     [self setupCenteredTitle];
     [self setupNavigationItems];
@@ -145,9 +154,14 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     }
 }
 
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self applyVaultNavigationChrome];
+    [self refreshNavigationItems];
     [self refreshBottomToolbarItems];
 }
 
@@ -193,8 +207,28 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 }
 
 - (void)setupNavigationItems {
+    [self refreshNavigationItems];
+}
+
+- (void)refreshNavigationItems {
+    if (self.selectionMode) {
+        NSArray<SCIVaultFile *> *files = [self visibleVaultFiles];
+        BOOL allSelected = files.count > 0 && self.selectedFileIDs.count == files.count;
+        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Cancel"
+                                                                                  style:UIBarButtonItemStylePlain
+                                                                                 target:self
+                                                                                 action:@selector(exitSelectionMode)];
+        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:(allSelected ? @"Deselect All" : @"Select All")
+                                                                                   style:UIBarButtonItemStylePlain
+                                                                                  target:self
+                                                                                  action:@selector(selectAllVisibleFiles)];
+        return;
+    }
+
     if (self.navigationController.viewControllers.firstObject == self) {
         self.navigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItem(@"xmark", @"xmark", self, @selector(dismissSelf));
+    } else {
+        self.navigationItem.leftBarButtonItem = nil;
     }
 
     self.navigationItem.rightBarButtonItem = SCIMediaChromeTopBarButtonItem(@"settings", @"gear", self, @selector(pushSettings));
@@ -217,6 +251,24 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self.bottomBarStack removeFromSuperview];
     self.bottomBarStack = nil;
 
+    if (self.selectionMode) {
+        UIButton *shareBtn = [self vaultBottomBarButtonWithSymbol:@"square.and.arrow.up" resource:@"share" accessibility:@"Share selected"];
+        [shareBtn addTarget:self action:@selector(shareSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
+
+        UIButton *moveBtn = [self vaultBottomBarButtonWithSymbol:@"folder" resource:@"folder_move" accessibility:@"Move selected"];
+        [moveBtn addTarget:self action:@selector(moveSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
+
+        UIButton *favoriteBtn = [self vaultBottomBarButtonWithSymbol:@"heart" resource:@"heart" accessibility:@"Favorite selected"];
+        [favoriteBtn addTarget:self action:@selector(toggleFavoriteForSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
+
+        UIButton *deleteBtn = [self vaultBottomBarButtonWithSymbol:@"trash" resource:@"trash" accessibility:@"Delete selected"];
+        [deleteBtn addTarget:self action:@selector(deleteSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
+        deleteBtn.tintColor = [UIColor systemRedColor];
+
+        self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, @[shareBtn, moveBtn, favoriteBtn, deleteBtn]);
+        return;
+    }
+
     UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease" resource:@"filter" accessibility:@"Filter"];
     [filterBtn addTarget:self action:@selector(presentFilter) forControlEvents:UIControlEventTouchUpInside];
 
@@ -232,7 +284,10 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     UIButton *folderBtn = [self vaultBottomBarButtonWithSymbol:@"folder.badge.plus" resource:@"folder" accessibility:@"New folder"];
     [folderBtn addTarget:self action:@selector(presentCreateFolder) forControlEvents:UIControlEventTouchUpInside];
 
-    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn];
+    UIButton *selectBtn = [self vaultBottomBarButtonWithSymbol:@"checkmark.circle" resource:@"circle_check" accessibility:@"Select"];
+    [selectBtn addTarget:self action:@selector(enterSelectionMode) forControlEvents:UIControlEventTouchUpInside];
+
+    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn, selectBtn];
 
     self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, row);
 }
@@ -274,6 +329,9 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 }
 
 - (void)toggleViewMode {
+    if (self.selectionMode) {
+        [self exitSelectionMode];
+    }
     self.viewMode = self.viewMode == SCIVaultViewModeGrid ? SCIVaultViewModeList : SCIVaultViewModeGrid;
     [[NSUserDefaults standardUserDefaults] setInteger:self.viewMode forKey:kViewModeKey];
 
@@ -380,7 +438,11 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 - (NSFetchRequest *)currentFetchRequest {
     NSFetchRequest *request = [[NSFetchRequest alloc] initWithEntityName:@"SCIVaultFile"];
-    request.sortDescriptors = [SCIVaultSortViewController sortDescriptorsForMode:self.sortMode];
+    NSMutableArray<NSSortDescriptor *> *sortDescriptors = [[SCIVaultSortViewController sortDescriptorsForMode:self.sortMode] mutableCopy];
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kFavoritesAtTopKey] && !self.filterFavoritesOnly) {
+        [sortDescriptors insertObject:[NSSortDescriptor sortDescriptorWithKey:@"isFavorite" ascending:NO] atIndex:0];
+    }
+    request.sortDescriptors = sortDescriptors;
     request.predicate = [SCIVaultFilterViewController predicateForTypes:self.filterTypes
                                                                 sources:self.filterSources
                                                           favoritesOnly:self.filterFavoritesOnly
@@ -389,6 +451,9 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 }
 
 - (void)refetch {
+    if (self.selectionMode) {
+        [self.selectedFileIDs removeAllObjects];
+    }
     NSFetchRequest *request = [self currentFetchRequest];
     _fetchedResultsController.fetchRequest.sortDescriptors = request.sortDescriptors;
     _fetchedResultsController.fetchRequest.predicate = request.predicate;
@@ -400,6 +465,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self reloadSubfolders];
     [self.collectionView reloadData];
     [self updateEmptyState];
+    [self refreshNavigationItems];
 }
 
 #pragma mark - Subfolders
@@ -440,6 +506,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self reloadSubfolders];
     [self.collectionView reloadData];
     [self updateEmptyState];
+    [self refreshNavigationItems];
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -477,13 +544,17 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     if (self.viewMode == SCIVaultViewModeGrid) {
         SCIVaultGridCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kGridCellID forIndexPath:indexPath];
-        [cell configureWithVaultFile:file];
+        [cell configureWithVaultFile:file
+                       selectionMode:self.selectionMode
+                            selected:[self.selectedFileIDs containsObject:file.identifier]];
         return cell;
     }
 
     SCIVaultListCollectionCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kListCellID forIndexPath:indexPath];
-    [cell configureWithVaultFile:file];
-    [cell setMoreActionsMenu:[self fileActionsMenuForFile:file]];
+    [cell configureWithVaultFile:file
+                   selectionMode:self.selectionMode
+                        selected:[self.selectedFileIDs containsObject:file.identifier]];
+    [cell setMoreActionsMenu:self.selectionMode ? nil : [self fileActionsMenuForFile:file]];
     return cell;
 }
 
@@ -537,6 +608,9 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [cv deselectItemAtIndexPath:indexPath animated:YES];
 
     if ([self isFolderIndexPath:indexPath]) {
+        if (self.selectionMode) {
+            return;
+        }
         NSString *subfolderPath = self.subfolders[indexPath.item];
         SCIVaultViewController *child = [[SCIVaultViewController alloc] initWithFolderPath:subfolderPath];
         [self.navigationController pushViewController:child animated:YES];
@@ -544,8 +618,13 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     }
 
     NSIndexPath *filePath = [NSIndexPath indexPathForItem:indexPath.item inSection:0];
-    NSArray *allFiles = self.fetchedResultsController.fetchedObjects;
     SCIVaultFile *selectedFile = [self.fetchedResultsController objectAtIndexPath:filePath];
+    if (self.selectionMode) {
+        [self toggleSelectionForFile:selectedFile];
+        return;
+    }
+
+    NSArray *allFiles = self.fetchedResultsController.fetchedObjects;
     NSInteger idx = [allFiles indexOfObject:selectedFile];
     if (idx == NSNotFound) idx = 0;
     [SCIFullScreenMediaPlayer showVaultFiles:allFiles
@@ -574,9 +653,181 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     }
 }
 
+- (NSArray<SCIVaultFile *> *)visibleVaultFiles {
+    return self.fetchedResultsController.fetchedObjects ?: @[];
+}
+
+- (SCIVaultFile *)vaultFileForCollectionIndexPath:(NSIndexPath *)indexPath {
+    if ([self isFolderIndexPath:indexPath]) {
+        return nil;
+    }
+    NSIndexPath *filePath = [NSIndexPath indexPathForItem:indexPath.item inSection:0];
+    return [self.fetchedResultsController objectAtIndexPath:filePath];
+}
+
+- (void)animateSelectionModeTransition {
+    for (NSIndexPath *indexPath in self.collectionView.indexPathsForVisibleItems) {
+        SCIVaultFile *file = [self vaultFileForCollectionIndexPath:indexPath];
+        if (!file) {
+            continue;
+        }
+
+        UICollectionViewCell *cell = [self.collectionView cellForItemAtIndexPath:indexPath];
+        BOOL selected = [self.selectedFileIDs containsObject:file.identifier];
+        if ([cell isKindOfClass:[SCIVaultListCollectionCell class]]) {
+            [(SCIVaultListCollectionCell *)cell setSelectionMode:self.selectionMode selected:selected animated:YES];
+            [(SCIVaultListCollectionCell *)cell setMoreActionsMenu:self.selectionMode ? nil : [self fileActionsMenuForFile:file]];
+        } else if ([cell isKindOfClass:[SCIVaultGridCell class]]) {
+            [(SCIVaultGridCell *)cell setSelectionMode:self.selectionMode selected:selected animated:YES];
+        }
+    }
+}
+
+- (NSArray<SCIVaultFile *> *)selectedVaultFiles {
+    if (self.selectedFileIDs.count == 0) {
+        return @[];
+    }
+
+    NSMutableArray<SCIVaultFile *> *files = [NSMutableArray array];
+    for (SCIVaultFile *file in [self visibleVaultFiles]) {
+        if ([self.selectedFileIDs containsObject:file.identifier]) {
+            [files addObject:file];
+        }
+    }
+    return files;
+}
+
+- (void)enterSelectionMode {
+    self.selectionMode = YES;
+    [self.selectedFileIDs removeAllObjects];
+    [self refreshNavigationItems];
+    [self refreshBottomToolbarItems];
+    [self animateSelectionModeTransition];
+}
+
+- (void)exitSelectionMode {
+    self.selectionMode = NO;
+    [self.selectedFileIDs removeAllObjects];
+    [self refreshNavigationItems];
+    [self refreshBottomToolbarItems];
+    [self animateSelectionModeTransition];
+}
+
+- (void)toggleSelectionForFile:(SCIVaultFile *)file {
+    if (file.identifier.length == 0) {
+        return;
+    }
+    if ([self.selectedFileIDs containsObject:file.identifier]) {
+        [self.selectedFileIDs removeObject:file.identifier];
+    } else {
+        [self.selectedFileIDs addObject:file.identifier];
+    }
+    [self refreshNavigationItems];
+    [self.collectionView reloadData];
+}
+
+- (void)selectAllVisibleFiles {
+    NSArray<SCIVaultFile *> *files = [self visibleVaultFiles];
+    if (files.count > 0 && self.selectedFileIDs.count == files.count) {
+        [self.selectedFileIDs removeAllObjects];
+    } else {
+        [self.selectedFileIDs removeAllObjects];
+        for (SCIVaultFile *file in files) {
+            if (file.identifier.length > 0) {
+                [self.selectedFileIDs addObject:file.identifier];
+            }
+        }
+    }
+    self.navigationItem.rightBarButtonItem.title = (self.selectedFileIDs.count == files.count && files.count > 0) ? @"Deselect All" : @"Select All";
+    [self.collectionView reloadData];
+}
+
+- (void)shareSelectedFiles {
+    NSArray<SCIVaultFile *> *files = [self selectedVaultFiles];
+    if (files.count == 0) {
+        return;
+    }
+
+    NSMutableArray<NSURL *> *urls = [NSMutableArray arrayWithCapacity:files.count];
+    for (SCIVaultFile *file in files) {
+        [urls addObject:file.fileURL];
+    }
+
+    UIActivityViewController *controller = [[UIActivityViewController alloc] initWithActivityItems:urls applicationActivities:nil];
+    [self presentViewController:controller animated:YES completion:nil];
+}
+
+- (void)moveSelectedFiles {
+    NSArray<SCIVaultFile *> *files = [self selectedVaultFiles];
+    if (files.count == 0) {
+        return;
+    }
+    [self presentMoveSheetForFiles:files];
+}
+
+- (void)toggleFavoriteForSelectedFiles {
+    NSArray<SCIVaultFile *> *files = [self selectedVaultFiles];
+    if (files.count == 0) {
+        return;
+    }
+
+    BOOL shouldFavorite = NO;
+    for (SCIVaultFile *file in files) {
+        if (!file.isFavorite) {
+            shouldFavorite = YES;
+            break;
+        }
+    }
+
+    for (SCIVaultFile *file in files) {
+        file.isFavorite = shouldFavorite;
+    }
+    [[SCIVaultCoreDataStack shared] saveContext];
+    [self refetch];
+}
+
+- (void)deleteSelectedFiles {
+    NSArray<SCIVaultFile *> *files = [self selectedVaultFiles];
+    if (files.count == 0) {
+        return;
+    }
+
+    NSString *message = [NSString stringWithFormat:@"This will permanently remove %ld file%@ from the vault.", (long)files.count, files.count == 1 ? @"" : @"s"];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete Selected Files?"
+                                                                  message:message
+                                                           preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Delete"
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(__unused UIAlertAction *action) {
+        NSError *firstError = nil;
+        for (SCIVaultFile *file in files) {
+            NSError *removeError = nil;
+            [file removeWithError:&removeError];
+            if (!firstError && removeError) {
+                firstError = removeError;
+            }
+        }
+        if (firstError) {
+            [SCIUtils showToastForDuration:2.0
+                                     title:@"Failed to delete"
+                                  subtitle:firstError.localizedDescription
+                              iconResource:@"error_filled"
+                   fallbackSystemImageName:@"exclamationmark.circle.fill"
+                                      tone:SCIFeedbackPillToneError];
+            return;
+        }
+        [self exitSelectionMode];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (UIContextMenuConfiguration *)collectionView:(UICollectionView *)cv
     contextMenuConfigurationForItemAtIndexPath:(NSIndexPath *)indexPath
                                          point:(CGPoint)point {
+    if (self.selectionMode) {
+        return nil;
+    }
     if ([self isFolderIndexPath:indexPath]) {
         NSString *folder = self.subfolders[indexPath.item];
         return [self contextMenuForFolder:folder];
@@ -908,7 +1159,15 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)moveFile:(SCIVaultFile *)file {
+- (void)assignFolderPath:(nullable NSString *)folderPath toFiles:(NSArray<SCIVaultFile *> *)files {
+    for (SCIVaultFile *file in files) {
+        file.folderPath = folderPath;
+    }
+    [[SCIVaultCoreDataStack shared] saveContext];
+    [self refetch];
+}
+
+- (void)presentMoveSheetForFiles:(NSArray<SCIVaultFile *> *)files {
     NSArray<NSString *> *allFolders = [self allFolderPaths];
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Move to folder"
                                                                   message:nil
@@ -917,16 +1176,14 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [sheet addAction:[UIAlertAction actionWithTitle:@"Root"
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction *a) {
-        file.folderPath = nil;
-        [[SCIVaultCoreDataStack shared] saveContext];
+        [self assignFolderPath:nil toFiles:files];
     }]];
 
     for (NSString *folder in allFolders) {
         [sheet addAction:[UIAlertAction actionWithTitle:folder
                                                   style:UIAlertActionStyleDefault
                                                 handler:^(UIAlertAction *a) {
-            file.folderPath = folder;
-            [[SCIVaultCoreDataStack shared] saveContext];
+            [self assignFolderPath:folder toFiles:files];
         }]];
     }
 
@@ -945,14 +1202,17 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                               [NSCharacterSet whitespaceAndNewlineCharacterSet]];
             if (name.length == 0) return;
             NSString *newPath = [self folderPathByAppendingComponent:name toBase:self.currentFolderPath];
-            file.folderPath = newPath;
-            [[SCIVaultCoreDataStack shared] saveContext];
+            [self assignFolderPath:newPath toFiles:files];
         }]];
         [self presentViewController:createAlert animated:YES completion:nil];
     }]];
 
     [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)moveFile:(SCIVaultFile *)file {
+    [self presentMoveSheetForFiles:@[file]];
 }
 
 - (NSArray<NSString *> *)allFolderPaths {
@@ -1068,12 +1328,16 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self refetch];
 }
 
+- (void)handleVaultPreferencesChanged:(NSNotification *)note {
+    (void)note;
+    [self refetch];
+}
+
 #pragma mark - Settings
 
 - (void)pushSettings {
     SCIVaultSettingsViewController *vc = [[SCIVaultSettingsViewController alloc] init];
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-    [self presentViewController:nav animated:YES completion:nil];
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 @end

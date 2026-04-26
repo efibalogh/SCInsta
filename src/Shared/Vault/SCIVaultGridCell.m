@@ -7,6 +7,8 @@
 @property (nonatomic, strong) UIImageView *thumbnailView;
 @property (nonatomic, strong) UIImageView *videoBadge;
 @property (nonatomic, strong) UIImageView *favoriteBadge;
+@property (nonatomic, strong) UIImageView *selectionBadge;
+@property (nonatomic, strong) NSLayoutConstraint *favoriteTrailingConstraint;
 
 @end
 
@@ -54,6 +56,15 @@
         _favoriteBadge.hidden = YES;
         [self.contentView addSubview:_favoriteBadge];
 
+        _selectionBadge = [[UIImageView alloc] initWithFrame:CGRectZero];
+        _selectionBadge.translatesAutoresizingMaskIntoConstraints = NO;
+        _selectionBadge.contentMode = UIViewContentModeScaleAspectFit;
+        _selectionBadge.tintColor = [UIColor whiteColor];
+        _selectionBadge.hidden = YES;
+        [self.contentView addSubview:_selectionBadge];
+
+        _favoriteTrailingConstraint = [_favoriteBadge.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-6];
+
         [NSLayoutConstraint activateConstraints:@[
             [_thumbnailView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
             [_thumbnailView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
@@ -69,9 +80,15 @@
             [_videoBadge.centerYAnchor constraintEqualToAnchor:videoBadgeBG.centerYAnchor],
 
             [_favoriteBadge.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:6],
-            [_favoriteBadge.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-6],
             [_favoriteBadge.widthAnchor constraintEqualToConstant:16],
             [_favoriteBadge.heightAnchor constraintEqualToConstant:16],
+
+            [_selectionBadge.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:6],
+            [_selectionBadge.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-6],
+            [_selectionBadge.widthAnchor constraintEqualToConstant:20],
+            [_selectionBadge.heightAnchor constraintEqualToConstant:20],
+
+            _favoriteTrailingConstraint,
         ]];
     }
     return self;
@@ -83,9 +100,25 @@
     self.videoBadge.hidden = YES;
     [self.contentView viewWithTag:100].hidden = YES;
     self.favoriteBadge.hidden = YES;
+    self.selectionBadge.hidden = YES;
+    self.selectionBadge.image = nil;
+    self.selectionBadge.alpha = 0.0;
+    self.favoriteTrailingConstraint.constant = -6;
 }
 
-- (void)configureWithVaultFile:(SCIVaultFile *)file {
+- (UIImage *)selectionBadgeImageSelected:(BOOL)selected {
+    NSString *resourceName = selected ? @"circle_check_filled" : @"circle";
+    UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:20.0];
+    if (image) {
+        return image;
+    }
+    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+    return [UIImage systemImageNamed:(selected ? @"checkmark.circle.fill" : @"circle") withConfiguration:cfg];
+}
+
+- (void)configureWithVaultFile:(SCIVaultFile *)file
+                 selectionMode:(BOOL)selectionMode
+                      selected:(BOOL)selected {
     UIImage *thumb = [SCIVaultFile loadThumbnailForFile:file];
     if (thumb) {
         self.thumbnailView.image = thumb;
@@ -107,6 +140,37 @@
     [self.contentView viewWithTag:100].hidden = !isVideo;
 
     self.favoriteBadge.hidden = !file.isFavorite;
+
+    [self setSelectionMode:selectionMode selected:selected animated:NO];
+}
+
+- (void)setSelectionMode:(BOOL)selectionMode selected:(BOOL)selected animated:(BOOL)animated {
+    self.selectionBadge.image = selectionMode ? [self selectionBadgeImageSelected:selected] : nil;
+    if (selectionMode) {
+        self.selectionBadge.hidden = NO;
+    }
+    self.favoriteTrailingConstraint.constant = selectionMode ? -30.0 : -6.0;
+
+    void (^applyState)(void) = ^{
+        self.selectionBadge.alpha = selectionMode ? 1.0 : 0.0;
+        [self.contentView layoutIfNeeded];
+    };
+    void (^finishState)(void) = ^{
+        self.selectionBadge.hidden = !selectionMode;
+    };
+
+    if (animated) {
+        [UIView animateWithDuration:0.22
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionBeginFromCurrentState
+                         animations:applyState
+                         completion:^(__unused BOOL finished) {
+            finishState();
+        }];
+    } else {
+        applyState();
+        finishState();
+    }
 }
 
 @end
