@@ -952,7 +952,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 		if (!firstGroup) {
 			[menuElements addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[]]];
 		}
-		if (group.collapsible || groupElements.count == 1) {
+		if (group.collapsible) {
 			UIImage *sectionImage = nil;
 			if (group.iconName.length > 0) {
 				sectionImage = [[SCIActionButtonImage(group.iconName, @"option", 22.0) imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] imageWithTintColor:[UIColor labelColor] renderingMode:UIImageRenderingModeAlwaysOriginal];

@@ -4,4 +4,5 @@
 
 @interface SCIInterfaceSettingsProvider : NSObject
 + (SCISetting *)rootSetting;
++ (SCISetting *)experimentalLiquidGlassSetting;
 @end

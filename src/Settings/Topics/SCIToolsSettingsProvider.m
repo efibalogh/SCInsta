@@ -1,6 +1,7 @@
 #import "SCIToolsSettingsProvider.h"
 
 #import "../SCITopicSettingsSupport.h"
+#import "SCIInterfaceSettingsProvider.h"
 #import "../../Utils.h"
 
 @implementation SCIToolsSettingsProvider
@@ -22,6 +23,9 @@
         ], nil),
         SCITopicSection(@"Instagram", @[
             [SCISetting switchCellWithTitle:@"Disable Safe Mode" subtitle:@"Makes Instagram not reset settings after subsequent crashes, at your own risk" defaultsKey:@"disable_safe_mode"]
+        ], nil),
+        SCITopicSection(@"Liquid Glass", @[
+            [SCIInterfaceSettingsProvider experimentalLiquidGlassSetting]
         ], nil)
     ]];
 

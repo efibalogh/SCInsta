@@ -185,8 +185,7 @@ static char kSCIActionsListSwitchAssocKey;
     }
     [self.configuration.sections removeObjectAtIndex:indexPath.row];
     [self.configuration save];
-    [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
-    [tableView reloadSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(1, 2)] withRowAnimation:UITableViewRowAnimationAutomatic];
+    [tableView reloadData];
 }
 
 - (void)addSectionTapped {
