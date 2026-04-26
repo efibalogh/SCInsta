@@ -8,6 +8,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)sharedManager;
 - (void)exportSettingsAndVaultFromController:(UIViewController *)controller;
 - (void)importSettingsAndVaultFromController:(UIViewController *)controller;
+- (void)presentExportOptionsFromController:(UIViewController *)controller;
+- (void)presentImportOptionsFromController:(UIViewController *)controller;
+- (void)exportFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeVault:(BOOL)includeVault;
+- (void)importFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeVault:(BOOL)includeVault;
 
 @end
 

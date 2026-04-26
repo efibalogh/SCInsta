@@ -10,6 +10,8 @@
 
 @interface SCISettingsTransferManager () <UIDocumentPickerDelegate>
 @property (nonatomic, weak) UIViewController *presentingController;
+@property (nonatomic, assign) BOOL pendingImportSettings;
+@property (nonatomic, assign) BOOL pendingImportVault;
 @end
 
 @implementation SCISettingsTransferManager
@@ -109,7 +111,7 @@ static BOOL SCIIsValidSettingsTransferBundleRoot(NSString *bundleRoot) {
     if (bundleRoot.length == 0) return NO;
     NSString *prefsPath = [bundleRoot stringByAppendingPathComponent:@"Preferences/settings.plist"];
     NSString *vaultPath = [bundleRoot stringByAppendingPathComponent:@"Vault"];
-    return [[NSFileManager defaultManager] fileExistsAtPath:prefsPath] &&
+    return [[NSFileManager defaultManager] fileExistsAtPath:prefsPath] ||
            [[NSFileManager defaultManager] fileExistsAtPath:vaultPath];
 }
 
@@ -161,31 +163,96 @@ static NSString *SCIResolvedImportBundleRootForPickedURL(NSURL *pickedURL, NSErr
     return SCIExpandSerializedSettingsTransferArchive(pickedURL, error);
 }
 
+static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault) {
+    return @{
+        @"format_version": @2,
+        @"created_at": [NSDate date],
+        @"includes_settings": @(includeSettings),
+        @"includes_vault": @(includeVault),
+        @"included_keys": includeSettings ? [[SCIExportedPreferenceKeys() allObjects] sortedArrayUsingSelector:@selector(compare:)] : @[]
+    };
+}
+
 - (void)exportSettingsAndVaultFromController:(UIViewController *)controller {
+    [self exportFromController:controller includeSettings:YES includeVault:YES];
+}
+
+- (void)importSettingsAndVaultFromController:(UIViewController *)controller {
+    [self importFromController:controller includeSettings:YES includeVault:YES];
+}
+
+- (void)presentExportOptionsFromController:(UIViewController *)controller {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Export Backup"
+                                                                   message:@"Choose what to include in the export."
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Export Settings Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf exportFromController:controller includeSettings:YES includeVault:NO];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Export Vault Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf exportFromController:controller includeSettings:NO includeVault:YES];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Export Settings + Vault" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf exportFromController:controller includeSettings:YES includeVault:YES];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    if (sheet.popoverPresentationController) {
+        sheet.popoverPresentationController.sourceView = controller.view;
+        sheet.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(controller.view.bounds), CGRectGetMidY(controller.view.bounds), 1.0, 1.0);
+    }
+    [controller presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)presentImportOptionsFromController:(UIViewController *)controller {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Import Backup"
+                                                                   message:@"Choose what to restore from the backup."
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Import Settings Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf importFromController:controller includeSettings:YES includeVault:NO];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Import Vault Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf importFromController:controller includeSettings:NO includeVault:YES];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Import Settings + Vault" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf importFromController:controller includeSettings:YES includeVault:YES];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    if (sheet.popoverPresentationController) {
+        sheet.popoverPresentationController.sourceView = controller.view;
+        sheet.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(controller.view.bounds), CGRectGetMidY(controller.view.bounds), 1.0, 1.0);
+    }
+    [controller presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)exportFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeVault:(BOOL)includeVault {
+    if (!includeSettings && !includeVault) return;
     self.presentingController = controller;
 
     NSString *root = SCITemporaryTransferRoot(@"export");
     NSString *bundleRoot = [root stringByAppendingPathComponent:@"SCInstaExportBundle"];
     NSString *prefsPath = [bundleRoot stringByAppendingPathComponent:@"Preferences/settings.plist"];
     NSString *vaultDestination = [bundleRoot stringByAppendingPathComponent:@"Vault"];
+    NSString *manifestPath = [bundleRoot stringByAppendingPathComponent:@"manifest.plist"];
 
     NSFileManager *fm = [NSFileManager defaultManager];
-    [fm createDirectoryAtPath:[prefsPath stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+    [fm createDirectoryAtPath:bundleRoot withIntermediateDirectories:YES attributes:nil error:nil];
 
-    NSDictionary *prefs = SCIPreferencesSnapshot();
-    NSDictionary *manifest = @{
-        @"format_version": @1,
-        @"created_at": [NSDate date],
-        @"included_keys": [[SCIExportedPreferenceKeys() allObjects] sortedArrayUsingSelector:@selector(compare:)]
-    };
-    [prefs writeToFile:prefsPath atomically:YES];
-    [manifest writeToFile:[bundleRoot stringByAppendingPathComponent:@"manifest.plist"] atomically:YES];
-
-    NSError *copyError = nil;
-    if (![fm copyItemAtPath:[SCIVaultPaths vaultDirectory] toPath:vaultDestination error:&copyError]) {
-        [SCIUtils showToastForDuration:3.0 title:@"Export failed" subtitle:copyError.localizedDescription iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
-        return;
+    if (includeSettings) {
+        [fm createDirectoryAtPath:[prefsPath stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+        NSDictionary *prefs = SCIPreferencesSnapshot();
+        [prefs writeToFile:prefsPath atomically:YES];
     }
+
+    if (includeVault) {
+        NSError *copyError = nil;
+        if (![fm copyItemAtPath:[SCIVaultPaths vaultDirectory] toPath:vaultDestination error:&copyError]) {
+            [SCIUtils showToastForDuration:3.0 title:@"Export failed" subtitle:copyError.localizedDescription iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+            return;
+        }
+    }
+
+    [SCITransferManifest(includeSettings, includeVault) writeToFile:manifestPath atomically:YES];
 
     NSError *wrapperError = nil;
     NSFileWrapper *wrapper = [[NSFileWrapper alloc] initWithURL:[NSURL fileURLWithPath:bundleRoot isDirectory:YES]
@@ -219,8 +286,11 @@ static NSString *SCIResolvedImportBundleRootForPickedURL(NSURL *pickedURL, NSErr
     }
 }
 
-- (void)importSettingsAndVaultFromController:(UIViewController *)controller {
+- (void)importFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeVault:(BOOL)includeVault {
+    if (!includeSettings && !includeVault) return;
     self.presentingController = controller;
+    self.pendingImportSettings = includeSettings;
+    self.pendingImportVault = includeVault;
     UIDocumentPickerViewController *picker = nil;
     if (@available(iOS 14.0, *)) {
         UTType *archiveType = SCISettingsTransferArchiveType();
@@ -237,6 +307,8 @@ static NSString *SCIResolvedImportBundleRootForPickedURL(NSURL *pickedURL, NSErr
 }
 
 - (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    self.pendingImportSettings = NO;
+    self.pendingImportVault = NO;
     self.presentingController = nil;
 }
 
@@ -250,37 +322,60 @@ static NSString *SCIResolvedImportBundleRootForPickedURL(NSURL *pickedURL, NSErr
     NSString *bundleRoot = SCIResolvedImportBundleRootForPickedURL(url, &archiveError);
     NSString *prefsPath = [bundleRoot stringByAppendingPathComponent:@"Preferences/settings.plist"];
     NSString *vaultPath = [bundleRoot stringByAppendingPathComponent:@"Vault"];
+    NSString *manifestPath = [bundleRoot stringByAppendingPathComponent:@"manifest.plist"];
+    NSDictionary *manifest = bundleRoot.length > 0 ? [NSDictionary dictionaryWithContentsOfFile:manifestPath] : nil;
+    NSDictionary *prefs = [[NSFileManager defaultManager] fileExistsAtPath:prefsPath] ? [NSDictionary dictionaryWithContentsOfFile:prefsPath] : nil;
+    BOOL archiveHasSettings = [prefs isKindOfClass:[NSDictionary class]];
+    BOOL archiveHasVault = [[NSFileManager defaultManager] fileExistsAtPath:vaultPath];
+    BOOL importSettings = self.pendingImportSettings;
+    BOOL importVault = self.pendingImportVault;
+    self.pendingImportSettings = NO;
+    self.pendingImportVault = NO;
 
-    NSDictionary *prefs = bundleRoot.length > 0 ? [NSDictionary dictionaryWithContentsOfFile:prefsPath] : nil;
-    if (![prefs isKindOfClass:[NSDictionary class]] || ![[NSFileManager defaultManager] fileExistsAtPath:vaultPath]) {
+    if (manifest && [manifest isKindOfClass:[NSDictionary class]]) {
+        NSNumber *manifestSettings = manifest[@"includes_settings"];
+        NSNumber *manifestVault = manifest[@"includes_vault"];
+        if ([manifestSettings respondsToSelector:@selector(boolValue)]) archiveHasSettings = manifestSettings.boolValue && archiveHasSettings;
+        if ([manifestVault respondsToSelector:@selector(boolValue)]) archiveHasVault = manifestVault.boolValue && archiveHasVault;
+    }
+
+    if ((importSettings && !archiveHasSettings) || (importVault && !archiveHasVault) || (!archiveHasSettings && !archiveHasVault)) {
         if (scoped) [url stopAccessingSecurityScopedResource];
         NSString *message = archiveError.localizedDescription ?: @"Archive contents were invalid.";
         [SCIUtils showToastForDuration:3.0 title:@"Import failed" subtitle:message iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
         return;
     }
 
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    for (NSString *key in SCIExportedPreferenceKeys()) {
-        [defaults removeObjectForKey:key];
+    if (importSettings) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        for (NSString *key in SCIExportedPreferenceKeys()) {
+            [defaults removeObjectForKey:key];
+        }
+        [prefs enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+            [defaults setObject:value forKey:key];
+        }];
     }
-    [prefs enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
-        [defaults setObject:value forKey:key];
-    }];
 
-    [[SCIVaultCoreDataStack shared] unloadPersistentStores];
-    NSError *vaultCopyError = nil;
-    if (!SCICopyItemReplacingDestination(vaultPath, [SCIVaultPaths vaultDirectory], &vaultCopyError)) {
-        if (scoped) [url stopAccessingSecurityScopedResource];
-        [SCIUtils showToastForDuration:3.0 title:@"Import failed" subtitle:vaultCopyError.localizedDescription iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+    if (importVault) {
+        [[SCIVaultCoreDataStack shared] unloadPersistentStores];
+        NSError *vaultCopyError = nil;
+        if (!SCICopyItemReplacingDestination(vaultPath, [SCIVaultPaths vaultDirectory], &vaultCopyError)) {
+            if (scoped) [url stopAccessingSecurityScopedResource];
+            [SCIUtils showToastForDuration:3.0 title:@"Import failed" subtitle:vaultCopyError.localizedDescription iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+            [[SCIVaultCoreDataStack shared] reloadPersistentContainer];
+            return;
+        }
+        [[SCIVaultManager sharedManager] removePasscode];
         [[SCIVaultCoreDataStack shared] reloadPersistentContainer];
-        return;
     }
 
-    [[SCIVaultManager sharedManager] removePasscode];
-    [[SCIVaultCoreDataStack shared] reloadPersistentContainer];
     if (scoped) [url stopAccessingSecurityScopedResource];
 
-    [SCIUtils showToastForDuration:3.0 title:@"Import complete" subtitle:@"Settings and vault media were restored. Reconfigure vault lock if needed." iconResource:@"info" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
+    NSString *subtitle = importSettings && importVault
+        ? @"Settings and vault media were restored. Reconfigure vault lock if needed."
+        : (importSettings ? @"Settings were restored." : @"Vault media were restored. Reconfigure vault lock if needed.");
+    [SCIUtils showToastForDuration:3.0 title:@"Import complete" subtitle:subtitle iconResource:@"info" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
+    [SCIUtils showRestartConfirmation];
 }
 
 @end

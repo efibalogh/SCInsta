@@ -114,13 +114,13 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.navigationController.navigationBar.prefersLargeTitles = NO;
+    self.navigationController.navigationBar.prefersLargeTitles = YES;
     // self.view.backgroundColor = UIColor.systemBackgroundColor;
 
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
-    self.tableView.contentInset = UIEdgeInsetsMake(self.reduceMargin ? -30 : -10, 0, 0, 0);
+    // self.tableView.contentInset = UIEdgeInsetsMake(self.reduceMargin ? -30 : -10, 0, 0, 0);
     self.tableView.delegate = self;
     self.tableView.dragInteractionEnabled = [self pageAllowsReordering];
     self.tableView.dragDelegate = self;

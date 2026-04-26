@@ -167,44 +167,31 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
             self.currentUsername = ((IGUserSession *)[window valueForKey:@"userSession"]).user.username;
     } @catch (__unused id e) {}
 
-    // Navigation-style header with a real UIBarButtonItem close affordance.
-    UINavigationBar *navBar = [[UINavigationBar alloc] init];
-    navBar.translatesAutoresizingMaskIntoConstraints = NO;
-    UINavigationItem *navItem = [[UINavigationItem alloc] initWithTitle:@"Mentions"];
-    UIImage *closeImg = [SCIUtils sci_resourceImageNamed:@"xmark" template:YES];
-    UIBarButtonItemStyle buttonStyle;
-    if (@available(iOS 26.0, *)) {
-        buttonStyle = (UIBarButtonItemStyle)2; // prominent
-    } else {
-        buttonStyle = UIBarButtonItemStylePlain;
-    }
-    navItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:closeImg
-                                                                 style:buttonStyle
-                                                                target:self
-                                                                action:@selector(sci_closeTapped:)];
-    navBar.items = @[navItem];
-    navBar.tintColor = [UIColor secondaryLabelColor];
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.text = @"Mentions";
+    titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    titleLabel.textColor = [UIColor labelColor];
+    titleLabel.textAlignment = NSTextAlignmentCenter;
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
     // Table view
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     self.tableView.translatesAutoresizingMaskIntoConstraints = NO;
-    // self.tableView.backgroundColor = bg;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
     self.tableView.separatorColor = [UIColor separatorColor];
     self.tableView.separatorInset = UIEdgeInsetsMake(0, 16 + kSCIMentionAvatarSize + 14, 0, 0);
     self.tableView.rowHeight = kSCIMentionRowHeight;
 
-    [self.view addSubview:navBar];
+    [self.view addSubview:titleLabel];
     [self.view addSubview:self.tableView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [navBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [navBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [navBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [titleLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16.0],
+        [titleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
 
-        [self.tableView.topAnchor constraintEqualToAnchor:navBar.bottomAnchor],
+        [self.tableView.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:16.0],
         [self.tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [self.tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [self.tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -251,11 +238,6 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
             [empty.centerYAnchor constraintEqualToAnchor:self.tableView.centerYAnchor],
         ]];
     }
-}
-
-- (void)sci_closeTapped:(id)sender {
-    (void)sender;
-    [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -538,7 +520,9 @@ void SCIPresentStoryMentionsSheet(UIView *overlayView) {
         sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
         sheet.prefersEdgeAttachedInCompactHeight = YES;
         sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = YES;
-        @try { [sheet setValue:@YES forKey:@"prefersGrabberIndicator"]; } @catch (__unused id e) {}
+        if (@available(iOS 15.0, *)) {
+            sheet.prefersGrabberVisible = YES;
+        }
     // }
 
     [presenter presentViewController:vc animated:YES completion:nil];
