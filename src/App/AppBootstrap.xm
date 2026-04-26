@@ -81,7 +81,9 @@
         @"hide_repost_button_feed": @(NO),
         @"hide_repost_button_reels": @(NO),
         @"story_poll_vote_counts": @(YES),
-        @"search_bar_open_clipboard_link": @(YES)
+        @"search_bar_open_clipboard_link": @(YES),
+        @"show_favorites_at_top": @(NO),
+        @"remove_user_from_copied_share_link": @(YES)
     };
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:sciDefaults];

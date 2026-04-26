@@ -12,6 +12,7 @@
             [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the Meta AI buttons and related functionality within the app" defaultsKey:@"hide_meta_ai"],
             [SCISetting switchCellWithTitle:@"Copy Description" subtitle:@"Copy description text fields by long-pressing on them" defaultsKey:@"copy_description"],
             [SCISetting switchCellWithTitle:@"Do Not Save Recent Searches" subtitle:@"Search bars will no longer save your recent searches" defaultsKey:@"no_recent_searches"],
+            [SCISetting switchCellWithTitle:@"Remove User from Copied Share Link" subtitle:@"Cleans copied Instagram share links into canonical post or reel URLs without the username path or tracking parameters" defaultsKey:@"remove_user_from_copied_share_link"],
             [SCISetting switchCellWithTitle:@"Enhanced Media Resolution" subtitle:@"Increases the screen size reported to Instagram in outgoing requests, allowing higher-resolution media in feeds and downloads." defaultsKey:@"enhanced_media_resolution"]
         ], nil),
         SCITopicSection(@"Cache", @[

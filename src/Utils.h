@@ -68,6 +68,7 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 + (BOOL)openInstagramProfileForUsername:(NSString *)username;
 + (BOOL)openInstagramMediaURL:(NSURL *)url;
 + (BOOL)openPhotosApp;
++ (nullable NSURL *)sanitizedInstagramShareURL:(NSURL *)url;
 
 // Media
 + (NSURL *)getPhotoUrl:(IGPhoto *)photo;

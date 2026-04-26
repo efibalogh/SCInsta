@@ -445,6 +445,53 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     return SCIURLFromStringOrURL(SCIKVCObject(user, @"profile_pic_url"));
 }
 
+static BOOL SCIInstagramHostMatchesCanonical(NSString *host) {
+    if (host.length == 0) return NO;
+    NSString *lower = host.lowercaseString;
+    return [lower isEqualToString:@"instagram.com"]
+        || [lower isEqualToString:@"www.instagram.com"]
+        || [lower isEqualToString:@"instagr.am"]
+        || [lower hasSuffix:@".instagram.com"];
+}
+
+static BOOL SCIInstagramPathUsesSharePrefix(NSArray<NSString *> *segments) {
+    if (segments.count < 2) return NO;
+    NSString *candidate = segments[1].lowercaseString;
+    return [candidate isEqualToString:@"p"]
+        || [candidate isEqualToString:@"reel"]
+        || [candidate isEqualToString:@"reels"]
+        || [candidate isEqualToString:@"tv"];
+}
+
+static NSArray<NSString *> *SCISanitizedInstagramPathSegments(NSArray<NSString *> *segments) {
+    if (segments.count >= 3 && SCIInstagramPathUsesSharePrefix(segments)) {
+        return [segments subarrayWithRange:NSMakeRange(1, segments.count - 1)];
+    }
+    return segments;
+}
+
+static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQueryItem *> *items) {
+    if (items.count == 0) return nil;
+
+    static NSSet<NSString *> *blockedKeys;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        blockedKeys = [NSSet setWithArray:@[
+            @"igsh", @"igshid", @"ig_rid", @"ig_mid",
+            @"utm_source", @"utm_medium", @"utm_campaign", @"utm_term", @"utm_content",
+            @"fbclid"
+        ]];
+    });
+
+    NSMutableArray<NSURLQueryItem *> *kept = [NSMutableArray array];
+    for (NSURLQueryItem *item in items) {
+        if (![blockedKeys containsObject:item.name.lowercaseString]) {
+            [kept addObject:item];
+        }
+    }
+    return kept.count > 0 ? kept : nil;
+}
+
 @implementation SCIUtils
 
 + (BOOL)getBoolPref:(NSString *)key {
@@ -696,12 +743,24 @@ static NSURL *SCIThumbProfilePicURL(id user) {
     return YES;
 }
 
++ (BOOL)openURLThroughApplicationDelegate:(NSURL *)url {
+    if (!url) return NO;
+    UIApplication *application = [UIApplication sharedApplication];
+    id<UIApplicationDelegate> delegate = application.delegate;
+    if ([delegate respondsToSelector:@selector(application:openURL:options:)]) {
+        [delegate application:application openURL:url options:@{}];
+        return YES;
+    }
+    return NO;
+}
+
 + (BOOL)openInstagramProfileForUsername:(NSString *)username {
     NSString *encodedUsername = [username stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
     if (encodedUsername.length == 0) return NO;
 
     NSURL *appURL = [NSURL URLWithString:[NSString stringWithFormat:@"instagram://user?username=%@", encodedUsername]];
     if (appURL && [[UIApplication sharedApplication] canOpenURL:appURL]) {
+        if ([self openURLThroughApplicationDelegate:appURL]) return YES;
         return [self openURL:appURL];
     }
 
@@ -725,13 +784,51 @@ static NSURL *SCIThumbProfilePicURL(id user) {
                               restorationHandler:^(__unused NSArray<id<UIUserActivityRestoring>> *restorableObjects) {}];
             if (handled) return YES;
         }
-    } else if ([scheme isEqualToString:@"instagram"] &&
-               [delegate respondsToSelector:@selector(application:openURL:options:)]) {
-        [delegate application:application openURL:url options:@{}];
-        return YES;
+        if ([self openURLThroughApplicationDelegate:url]) return YES;
+    } else if ([scheme isEqualToString:@"instagram"]) {
+        if ([self openURLThroughApplicationDelegate:url]) return YES;
     }
 
     return [self openURL:url];
+}
+
++ (NSURL *)sanitizedInstagramShareURL:(NSURL *)url {
+    if (!url) return nil;
+    if (![url isKindOfClass:[NSURL class]]) return nil;
+
+    if (![url.scheme.lowercaseString isEqualToString:@"http"] && ![url.scheme.lowercaseString isEqualToString:@"https"]) {
+        return url;
+    }
+    if (!SCIInstagramHostMatchesCanonical(url.host)) {
+        return url;
+    }
+
+    NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    if (!components) {
+        return url;
+    }
+
+    NSArray<NSString *> *rawSegments = [components.path componentsSeparatedByString:@"/"];
+    NSMutableArray<NSString *> *segments = [NSMutableArray array];
+    for (NSString *segment in rawSegments) {
+        if (segment.length > 0) {
+            [segments addObject:segment];
+        }
+    }
+
+    NSArray<NSString *> *sanitizedSegments = SCISanitizedInstagramPathSegments(segments);
+    NSString *path = sanitizedSegments.count > 0 ? [@"/" stringByAppendingString:[sanitizedSegments componentsJoinedByString:@"/"]] : @"/";
+    if (![path hasSuffix:@"/"]) {
+        path = [path stringByAppendingString:@"/"];
+    }
+
+    components.scheme = @"https";
+    components.host = @"www.instagram.com";
+    components.path = path;
+    components.queryItems = SCISanitizedInstagramQueryItems(components.queryItems);
+    components.fragment = nil;
+
+    return components.URL ?: url;
 }
 
 + (BOOL)openPhotosApp {
