@@ -12,6 +12,7 @@
         @"like_confirm_feed": @(NO),
         @"like_confirm_stories": @(NO),
         @"call_confirm": @(YES),
+        @"confirm_create_group_button": @(NO),
         @"keep_deleted_message": @(YES),
         @"profile_photo_zoom": @(YES),
         @"follow_indicator": @(NO),
@@ -83,7 +84,8 @@
         @"story_poll_vote_counts": @(YES),
         @"search_bar_open_clipboard_link": @(YES),
         @"show_favorites_at_top": @(NO),
-        @"remove_user_from_copied_share_link": @(YES)
+        @"remove_user_from_copied_share_link": @(YES),
+        @"hide_create_group_button": @(NO)
     };
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:sciDefaults];

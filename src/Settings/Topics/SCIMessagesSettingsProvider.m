@@ -22,6 +22,7 @@ static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_butt
             [SCISetting switchCellWithTitle:@"Disable Disappearing Swipe-Up" subtitle:@"Blocks swipe-up gesture paths used to enter or toggle disappearing mode" defaultsKey:@"disable_disappearing_swipe_up"],
             [SCISetting switchCellWithTitle:@"Disable Typing Status" subtitle:@"Prevents the typing indicator from being shown to others when you're typing in DMs" defaultsKey:@"disable_typing_status"],
             [SCISetting switchCellWithTitle:@"No Suggested Chats" subtitle:@"Hides the suggested broadcast channels in direct messages" defaultsKey:@"no_suggested_chats"],
+            [SCISetting switchCellWithTitle:@"Hide Create Group Button" subtitle:@"Removes the share-sheet button that appears after selecting multiple recipients, including its layout space" defaultsKey:@"hide_create_group_button"],
             [SCISetting switchCellWithTitle:@"Hide Reels Blend Button" subtitle:@"Hides the button in DMs that opens a reels blend" defaultsKey:@"hide_reels_blend"]
         ], nil),
         SCITopicSection(@"Visual Messages", @[
@@ -39,6 +40,7 @@ static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_butt
         ], nil),
         SCITopicSection(@"Confirmation", @[
             [SCISetting switchCellWithTitle:@"Confirm Call" subtitle:@"Shows an alert when you tap the audio or video call button to confirm before calling" defaultsKey:@"call_confirm"],
+            [SCISetting switchCellWithTitle:@"Confirm Create Group Button" subtitle:@"Shows a confirmation alert before using the share-sheet button that creates or sends to a group from multiple selected recipients" defaultsKey:@"confirm_create_group_button"],
             [SCISetting switchCellWithTitle:@"Confirm Voice Messages" subtitle:@"Shows an alert to confirm before sending a voice message" defaultsKey:@"voice_message_confirm"],
             [SCISetting switchCellWithTitle:@"Confirm Follow Requests" subtitle:@"Shows an alert when you accept or decline a follow request" defaultsKey:@"follow_request_confirm"],
             [SCISetting switchCellWithTitle:@"Confirm Shh Mode" subtitle:@"Shows an alert to confirm before toggling disappearing messages" defaultsKey:@"shh_mode_confirm"],
