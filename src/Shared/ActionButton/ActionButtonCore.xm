@@ -302,14 +302,192 @@ static NSURL *SCIURLFromAssetLikeObject(id object, BOOL videoHint) {
 	return nil;
 }
 
+static id SCIFieldCacheValue(id obj, NSString *key) {
+    if (!obj || key.length == 0) return nil;
+
+    static Ivar fieldCacheIvar = NULL;
+    static Class storableClass = Nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        storableClass = NSClassFromString(@"IGAPIStorableObject");
+        if (storableClass) {
+            fieldCacheIvar = class_getInstanceVariable(storableClass, "_fieldCache");
+        }
+    });
+
+    if (!fieldCacheIvar || !storableClass || ![obj isKindOfClass:storableClass]) return nil;
+
+    id fieldCache = nil;
+    @try {
+        fieldCache = object_getIvar(obj, fieldCacheIvar);
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+
+    if (![fieldCache isKindOfClass:[NSDictionary class]]) return nil;
+    id value = ((NSDictionary *)fieldCache)[key];
+    if (!value || [value isKindOfClass:[NSNull class]]) return nil;
+    return value;
+}
+
+static id SCIUnderlyingMediaObjectForAction(id object) {
+    if (!object) return nil;
+
+    if ([SCIUtils getPhotoUrlForMedia:object] || [SCIUtils getVideoUrlForMedia:object]) {
+        return object;
+    }
+
+    for (NSString *selectorName in @[@"photo", @"rawPhoto", @"video", @"rawVideo"]) {
+        id nestedAsset = SCIObjectForSelector(object, selectorName);
+        if (!nestedAsset) nestedAsset = SCIKVCObject(object, selectorName);
+        if (nestedAsset && nestedAsset != object) {
+            return object;
+        }
+    }
+
+    for (NSString *selectorName in @[@"media", @"item", @"storyItem", @"visualMessage", @"explorePostInFeed", @"rootItem", @"clipsItem", @"clipsMedia", @"post"]) {
+        id nested = SCIObjectForSelector(object, selectorName);
+        if (!nested) nested = SCIKVCObject(object, selectorName);
+        if (nested && nested != object) {
+            id resolved = SCIUnderlyingMediaObjectForAction(nested);
+            if (resolved) return resolved;
+        }
+    }
+
+    return object;
+}
+
+static NSURL *SCIBestCandidatePhotoURLFromCandidates(id candidates) {
+    if (![candidates isKindOfClass:[NSArray class]] || [(NSArray *)candidates count] == 0) {
+        return nil;
+    }
+
+    NSDictionary *bestCandidate = nil;
+    NSInteger bestWidth = 0;
+    for (id candidate in (NSArray *)candidates) {
+        if (![candidate isKindOfClass:[NSDictionary class]]) continue;
+        NSInteger width = [((NSDictionary *)candidate)[@"width"] integerValue];
+        if (width > bestWidth) {
+            bestWidth = width;
+            bestCandidate = candidate;
+        }
+    }
+
+    NSString *urlString = bestCandidate[@"url"];
+    return urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
+}
+
+static NSURL *SCIHDPhotoURLForMediaObject(id mediaObject) {
+    id imageVersions = SCIFieldCacheValue(mediaObject, @"image_versions2");
+    id candidates = [imageVersions isKindOfClass:[NSDictionary class]] ? ((NSDictionary *)imageVersions)[@"candidates"] : nil;
+    if (!candidates) {
+        candidates = SCIFieldCacheValue(mediaObject, @"candidates");
+    }
+
+    NSURL *fieldCacheURL = SCIBestCandidatePhotoURLFromCandidates(candidates);
+    if (fieldCacheURL) return fieldCacheURL;
+
+    id photoObject = SCIObjectForSelector(mediaObject, @"photo");
+    if (!photoObject) return nil;
+
+    Ivar originalVersionsIvar = class_getInstanceVariable([photoObject class], "_originalImageVersions");
+    if (!originalVersionsIvar) return nil;
+
+    id originalVersions = nil;
+    @try {
+        originalVersions = object_getIvar(photoObject, originalVersionsIvar);
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+
+    if (![originalVersions isKindOfClass:[NSArray class]] || [(NSArray *)originalVersions count] == 0) {
+        return nil;
+    }
+
+    NSURL *bestURL = nil;
+    NSInteger bestWidth = 0;
+    for (id item in (NSArray *)originalVersions) {
+        NSURL *url = nil;
+        NSInteger width = 0;
+        if ([item isKindOfClass:[NSDictionary class]]) {
+            NSString *urlString = ((NSDictionary *)item)[@"url"];
+            if (urlString.length > 0) url = [NSURL URLWithString:urlString];
+            width = [((NSDictionary *)item)[@"width"] integerValue];
+        } else {
+            if ([item respondsToSelector:@selector(url)]) {
+                url = SCIURLFromValue([item valueForKey:@"url"]);
+            }
+            if ([item respondsToSelector:@selector(width)]) {
+                width = [[item valueForKey:@"width"] integerValue];
+            }
+        }
+        if (url && width > bestWidth) {
+            bestWidth = width;
+            bestURL = url;
+        }
+    }
+
+    return bestURL;
+}
+
+static NSURL *SCIFieldCachePhotoURLForMediaObject(id mediaObject) {
+    id imageVersions = SCIFieldCacheValue(mediaObject, @"image_versions2");
+    id candidates = [imageVersions isKindOfClass:[NSDictionary class]] ? ((NSDictionary *)imageVersions)[@"candidates"] : nil;
+    if (!candidates) {
+        candidates = SCIFieldCacheValue(mediaObject, @"candidates");
+    }
+    return SCIBestCandidatePhotoURLFromCandidates(candidates);
+}
+
+static NSURL *SCIBestDownloadURLForMediaObject(id mediaObject) {
+    if (!mediaObject) return nil;
+
+    mediaObject = SCIUnderlyingMediaObjectForAction(mediaObject);
+
+    NSURL *videoURL = [SCIUtils getVideoUrlForMedia:mediaObject];
+    if (videoURL) return videoURL;
+
+    NSURL *hdPhotoURL = SCIHDPhotoURLForMediaObject(mediaObject);
+    if (hdPhotoURL) return hdPhotoURL;
+
+    NSURL *photoURL = [SCIUtils getPhotoUrlForMedia:mediaObject];
+    if (photoURL) return photoURL;
+
+    return SCIFieldCachePhotoURLForMediaObject(mediaObject);
+}
+
+static NSURL *SCICoverURLForMediaObject(id mediaObject) {
+    if (!mediaObject) return nil;
+
+    mediaObject = SCIUnderlyingMediaObjectForAction(mediaObject);
+
+    NSURL *hdPhotoURL = SCIHDPhotoURLForMediaObject(mediaObject);
+    if (hdPhotoURL) return hdPhotoURL;
+
+    NSURL *photoURL = [SCIUtils getPhotoUrlForMedia:mediaObject];
+    if (photoURL) return photoURL;
+
+    return SCIFieldCachePhotoURLForMediaObject(mediaObject);
+}
+
 static SCIResolvedMediaEntry *SCIEntryFromMediaObject(id mediaObject) {
 	if (!mediaObject) return nil;
+
+    mediaObject = SCIUnderlyingMediaObjectForAction(mediaObject);
 
 	SCIResolvedMediaEntry *entry = [[SCIResolvedMediaEntry alloc] init];
 	entry.mediaObject = mediaObject;
 	entry.metadataObject = mediaObject;
 
+    if (!entry.photoURL) {
+        entry.photoURL = [SCIUtils getPhotoUrlForMedia:mediaObject];
+    }
+    if (!entry.videoURL) {
+        entry.videoURL = [SCIUtils getVideoUrlForMedia:mediaObject];
+    }
+
 	id photoObject = SCIObjectForSelector(mediaObject, @"photo");
+	if (!photoObject) photoObject = SCIObjectForSelector(mediaObject, @"rawPhoto");
 	if (photoObject) {
 		entry.photoURL = [SCIUtils getPhotoUrl:photoObject];
 		if (!entry.photoURL) {
@@ -364,21 +542,27 @@ static NSArray<SCIResolvedMediaEntry *> *SCIEntriesFromMedia(id media) {
 
 	if (items.count > 0) {
 		for (id item in items) {
-			SCIResolvedMediaEntry *entry = SCIEntryFromMediaObject(item);
-			if (!entry) entry = SCIEntryFromMediaObject(SCIObjectForSelector(item, @"media") ?: SCIKVCObject(item, @"media"));
+            id nestedMedia = SCIObjectForSelector(item, @"media") ?: SCIKVCObject(item, @"media");
+			SCIResolvedMediaEntry *entry = SCIEntryFromMediaObject(nestedMedia);
 			if (!entry) entry = SCIEntryFromMediaObject(SCIObjectForSelector(item, @"visualMessage") ?: SCIKVCObject(item, @"visualMessage"));
 			if (!entry) entry = SCIEntryFromMediaObject(SCIObjectForSelector(item, @"item") ?: SCIKVCObject(item, @"item"));
+			if (!entry) entry = SCIEntryFromMediaObject(item);
 			if (entry) {
-				entry.mediaObject = item;
+				if (!entry.mediaObject) {
+                    entry.mediaObject = item;
+                }
+                if (!entry.metadataObject) {
+                    entry.metadataObject = nestedMedia ?: item;
+                }
 				[entries addObject:entry];
 			}
 		}
 	} else {
-		SCIResolvedMediaEntry *singleEntry = SCIEntryFromMediaObject(media);
+        id nested = SCIObjectForSelector(media, @"media");
+        if (!nested) nested = SCIKVCObject(media, @"media");
+		SCIResolvedMediaEntry *singleEntry = SCIEntryFromMediaObject(nested);
 		if (!singleEntry) {
-			id nested = SCIObjectForSelector(media, @"media");
-			if (!nested) nested = SCIKVCObject(media, @"media");
-			singleEntry = SCIEntryFromMediaObject(nested);
+			singleEntry = SCIEntryFromMediaObject(media);
 		}
 		if (singleEntry) [entries addObject:singleEntry];
 	}
@@ -703,18 +887,17 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	}
 
 	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) {
-		if (!currentURL) {
+        NSURL *bestURL = currentEntry.videoURL ?: currentEntry.photoURL;
+        if (!bestURL) {
+            id mediaForCopy = currentEntry.metadataObject ?: currentEntry.mediaObject ?: media;
+            bestURL = SCIBestDownloadURLForMediaObject(mediaForCopy);
+        }
+		if (!bestURL) {
 			[SCIUtils showToastForDuration:2.0 title:@"No link available" subtitle:nil iconResource:@"link" fallbackSystemImageName:@"link" tone:SCIFeedbackPillToneError];
 			return YES;
 		}
 
-		NSURL *normalized = currentURL;
-		if ([normalized respondsToSelector:@selector(normalizedURL)]) {
-			NSURL *resolved = [normalized normalizedURL];
-			if (resolved) normalized = resolved;
-		}
-
-		[UIPasteboard generalPasteboard].string = normalized.absoluteString ?: @"";
+		[UIPasteboard generalPasteboard].string = bestURL.absoluteString ?: @"";
 		[SCIUtils showToastForDuration:1.5 title:@"Download link copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
 		return YES;
 	}
@@ -740,7 +923,23 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
 		thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
 		thumbnailMeta.sourceUsername = meta.sourceUsername;
-		SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
+        id mediaForThumbnail = currentEntry.metadataObject ?: currentEntry.mediaObject ?: media;
+        NSURL *coverURL = SCICoverURLForMediaObject(mediaForThumbnail);
+        if (coverURL) {
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                NSData *data = [NSData dataWithContentsOfURL:coverURL];
+                UIImage *image = data ? [UIImage imageWithData:data] : nil;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (image) {
+                        [SCIFullScreenMediaPlayer showImage:image metadata:thumbnailMeta playbackSource:(SCIFullScreenPlaybackSource)context.source sourceView:context.view controller:context.controller];
+                    } else {
+		                SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
+                    }
+                });
+            });
+        } else {
+		    SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
+        }
 		return YES;
 	}
 
