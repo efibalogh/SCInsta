@@ -4,7 +4,7 @@
 #import "Topics/SCIFeedSettingsProvider.h"
 #import "Topics/SCIGeneralSettingsProvider.h"
 #import "Topics/SCIInterfaceSettingsProvider.h"
-#import "Topics/SCIMediaVaultSettingsProvider.h"
+#import "Topics/SCIGallerySettingsProvider.h"
 #import "Topics/SCIMessagesSettingsProvider.h"
 #import "Topics/SCIProfileSettingsProvider.h"
 #import "Topics/SCIReelsSettingsProvider.h"
@@ -30,7 +30,7 @@
         @{
             @"header": @"",
             @"rows": @[
-                [SCIMediaVaultSettingsProvider rootSetting]
+                [SCIGallerySettingsProvider rootSetting]
             ]
         },
         @{

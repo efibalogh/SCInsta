@@ -33,7 +33,7 @@
 
     NSArray<NSDictionary *> *configs = @[
         @{
-            @"title": @"Saved to Vault",
+            @"title": @"Saved to Gallery",
             @"subtitle": @"Feedback pill preview: success tone.",
             @"iconResource": @"circle_check_filled",
             @"tone": @(SCIFeedbackPillToneSuccess)

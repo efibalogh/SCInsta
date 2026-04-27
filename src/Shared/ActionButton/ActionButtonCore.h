@@ -15,7 +15,7 @@ FOUNDATION_EXPORT NSString * const kSCIActionNone;
 FOUNDATION_EXPORT NSString * const kSCIActionDownloadLibrary;
 FOUNDATION_EXPORT NSString * const kSCIActionDownloadShare;
 FOUNDATION_EXPORT NSString * const kSCIActionCopyDownloadLink;
-FOUNDATION_EXPORT NSString * const kSCIActionDownloadVault;
+FOUNDATION_EXPORT NSString * const kSCIActionDownloadGallery;
 FOUNDATION_EXPORT NSString * const kSCIActionExpand;
 FOUNDATION_EXPORT NSString * const kSCIActionViewThumbnail;
 FOUNDATION_EXPORT NSString * const kSCIActionCopyCaption;

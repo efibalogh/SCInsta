@@ -1,7 +1,7 @@
 #import "Download.h"
-#import "../Shared/Vault/SCIVaultFile.h"
-#import "../Shared/Vault/SCIVaultSaveMetadata.h"
-#import "../Shared/Vault/SCIVaultViewController.h"
+#import "../Shared/Gallery/SCIGalleryFile.h"
+#import "../Shared/Gallery/SCIGallerySaveMetadata.h"
+#import "../Shared/Gallery/SCIGalleryViewController.h"
 #import <Photos/Photos.h>
 
 @implementation SCIDownloadDelegate
@@ -130,7 +130,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 }
 
 - (void)downloadDidCancel {
-    self.pendingVaultSaveMetadata = nil;
+    self.pendingGallerySaveMetadata = nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.progressView dismiss];
     });
@@ -148,7 +148,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 }
 
 - (void)downloadDidFinishWithError:(NSError *)error {
-    self.pendingVaultSaveMetadata = nil;
+    self.pendingGallerySaveMetadata = nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (error && error.code != NSURLErrorCancelled) {
             NSLog(@"[SCInsta] Download: Download failed with error: \"%@\"", error);
@@ -171,12 +171,12 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 }
 
 - (void)downloadDidFinishWithFileURL:(NSURL *)fileURL {
-    SCIVaultSaveMetadata *vaultMeta = self.pendingVaultSaveMetadata;
-    self.pendingVaultSaveMetadata = nil;
+    SCIGallerySaveMetadata *galleryMeta = self.pendingGallerySaveMetadata;
+    self.pendingGallerySaveMetadata = nil;
 
     BOOL isVideo = [self isVideoFileAtURL:fileURL];
-    SCIVaultMediaType vaultType = isVideo ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
-    NSString *fileName = SCIFileNameForMedia(fileURL, vaultType, vaultMeta);
+    SCIGalleryMediaType galleryType = isVideo ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
+    NSString *fileName = SCIFileNameForMedia(fileURL, galleryType, galleryMeta);
     NSString *newPath = [[fileURL.path stringByDeletingLastPathComponent] stringByAppendingPathComponent:fileName];
     NSURL *newURL = [NSURL fileURLWithPath:newPath];
 
@@ -242,26 +242,26 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
             return;
         }
 
-        if (self.action == saveToVault) {
+        if (self.action == saveToGallery) {
             NSError *error;
-            SCIVaultFile *file = [SCIVaultFile saveFileToVault:newURL
-                                                        source:SCIVaultSourceOther
-                                                     mediaType:vaultType
+            SCIGalleryFile *file = [SCIGalleryFile saveFileToGallery:newURL
+                                                        source:SCIGallerySourceOther
+                                                     mediaType:galleryType
                                                     folderPath:nil
-                                                      metadata:vaultMeta
+                                                      metadata:galleryMeta
                                                          error:&error];
             if (file) {
-                [self showCompletionPillWithSubtitle:@"Saved to Vault successfully" completionImmediately:NO completion:^{
+                [self showCompletionPillWithSubtitle:@"Saved to Gallery successfully" completionImmediately:NO completion:^{
                     SCIReleaseActiveDownloadDelegate(self);
                 }];
                 if (self.progressView) {
                     self.progressView.onTapWhenCompleted = ^{
-                        [SCIVaultViewController presentVault];
+                        [SCIGalleryViewController presentGallery];
                     };
                 }
             } else {
                 if (self.progressView) {
-                    [self.progressView showError:@"Failed to save to vault"];
+                    [self.progressView showError:@"Failed to save to gallery"];
                 }
                 SCIReleaseActiveDownloadDelegate(self);
             }

@@ -11,15 +11,15 @@
 #import "../../Utils.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../MediaPreview/SCIMediaItem.h"
-#import "../Vault/SCIVaultFile.h"
-#import "../Vault/SCIVaultOriginController.h"
-#import "../Vault/SCIVaultSaveMetadata.h"
+#import "../Gallery/SCIGalleryFile.h"
+#import "../Gallery/SCIGalleryOriginController.h"
+#import "../Gallery/SCIGallerySaveMetadata.h"
 
 NSString * const kSCIActionNone = @"none";
 NSString * const kSCIActionDownloadLibrary = @"download_library";
 NSString * const kSCIActionDownloadShare = @"download_share";
 NSString * const kSCIActionCopyDownloadLink = @"copy_download_link";
-NSString * const kSCIActionDownloadVault = @"download_vault";
+NSString * const kSCIActionDownloadGallery = @"download_gallery";
 NSString * const kSCIActionExpand = @"expand";
 NSString * const kSCIActionViewThumbnail = @"view_thumbnail";
 NSString * const kSCIActionCopyCaption = @"copy_caption";
@@ -161,30 +161,30 @@ static NSString *SCIDefaultActionPrefKeyForSource(SCIActionButtonSource source) 
 	return [NSString stringWithFormat:@"action_button_%@_default_action", SCIActionButtonTopicKeyForSource(source)];
 }
 
-static SCIVaultSource SCIVaultSourceForActionSource(SCIActionButtonSource source) {
+static SCIGallerySource SCIGallerySourceForActionSource(SCIActionButtonSource source) {
 	switch (source) {
 		case SCIActionButtonSourceFeed:
-			return SCIVaultSourceFeed;
+			return SCIGallerySourceFeed;
 		case SCIActionButtonSourceReels:
-			return SCIVaultSourceReels;
+			return SCIGallerySourceReels;
 		case SCIActionButtonSourceStories:
-			return SCIVaultSourceStories;
+			return SCIGallerySourceStories;
 		case SCIActionButtonSourceDirect:
-			return SCIVaultSourceDMs;
+			return SCIGallerySourceDMs;
         case SCIActionButtonSourceProfile:
-            return SCIVaultSourceProfile;
+            return SCIGallerySourceProfile;
 		default:
-			return SCIVaultSourceOther;
+			return SCIGallerySourceOther;
 	}
 }
 
-static SCIVaultSaveMetadata *SCIVaultMetadata(SCIActionButtonSource source, NSString *username, id media) {
-	SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
-	meta.source = (int16_t)SCIVaultSourceForActionSource(source);
+static SCIGallerySaveMetadata *SCIGalleryMetadata(SCIActionButtonSource source, NSString *username, id media) {
+	SCIGallerySaveMetadata *meta = [[SCIGallerySaveMetadata alloc] init];
+	meta.source = (int16_t)SCIGallerySourceForActionSource(source);
 	if (username.length > 0) {
 		meta.sourceUsername = username;
 	}
-    [SCIVaultOriginController populateMetadata:meta fromMedia:media];
+    [SCIGalleryOriginController populateMetadata:meta fromMedia:media];
 	return meta;
 }
 
@@ -208,7 +208,7 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButton
 	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) {
 		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"link%@", append] pointSize:size];
 	}
-	if ([identifier isEqualToString:kSCIActionDownloadVault]) {
+	if ([identifier isEqualToString:kSCIActionDownloadGallery]) {
 		return [SCIAssetUtils instagramIconNamed:@"photo_gallery" pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
@@ -661,8 +661,8 @@ static NSArray<SCIMediaItem *> *SCIPlayerItemsFromEntries(NSArray<SCIResolvedMed
 
 		SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
 		item.mediaType = entry.videoURL ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
-		item.vaultSaveSource = SCIVaultSourceForActionSource(source);
-		item.vaultMetadata = SCIVaultMetadata(source, username, metadataObject);
+		item.gallerySaveSource = SCIGallerySourceForActionSource(source);
+		item.galleryMetadata = SCIGalleryMetadata(source, username, metadataObject);
 		if (username.length > 0) item.title = username;
 		[items addObject:item];
 	}
@@ -728,7 +728,7 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 		size = 44.0;
 	} else if ([identifier isEqualToString:kSCIActionDownloadShare] || 
 			   [identifier isEqualToString:kSCIActionViewThumbnail] ||
-               [identifier isEqualToString:kSCIActionDownloadVault]) {
+               [identifier isEqualToString:kSCIActionDownloadGallery]) {
 		size = 23.0;
 	}
 
@@ -749,8 +749,8 @@ static CGSize SCICustomButtonIconDisplaySize(NSString *identifier, SCIActionButt
 	if (source == SCIActionButtonSourceReels &&
 		([identifier isEqualToString:kSCIActionDownloadShare] ||
 		 [identifier isEqualToString:kSCIActionViewThumbnail] ||
-		 [identifier isEqualToString:kSCIActionDownloadVault])) {
-		if ([identifier isEqualToString:kSCIActionDownloadVault]) {
+		 [identifier isEqualToString:kSCIActionDownloadGallery])) {
+		if ([identifier isEqualToString:kSCIActionDownloadGallery]) {
 			width = 28.0;
 			height = 28.0;
 		} else {
@@ -851,7 +851,7 @@ static BOOL SCIIsActionVisible(SCIActionButtonContext *context,
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary] ||
 		[identifier isEqualToString:kSCIActionDownloadShare] ||
 		[identifier isEqualToString:kSCIActionCopyDownloadLink] ||
-		[identifier isEqualToString:kSCIActionDownloadVault]) {
+		[identifier isEqualToString:kSCIActionDownloadGallery]) {
 		return currentURL != nil;
 	}
 	if ([identifier isEqualToString:kSCIActionCopyCaption]) {
@@ -908,7 +908,7 @@ static NSString *SCIActionButtonMenuSignature(SCIActionButtonContext *context,
 			configuration.dictionaryRepresentation.description ?: @""];
 }
 
-static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *metadata, SCIActionButtonContext *context) {
+static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIGallerySaveMetadata *metadata, SCIActionButtonContext *context) {
 	if (!videoURL) {
 		[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled"];
 		return;
@@ -950,7 +950,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 								   NSArray<SCIResolvedMediaEntry *> *entries,
 								   NSInteger resolvedIndex,
 								   NSString *username,
-								   SCIVaultSaveMetadata *meta,
+								   SCIGallerySaveMetadata *meta,
 								   id media) {
 	NSURL *currentURL = currentEntry.videoURL ?: currentEntry.photoURL;
 	BOOL isVideo = (currentEntry.videoURL != nil);
@@ -958,7 +958,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary] ||
 		[identifier isEqualToString:kSCIActionDownloadShare] ||
-		[identifier isEqualToString:kSCIActionDownloadVault]) {
+		[identifier isEqualToString:kSCIActionDownloadGallery]) {
 		if (!currentURL) {
 			if (shouldShowFeedbackPill) {
 				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No downloadable media" subtitle:nil iconResource:@"download"];
@@ -968,10 +968,10 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 
 		DownloadAction action = saveToPhotos;
 		if ([identifier isEqualToString:kSCIActionDownloadShare]) action = share;
-		else if ([identifier isEqualToString:kSCIActionDownloadVault]) action = saveToVault;
+		else if ([identifier isEqualToString:kSCIActionDownloadGallery]) action = saveToGallery;
 
 		SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:shouldShowFeedbackPill];
-		delegate.pendingVaultSaveMetadata = meta;
+		delegate.pendingGallerySaveMetadata = meta;
 		[delegate downloadFileWithURL:currentURL fileExtension:SCIExtensionForURL(currentURL, isVideo) hudLabel:nil];
 		return YES;
 	}
@@ -1028,8 +1028,8 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 			return YES;
 		}
 
-		SCIVaultSaveMetadata *thumbnailMeta = [[SCIVaultSaveMetadata alloc] init];
-		thumbnailMeta.source = (int16_t)SCIVaultSourceThumbnail;
+		SCIGallerySaveMetadata *thumbnailMeta = [[SCIGallerySaveMetadata alloc] init];
+		thumbnailMeta.source = (int16_t)SCIGallerySourceThumbnail;
 		thumbnailMeta.sourceUsername = meta.sourceUsername;
         id mediaForThumbnail = currentEntry.metadataObject ?: currentEntry.mediaObject ?: media;
         NSURL *coverURL = SCICoverURLForMediaObject(mediaForThumbnail);
@@ -1136,7 +1136,7 @@ BOOL SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonContext *co
 		}
 	}
 
-	SCIVaultSaveMetadata *meta = SCIVaultMetadata(context.source, username, metadataObject);
+	SCIGallerySaveMetadata *meta = SCIGalleryMetadata(context.source, username, metadataObject);
 
 	if (isDefaultTap && !SCIActionIdentifierOpensPreview(identifier)) {
 		SCIPausePlaybackForPreviewContext(context);

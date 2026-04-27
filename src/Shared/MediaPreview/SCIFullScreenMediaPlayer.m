@@ -9,10 +9,10 @@
 #import "SCIFullScreenVideoViewController.h"
 #import "../../Utils.h"
 #import "../UI/SCIMediaChrome.h"
-#import "../Vault/SCIVaultFile.h"
-#import "../Vault/SCIVaultOriginController.h"
-#import "../Vault/SCIVaultSaveMetadata.h"
-#import "../Vault/SCIVaultCoreDataStack.h"
+#import "../Gallery/SCIGalleryFile.h"
+#import "../Gallery/SCIGalleryOriginController.h"
+#import "../Gallery/SCIGallerySaveMetadata.h"
+#import "../Gallery/SCIGalleryCoreDataStack.h"
 #import "../../AssetUtils.h"
 #import "../../Downloader/Download.h"
 
@@ -23,11 +23,11 @@ static CGFloat const kDismissReturnVelocityAnimationRatio = 0.00007;
 static CGFloat const kDismissMinimumVelocity = 1.0;
 static CGFloat const kDismissMinimumDuration = 0.12;
 static CGFloat const kDismissFinalBackdropAlpha = 0.1;
-static CGFloat const kVaultPreviewMenuIconPointSize = 22.0;
+static CGFloat const kGalleryPreviewMenuIconPointSize = 22.0;
 
-static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
+static UIImage *SCIGalleryPreviewMenuIcon(NSString *resourceName) {
     return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
-                                   pointSize:kVaultPreviewMenuIconPointSize];
+                                   pointSize:kGalleryPreviewMenuIconPointSize];
 }
 
 static UIViewController *SCIPreviewPresenterForContext(SCIFullScreenPlaybackSource playbackSource,
@@ -60,11 +60,11 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 
 @property (nonatomic, strong) UIView *bottomBar;
 @property (nonatomic, strong) UIButton *savePhotosButton;
-@property (nonatomic, strong) UIButton *saveVaultButton;
-@property (nonatomic, strong) UIButton *deleteVaultButton;
+@property (nonatomic, strong) UIButton *saveGalleryButton;
+@property (nonatomic, strong) UIButton *deleteGalleryButton;
 @property (nonatomic, strong) UIButton *shareButton;
 @property (nonatomic, strong) UIButton *clipboardButton;
-@property (nonatomic, strong) UIButton *vaultOriginButton;
+@property (nonatomic, strong) UIButton *galleryOriginButton;
 
 @property (nonatomic, assign) BOOL isToolbarVisible;
 @property (nonatomic, assign) BOOL isSingleItemMode;
@@ -93,46 +93,46 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 #pragma mark - Convenience Factories
 
 + (void)showFileURL:(NSURL *)fileURL {
-    [self showFileURL:fileURL fromVault:NO];
+    [self showFileURL:fileURL fromGallery:NO];
 }
 
-+ (void)showFileURL:(NSURL *)fileURL metadata:(SCIVaultSaveMetadata *)metadata {
++ (void)showFileURL:(NSURL *)fileURL metadata:(SCIGallerySaveMetadata *)metadata {
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:fileURL];
-    item.isFromVault = NO;
-    item.vaultMetadata = metadata;
+    item.isFromGallery = NO;
+    item.galleryMetadata = metadata;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    player.isFromVault = NO;
+    player.isFromGallery = NO;
 
     UIViewController *presenter = topMostController();
     [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
 }
 
-+ (void)showFileURL:(NSURL *)fileURL fromVault:(BOOL)fromVault {
++ (void)showFileURL:(NSURL *)fileURL fromGallery:(BOOL)fromGallery {
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:fileURL];
-    item.isFromVault = fromVault;
+    item.isFromGallery = fromGallery;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    player.isFromVault = fromVault;
+    player.isFromGallery = fromGallery;
 
     UIViewController *presenter = topMostController();
     [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
 }
 
-+ (void)showVaultFiles:(NSArray<SCIVaultFile *> *)files
++ (void)showGalleryFiles:(NSArray<SCIGalleryFile *> *)files
        startingAtIndex:(NSInteger)index
     fromViewController:(UIViewController *)presenter {
     if (files.count == 0) return;
 
     NSMutableArray<SCIMediaItem *> *items = [NSMutableArray arrayWithCapacity:files.count];
-    for (SCIVaultFile *file in files) {
+    for (SCIGalleryFile *file in files) {
         if (![file fileExists]) continue;
-        SCIMediaItem *item = [SCIMediaItem itemWithVaultFile:file];
+        SCIMediaItem *item = [SCIMediaItem itemWithGalleryFile:file];
         [items addObject:item];
     }
 
     if (items.count == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenVault duration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenGallery duration:2.0
                                  title:@"No files found"
                               subtitle:nil
                           iconResource:@"search"
@@ -141,14 +141,14 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     }
 
     NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenVault duration:1.4
-                                     title:@"Opened vault media"
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenGallery duration:1.4
+                                     title:@"Opened gallery media"
                                   subtitle:nil
                               iconResource:@"photo_gallery"
                                       tone:SCIFeedbackPillToneInfo];
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    player.isFromVault = YES;
+    player.isFromGallery = YES;
     [player playItems:items startingAtIndex:adjustedIndex fromViewController:presenter];
 }
 
@@ -156,13 +156,13 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     [self showPhotoURLs:urls initialIndex:index metadata:nil];
 }
 
-+ (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(SCIVaultSaveMetadata *)metadata {
++ (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(SCIGallerySaveMetadata *)metadata {
     if (urls.count == 0) return;
 
     NSMutableArray<SCIMediaItem *> *items = [NSMutableArray arrayWithCapacity:urls.count];
     for (NSURL *url in urls) {
         SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
-        item.vaultMetadata = metadata;
+        item.galleryMetadata = metadata;
         [items addObject:item];
     }
 
@@ -173,7 +173,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     [player playItems:items startingAtIndex:adjustedIndex fromViewController:presenter];
 }
 
-+ (void)showMediaItems:(NSArray<SCIMediaItem *> *)items startingAtIndex:(NSInteger)index metadata:(SCIVaultSaveMetadata *)metadata {
++ (void)showMediaItems:(NSArray<SCIMediaItem *> *)items startingAtIndex:(NSInteger)index metadata:(SCIGallerySaveMetadata *)metadata {
     [self showMediaItems:items
          startingAtIndex:index
                 metadata:metadata
@@ -186,7 +186,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 
 + (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
        startingAtIndex:(NSInteger)index
-              metadata:(SCIVaultSaveMetadata *)metadata
+              metadata:(SCIGallerySaveMetadata *)metadata
         playbackSource:(SCIFullScreenPlaybackSource)playbackSource
             sourceView:(UIView *)sourceView
             controller:(UIViewController *)controller
@@ -196,8 +196,8 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 
     if (metadata) {
         for (SCIMediaItem *item in items) {
-            if (item && !item.vaultMetadata) {
-                item.vaultMetadata = metadata;
+            if (item && !item.galleryMetadata) {
+                item.galleryMetadata = metadata;
             }
         }
     }
@@ -205,7 +205,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    player.isFromVault = NO;
+    player.isFromGallery = NO;
     [player configurePlaybackContextWithSource:playbackSource
                                     sourceView:sourceView
                                     controller:controller
@@ -219,7 +219,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     [self showImage:image metadata:nil];
 }
 
-+ (void)showImage:(UIImage *)image metadata:(SCIVaultSaveMetadata *)metadata {
++ (void)showImage:(UIImage *)image metadata:(SCIGallerySaveMetadata *)metadata {
     [self showImage:image
            metadata:metadata
      playbackSource:SCIFullScreenPlaybackSourceUnknown
@@ -230,7 +230,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 }
 
 + (void)showImage:(UIImage *)image
-         metadata:(SCIVaultSaveMetadata *)metadata
+         metadata:(SCIGallerySaveMetadata *)metadata
    playbackSource:(SCIFullScreenPlaybackSource)playbackSource
        sourceView:(UIView *)sourceView
        controller:(UIViewController *)controller
@@ -238,11 +238,11 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
    resumePlayback:(SCIMediaPreviewPlaybackBlock)resumePlayback {
     if (!image) return;
     SCIMediaItem *item = [SCIMediaItem itemWithImage:image];
-    item.vaultMetadata = metadata;
+    item.galleryMetadata = metadata;
     if (metadata.sourceUsername.length > 0) {
         item.title = metadata.sourceUsername;
     }
-    item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
+    item.gallerySaveSource = metadata ? (NSInteger)metadata.source : -1;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     [player configurePlaybackContextWithSource:playbackSource
@@ -258,7 +258,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     [self showRemoteImageURL:url metadata:nil];
 }
 
-+ (void)showRemoteImageURL:(NSURL *)url metadata:(SCIVaultSaveMetadata *)metadata {
++ (void)showRemoteImageURL:(NSURL *)url metadata:(SCIGallerySaveMetadata *)metadata {
     [self showRemoteImageURL:url
                     metadata:metadata
               playbackSource:SCIFullScreenPlaybackSourceUnknown
@@ -269,7 +269,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 }
 
 + (void)showRemoteImageURL:(NSURL *)url
-                  metadata:(SCIVaultSaveMetadata *)metadata
+                  metadata:(SCIGallerySaveMetadata *)metadata
             playbackSource:(SCIFullScreenPlaybackSource)playbackSource
                 sourceView:(UIView *)sourceView
                 controller:(UIViewController *)controller
@@ -278,11 +278,11 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     if (!url) return;
 
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
-    item.vaultMetadata = metadata;
+    item.galleryMetadata = metadata;
     if (metadata.sourceUsername.length > 0) {
         item.title = metadata.sourceUsername;
     }
-    item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
+    item.gallerySaveSource = metadata ? (NSInteger)metadata.source : -1;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     [player configurePlaybackContextWithSource:playbackSource
@@ -296,9 +296,9 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(NSString *)username {
     if (!url) return;
-    SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
-    meta.source = (int16_t)SCIVaultSourceProfile;
-    [SCIVaultOriginController populateProfileMetadata:meta username:username user:nil];
+    SCIGallerySaveMetadata *meta = [[SCIGallerySaveMetadata alloc] init];
+    meta.source = (int16_t)SCIGallerySourceProfile;
+    [SCIGalleryOriginController populateProfileMetadata:meta username:username user:nil];
     [self showRemoteImageURL:url metadata:meta];
 }
 
@@ -443,7 +443,7 @@ fromViewController:(UIViewController *)presenter {
         [_counterLabel.centerYAnchor constraintEqualToAnchor:_closeButton.centerYAnchor],
     ]];
 
-    if (_isFromVault) {
+    if (_isFromGallery) {
         _topFavoriteButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _topFavoriteButton.translatesAutoresizingMaskIntoConstraints = NO;
         [_topFavoriteButton setImage:SCIMediaChromeTopIcon(@"heart") forState:UIControlStateNormal];
@@ -480,23 +480,23 @@ fromViewController:(UIViewController *)presenter {
     [_clipboardButton addTarget:self action:@selector(copyMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_clipboardButton];
 
-    if (_isFromVault) {
-        _vaultOriginButton = SCIMediaChromeBottomButton(@"more", @"More");
-        [_bottomBar addSubview:_vaultOriginButton];
+    if (_isFromGallery) {
+        _galleryOriginButton = SCIMediaChromeBottomButton(@"more", @"More");
+        [_bottomBar addSubview:_galleryOriginButton];
 
-        _deleteVaultButton = SCIMediaChromeBottomButton(@"trash", @"Delete from Vault");
-        _deleteVaultButton.tintColor = [UIColor systemRedColor];
-        [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
-        [_bottomBar addSubview:_deleteVaultButton];
+        _deleteGalleryButton = SCIMediaChromeBottomButton(@"trash", @"Delete from Gallery");
+        _deleteGalleryButton.tintColor = [UIColor systemRedColor];
+        [_deleteGalleryButton addTarget:self action:@selector(deleteFromGallery) forControlEvents:UIControlEventTouchUpInside];
+        [_bottomBar addSubview:_deleteGalleryButton];
     } else {
-        _saveVaultButton = SCIMediaChromeBottomButton(@"photo_gallery", @"Save to Vault");
-        [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
-        [_bottomBar addSubview:_saveVaultButton];
+        _saveGalleryButton = SCIMediaChromeBottomButton(@"photo_gallery", @"Save to Gallery");
+        [_saveGalleryButton addTarget:self action:@selector(saveToGallery) forControlEvents:UIControlEventTouchUpInside];
+        [_bottomBar addSubview:_saveGalleryButton];
     }
 
-    NSArray<UIView *> *row = _isFromVault
-        ? @[_savePhotosButton, _shareButton, _clipboardButton, _vaultOriginButton, _deleteVaultButton]
-        : @[_savePhotosButton, _shareButton, _clipboardButton, _saveVaultButton];
+    NSArray<UIView *> *row = _isFromGallery
+        ? @[_savePhotosButton, _shareButton, _clipboardButton, _galleryOriginButton, _deleteGalleryButton]
+        : @[_savePhotosButton, _shareButton, _clipboardButton, _saveGalleryButton];
 
     SCIMediaChromeInstallBottomRow(_bottomBar, row);
 }
@@ -679,7 +679,7 @@ fromViewController:(UIViewController *)presenter {
 - (void)updateUI {
     [self updateCounter];
     [self updateFavoriteButton];
-    [self updateVaultOriginButton];
+    [self updateGalleryOriginButton];
 }
 
 - (void)updateCounter {
@@ -698,12 +698,12 @@ fromViewController:(UIViewController *)presenter {
     if (!_topFavoriteButton) return;
 
     SCIMediaItem *item = [self currentItem];
-    BOOL isFav = item.vaultFile.isFavorite;
+    BOOL isFav = item.galleryFile.isFavorite;
     UIImage *img = isFav
         ? SCIMediaChromeTopIcon(@"heart_filled")
         : SCIMediaChromeTopIcon(@"heart");
 
-    if (!item.vaultFile) {
+    if (!item.galleryFile) {
         _topFavoriteButton.hidden = YES;
         return;
     }
@@ -713,7 +713,7 @@ fromViewController:(UIViewController *)presenter {
     _topFavoriteButton.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
 }
 
-- (void)showVaultOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
+- (void)showGalleryOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
     [SCIUtils showToastForActionIdentifier:actionIdentifier duration:2.0
                              title:title
                           subtitle:@"The original content may no longer exist."
@@ -721,44 +721,44 @@ fromViewController:(UIViewController *)presenter {
                               tone:SCIFeedbackPillToneError];
 }
 
-- (void)openOriginalPostForCurrentVaultItem {
-    SCIVaultFile *file = self.currentItem.vaultFile;
-    if ([SCIVaultOriginController openOriginalPostForVaultFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link"];
+- (void)openOriginalPostForCurrentGalleryItem {
+    SCIGalleryFile *file = self.currentItem.galleryFile;
+    if ([SCIGalleryOriginController openOriginalPostForGalleryFile:file]) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link"];
     } else {
-        [self showVaultOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionVaultOpenOriginal];
+        [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionGalleryOpenOriginal];
     }
 }
 
-- (void)openProfileForCurrentVaultItem {
-    SCIVaultFile *file = self.currentItem.vaultFile;
-    if ([SCIVaultOriginController openProfileForVaultFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile"];
+- (void)openProfileForCurrentGalleryItem {
+    SCIGalleryFile *file = self.currentItem.galleryFile;
+    if ([SCIGalleryOriginController openProfileForGalleryFile:file]) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile"];
     } else {
-        [self showVaultOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionVaultOpenProfile];
+        [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionGalleryOpenProfile];
     }
 }
 
-- (UIMenu *)vaultOriginMenuForCurrentItem {
-    SCIVaultFile *file = self.currentItem.vaultFile;
+- (UIMenu *)galleryOriginMenuForCurrentItem {
+    SCIGalleryFile *file = self.currentItem.galleryFile;
     NSMutableArray<UIMenuElement *> *actions = [NSMutableArray array];
     __weak typeof(self) weakSelf = self;
 
     if (file.hasOpenableOriginalMedia) {
         [actions addObject:[UIAction actionWithTitle:@"Open Original Post"
-                                               image:SCIVaultPreviewMenuIcon(@"external_link")
+                                               image:SCIGalleryPreviewMenuIcon(@"external_link")
                                           identifier:nil
                                              handler:^(__unused UIAction *action) {
-            [weakSelf openOriginalPostForCurrentVaultItem];
+            [weakSelf openOriginalPostForCurrentGalleryItem];
         }]];
     }
 
     if (file.hasOpenableProfile) {
         [actions addObject:[UIAction actionWithTitle:@"Open Profile"
-                                               image:SCIVaultPreviewMenuIcon(@"profile")
+                                               image:SCIGalleryPreviewMenuIcon(@"profile")
                                           identifier:nil
                                              handler:^(__unused UIAction *action) {
-            [weakSelf openProfileForCurrentVaultItem];
+            [weakSelf openProfileForCurrentGalleryItem];
         }]];
     }
 
@@ -771,56 +771,56 @@ fromViewController:(UIViewController *)presenter {
     return [UIMenu menuWithTitle:@"" children:actions];
 }
 
-- (void)performSingleVaultOriginAction {
-    SCIVaultFile *file = self.currentItem.vaultFile;
+- (void)performSingleGalleryOriginAction {
+    SCIGalleryFile *file = self.currentItem.galleryFile;
     if (file.hasOpenableProfile && !file.hasOpenableOriginalMedia) {
-        [self openProfileForCurrentVaultItem];
+        [self openProfileForCurrentGalleryItem];
         return;
     }
     if (file.hasOpenableOriginalMedia && !file.hasOpenableProfile) {
-        [self openOriginalPostForCurrentVaultItem];
+        [self openOriginalPostForCurrentGalleryItem];
     }
 }
 
-- (void)updateVaultOriginButton {
-    if (!_vaultOriginButton) return;
+- (void)updateGalleryOriginButton {
+    if (!_galleryOriginButton) return;
 
-    SCIVaultFile *file = self.currentItem.vaultFile;
+    SCIGalleryFile *file = self.currentItem.galleryFile;
     BOOL hasOriginal = file.hasOpenableOriginalMedia;
     BOOL hasProfile = file.hasOpenableProfile;
     NSInteger actionCount = (hasOriginal ? 1 : 0) + (hasProfile ? 1 : 0);
 
-    _vaultOriginButton.hidden = !file;
-    [_vaultOriginButton removeTarget:self action:@selector(performSingleVaultOriginAction) forControlEvents:UIControlEventTouchUpInside];
+    _galleryOriginButton.hidden = !file;
+    [_galleryOriginButton removeTarget:self action:@selector(performSingleGalleryOriginAction) forControlEvents:UIControlEventTouchUpInside];
 
     if (actionCount <= 0) {
-        [_vaultOriginButton setImage:SCIMediaChromeBottomIcon(@"more") forState:UIControlStateNormal];
-        _vaultOriginButton.accessibilityLabel = @"More";
-        _vaultOriginButton.enabled = NO;
-        _vaultOriginButton.alpha = 0.55;
-        _vaultOriginButton.menu = nil;
-        _vaultOriginButton.showsMenuAsPrimaryAction = NO;
+        [_galleryOriginButton setImage:SCIMediaChromeBottomIcon(@"more") forState:UIControlStateNormal];
+        _galleryOriginButton.accessibilityLabel = @"More";
+        _galleryOriginButton.enabled = NO;
+        _galleryOriginButton.alpha = 0.55;
+        _galleryOriginButton.menu = nil;
+        _galleryOriginButton.showsMenuAsPrimaryAction = NO;
         return;
     }
 
-    _vaultOriginButton.enabled = YES;
-    _vaultOriginButton.alpha = 1.0;
+    _galleryOriginButton.enabled = YES;
+    _galleryOriginButton.alpha = 1.0;
 
     if (actionCount == 1) {
         NSString *resourceName = hasProfile ? @"profile" : @"external_link";
         NSString *label = hasProfile ? @"Open Profile" : @"Open Original Post";
-        [_vaultOriginButton setImage:SCIMediaChromeBottomIcon(resourceName) forState:UIControlStateNormal];
-        _vaultOriginButton.accessibilityLabel = label;
-        _vaultOriginButton.menu = nil;
-        _vaultOriginButton.showsMenuAsPrimaryAction = NO;
-        [_vaultOriginButton addTarget:self action:@selector(performSingleVaultOriginAction) forControlEvents:UIControlEventTouchUpInside];
+        [_galleryOriginButton setImage:SCIMediaChromeBottomIcon(resourceName) forState:UIControlStateNormal];
+        _galleryOriginButton.accessibilityLabel = label;
+        _galleryOriginButton.menu = nil;
+        _galleryOriginButton.showsMenuAsPrimaryAction = NO;
+        [_galleryOriginButton addTarget:self action:@selector(performSingleGalleryOriginAction) forControlEvents:UIControlEventTouchUpInside];
         return;
     }
 
-    [_vaultOriginButton setImage:SCIMediaChromeBottomIcon(@"more") forState:UIControlStateNormal];
-    _vaultOriginButton.accessibilityLabel = @"More";
-    _vaultOriginButton.menu = [self vaultOriginMenuForCurrentItem];
-    _vaultOriginButton.showsMenuAsPrimaryAction = YES;
+    [_galleryOriginButton setImage:SCIMediaChromeBottomIcon(@"more") forState:UIControlStateNormal];
+    _galleryOriginButton.accessibilityLabel = @"More";
+    _galleryOriginButton.menu = [self galleryOriginMenuForCurrentItem];
+    _galleryOriginButton.showsMenuAsPrimaryAction = YES;
 }
 
 #pragma mark - Toolbar Toggle
@@ -907,10 +907,10 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)favoriteTapped {
     SCIMediaItem *item = [self currentItem];
-    if (!item.vaultFile) return;
+    if (!item.galleryFile) return;
 
-    item.vaultFile.isFavorite = !item.vaultFile.isFavorite;
-    [[SCIVaultCoreDataStack shared] saveContext];
+    item.galleryFile.isFavorite = !item.galleryFile.isFavorite;
+    [[SCIGalleryCoreDataStack shared] saveContext];
     [self updateFavoriteButton];
 
     UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
@@ -951,7 +951,7 @@ fromViewController:(UIViewController *)presenter {
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos]];
-    delegate.pendingVaultSaveMetadata = item.vaultMetadata;
+    delegate.pendingGallerySaveMetadata = item.galleryMetadata;
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
@@ -971,12 +971,12 @@ fromViewController:(UIViewController *)presenter {
     }
 }
 
-- (void)saveToVault {
+- (void)saveToGallery {
     NSURL *targetURL = [self currentFileURL];
     SCIMediaItem *item = [self currentItem];
 
     if (!targetURL && !item.image) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault duration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:2.0
                                  title:@"No media to save"
                               subtitle:nil
                           iconResource:@"media"
@@ -984,10 +984,10 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    SCIVaultMediaType vaultType = (item.mediaType == SCIMediaItemTypeVideo && targetURL) ? SCIVaultMediaTypeVideo : SCIVaultMediaTypeImage;
+    SCIGalleryMediaType galleryType = (item.mediaType == SCIMediaItemTypeVideo && targetURL) ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
 
     if (targetURL.isFileURL && [[NSFileManager defaultManager] fileExistsAtPath:targetURL.path]) {
-        [self vaultSaveLocalFile:targetURL mediaType:vaultType];
+        [self gallerySaveLocalFile:targetURL mediaType:galleryType];
         return;
     } else if (!targetURL && item.image) {
         NSData *jpegData = UIImageJPEGRepresentation(item.image, 0.95);
@@ -995,64 +995,64 @@ fromViewController:(UIViewController *)presenter {
             NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID].UUIDString stringByAppendingPathExtension:@"jpg"]];
             NSURL *tempURL = [NSURL fileURLWithPath:tempPath];
             [jpegData writeToURL:tempURL atomically:YES];
-            [self vaultSaveLocalFile:tempURL mediaType:SCIVaultMediaTypeImage];
+            [self gallerySaveLocalFile:tempURL mediaType:SCIGalleryMediaTypeImage];
             [[NSFileManager defaultManager] removeItemAtURL:tempURL error:nil];
             return;
         }
     }
 
     NSString *ext = targetURL.pathExtension;
-    if (ext.length == 0) ext = vaultType == SCIVaultMediaTypeVideo ? @"mp4" : @"jpg";
+    if (ext.length == 0) ext = galleryType == SCIGalleryMediaTypeVideo ? @"mp4" : @"jpg";
 
-    SCIVaultSaveMetadata *meta = item.vaultMetadata;
-    if (!meta && (item.title.length > 0 || item.vaultSaveSource >= 0)) {
-        meta = [[SCIVaultSaveMetadata alloc] init];
+    SCIGallerySaveMetadata *meta = item.galleryMetadata;
+    if (!meta && (item.title.length > 0 || item.gallerySaveSource >= 0)) {
+        meta = [[SCIGallerySaveMetadata alloc] init];
         if (item.title.length) {
             meta.sourceUsername = item.title;
         }
-        if (item.vaultSaveSource >= 0) {
-            meta.source = (int16_t)item.vaultSaveSource;
+        if (item.gallerySaveSource >= 0) {
+            meta.source = (int16_t)item.gallerySaveSource;
         } else {
-            meta.source = (int16_t)SCIVaultSourceOther;
+            meta.source = (int16_t)SCIGallerySourceOther;
         }
     }
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault]];
-    delegate.pendingVaultSaveMetadata = meta;
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery]];
+    delegate.pendingGallerySaveMetadata = meta;
     [delegate downloadFileWithURL:targetURL fileExtension:ext hudLabel:nil];
 }
 
-- (void)vaultSaveLocalFile:(NSURL *)localURL mediaType:(SCIVaultMediaType)vaultType {
+- (void)gallerySaveLocalFile:(NSURL *)localURL mediaType:(SCIGalleryMediaType)galleryType {
     NSError *error;
     SCIMediaItem *item = [self currentItem];
-    SCIVaultSaveMetadata *meta = item.vaultMetadata;
-    if (!meta && (item.title.length > 0 || item.vaultSaveSource >= 0)) {
-        meta = [[SCIVaultSaveMetadata alloc] init];
+    SCIGallerySaveMetadata *meta = item.galleryMetadata;
+    if (!meta && (item.title.length > 0 || item.gallerySaveSource >= 0)) {
+        meta = [[SCIGallerySaveMetadata alloc] init];
         if (item.title.length) {
             meta.sourceUsername = item.title;
         }
-        if (item.vaultSaveSource >= 0) {
-            meta.source = (int16_t)item.vaultSaveSource;
+        if (item.gallerySaveSource >= 0) {
+            meta.source = (int16_t)item.gallerySaveSource;
         } else {
-            meta.source = (int16_t)SCIVaultSourceOther;
+            meta.source = (int16_t)SCIGallerySourceOther;
         }
     }
-    SCIVaultFile *file = [SCIVaultFile saveFileToVault:localURL
-                                                source:SCIVaultSourceOther
-                                             mediaType:vaultType
+    SCIGalleryFile *file = [SCIGalleryFile saveFileToGallery:localURL
+                                                source:SCIGallerySourceOther
+                                             mediaType:galleryType
                                             folderPath:nil
                                               metadata:meta
                                                  error:&error];
 
     if (file) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault duration:2.0
-                                 title:@"Saved to Vault"
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:2.0
+                                 title:@"Saved to Gallery"
                               subtitle:nil
                           iconResource:@"circle_check_filled"
                                   tone:SCIFeedbackPillToneSuccess];
     } else {
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault duration:3.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:3.0
                                  title:@"Failed to save"
                               subtitle:msg
                           iconResource:@"error_filled"
@@ -1085,7 +1085,7 @@ fromViewController:(UIViewController *)presenter {
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewShare]];
-    delegate.pendingVaultSaveMetadata = item.vaultMetadata;
+    delegate.pendingGallerySaveMetadata = item.galleryMetadata;
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
@@ -1118,12 +1118,12 @@ fromViewController:(UIViewController *)presenter {
     }
 }
 
-- (void)deleteFromVault {
+- (void)deleteFromGallery {
     SCIMediaItem *item = [self currentItem];
-    if (!item.vaultFile) return;
+    if (!item.galleryFile) return;
 
     __weak typeof(self) weakSelf = self;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete from Vault?"
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete from Gallery?"
                                                                   message:@"This will permanently remove this file."
                                                            preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
@@ -1135,13 +1135,13 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)performDeleteCurrentItem {
     SCIMediaItem *item = [self currentItem];
-    if (!item.vaultFile) return;
+    if (!item.galleryFile) return;
 
     NSInteger deletedIndex = _currentIndex;
     NSError *err;
-    [item.vaultFile removeWithError:&err];
+    [item.galleryFile removeWithError:&err];
     if (err) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteVault duration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:2.0
                                  title:@"Failed to delete"
                               subtitle:err.localizedDescription
                           iconResource:@"error_filled"
@@ -1159,8 +1159,8 @@ fromViewController:(UIViewController *)presenter {
     }
 
     if (_items.count == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteVault duration:1.5
-                                         title:@"Deleted from vault"
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:1.5
+                                         title:@"Deleted from gallery"
                                       subtitle:nil
                                   iconResource:@"circle_check_filled"
                                           tone:SCIFeedbackPillToneSuccess];
@@ -1186,8 +1186,8 @@ fromViewController:(UIViewController *)presenter {
     [self prepareViewControllerForDisplay:newVC];
     [self prepareAdjacentViewControllersAroundIndex:_currentIndex];
     [self updateUI];
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteVault duration:1.5
-                                     title:@"Deleted from vault"
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:1.5
+                                     title:@"Deleted from gallery"
                                   subtitle:nil
                               iconResource:@"circle_check_filled"
                                       tone:SCIFeedbackPillToneSuccess];

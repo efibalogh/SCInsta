@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@class SCIMediaItem, SCIVaultFile, SCIVaultSaveMetadata;
+@class SCIMediaItem, SCIGalleryFile, SCIGallerySaveMetadata;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -23,7 +23,7 @@ typedef void (^SCIMediaPreviewPlaybackBlock)(void);
 
 @interface SCIFullScreenMediaPlayer : UIViewController
 
-@property (nonatomic, assign) BOOL isFromVault;
+@property (nonatomic, assign) BOOL isFromGallery;
 @property (nonatomic, weak, nullable) id<SCIFullScreenMediaPlayerDelegate> delegate;
 
 - (void)playItems:(NSArray<SCIMediaItem *> *)items
@@ -31,23 +31,23 @@ typedef void (^SCIMediaPreviewPlaybackBlock)(void);
 fromViewController:(UIViewController *)presenter;
 
 + (void)showFileURL:(NSURL *)fileURL;
-+ (void)showFileURL:(NSURL *)fileURL metadata:(nullable SCIVaultSaveMetadata *)metadata;
-+ (void)showFileURL:(NSURL *)fileURL fromVault:(BOOL)fromVault;
++ (void)showFileURL:(NSURL *)fileURL metadata:(nullable SCIGallerySaveMetadata *)metadata;
++ (void)showFileURL:(NSURL *)fileURL fromGallery:(BOOL)fromGallery;
 
-+ (void)showVaultFiles:(NSArray<SCIVaultFile *> *)files
++ (void)showGalleryFiles:(NSArray<SCIGalleryFile *> *)files
        startingAtIndex:(NSInteger)index
     fromViewController:(UIViewController *)presenter;
 
 + (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index;
-+ (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(nullable SCIVaultSaveMetadata *)metadata;
++ (void)showPhotoURLs:(NSArray<NSURL *> *)urls initialIndex:(NSInteger)index metadata:(nullable SCIGallerySaveMetadata *)metadata;
 
-/// Ordered carousel / album: images and videos as `SCIMediaItem` (matches vault `playItems` behavior).
+/// Ordered carousel / album: images and videos as `SCIMediaItem` (matches gallery `playItems` behavior).
 + (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
        startingAtIndex:(NSInteger)index
-              metadata:(nullable SCIVaultSaveMetadata *)metadata;
+              metadata:(nullable SCIGallerySaveMetadata *)metadata;
 + (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
        startingAtIndex:(NSInteger)index
-              metadata:(nullable SCIVaultSaveMetadata *)metadata
+              metadata:(nullable SCIGallerySaveMetadata *)metadata
         playbackSource:(SCIFullScreenPlaybackSource)playbackSource
             sourceView:(nullable UIView *)sourceView
             controller:(nullable UIViewController *)controller
@@ -55,24 +55,24 @@ fromViewController:(UIViewController *)presenter;
         resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
 
 + (void)showImage:(UIImage *)image;
-+ (void)showImage:(UIImage *)image metadata:(nullable SCIVaultSaveMetadata *)metadata;
++ (void)showImage:(UIImage *)image metadata:(nullable SCIGallerySaveMetadata *)metadata;
 + (void)showImage:(UIImage *)image
-         metadata:(nullable SCIVaultSaveMetadata *)metadata
+         metadata:(nullable SCIGallerySaveMetadata *)metadata
    playbackSource:(SCIFullScreenPlaybackSource)playbackSource
        sourceView:(nullable UIView *)sourceView
        controller:(nullable UIViewController *)controller
     pausePlayback:(nullable SCIMediaPreviewPlaybackBlock)pausePlayback
    resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
 + (void)showRemoteImageURL:(NSURL *)url;
-+ (void)showRemoteImageURL:(NSURL *)url metadata:(nullable SCIVaultSaveMetadata *)metadata;
++ (void)showRemoteImageURL:(NSURL *)url metadata:(nullable SCIGallerySaveMetadata *)metadata;
 + (void)showRemoteImageURL:(NSURL *)url
-                  metadata:(nullable SCIVaultSaveMetadata *)metadata
+                  metadata:(nullable SCIGallerySaveMetadata *)metadata
             playbackSource:(SCIFullScreenPlaybackSource)playbackSource
                 sourceView:(nullable UIView *)sourceView
                 controller:(nullable UIViewController *)controller
              pausePlayback:(nullable SCIMediaPreviewPlaybackBlock)pausePlayback
             resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
-/// Profile / avatar long-press: sets vault source + optional username for “Save to Vault”.
+/// Profile / avatar long-press: sets gallery source + optional username for “Save to Gallery”.
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(nullable NSString *)username;
 
 @end

@@ -1,4 +1,4 @@
-// Story Mentions — Vault-style bottom sheet listing mentioned users with Follow/Following buttons.
+// Story Mentions — Gallery-style bottom sheet listing mentioned users with Follow/Following buttons.
 // Triggered by the @ button in story overlays (SeenButtons.x).
 
 #import "../../Utils.h"

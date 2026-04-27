@@ -9,13 +9,13 @@ static NSArray *SCIExportBackupSections(void) {
     return @[
         SCITopicSection(@"", @[
             [SCISetting buttonCellWithTitle:@"Export Settings Only" subtitle:@"Create a backup with SCInsta settings only" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:YES includeVault:NO];
+                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:YES includeGallery:NO];
             }],
-            [SCISetting buttonCellWithTitle:@"Export Vault Only" subtitle:@"Create a backup with vault media only" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:NO includeVault:YES];
+            [SCISetting buttonCellWithTitle:@"Export Gallery Only" subtitle:@"Create a backup with gallery media only" icon:nil action:^(void) {
+                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:NO includeGallery:YES];
             }],
-            [SCISetting buttonCellWithTitle:@"Export Settings + Vault" subtitle:@"Create a backup with both settings and vault media" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:YES includeVault:YES];
+            [SCISetting buttonCellWithTitle:@"Export Settings + Gallery" subtitle:@"Create a backup with both settings and gallery media" icon:nil action:^(void) {
+                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:YES includeGallery:YES];
             }]
         ], nil)
     ];
@@ -25,13 +25,13 @@ static NSArray *SCIImportBackupSections(void) {
     return @[
         SCITopicSection(@"", @[
             [SCISetting buttonCellWithTitle:@"Import Settings Only" subtitle:@"Restore SCInsta settings from a backup file" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:YES includeVault:NO];
+                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:YES includeGallery:NO];
             }],
-            [SCISetting buttonCellWithTitle:@"Import Vault Only" subtitle:@"Restore vault media from a backup file" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:NO includeVault:YES];
+            [SCISetting buttonCellWithTitle:@"Import Gallery Only" subtitle:@"Restore gallery media from a backup file" icon:nil action:^(void) {
+                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:NO includeGallery:YES];
             }],
-            [SCISetting buttonCellWithTitle:@"Import Settings + Vault" subtitle:@"Restore both settings and vault media from a backup file" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:YES includeVault:YES];
+            [SCISetting buttonCellWithTitle:@"Import Settings + Gallery" subtitle:@"Restore both settings and gallery media from a backup file" icon:nil action:^(void) {
+                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:YES includeGallery:YES];
             }]
         ], @"A restart prompt appears after a successful import.")
     ];
@@ -58,8 +58,8 @@ static NSArray *SCIImportBackupSections(void) {
             [SCISetting switchCellWithTitle:@"Disable Safe Mode" subtitle:@"Makes Instagram not reset settings after subsequent crashes, at your own risk" defaultsKey:@"disable_safe_mode"]
         ], nil),
         SCITopicSection(@"Backup & Transfer", @[
-            [SCISetting navigationCellWithTitle:@"Export Backup" subtitle:@"Choose whether to include settings, vault media, or both" icon:nil navSections:SCIExportBackupSections()],
-            [SCISetting navigationCellWithTitle:@"Import Backup" subtitle:@"Choose whether to restore settings, vault media, or both" icon:nil navSections:SCIImportBackupSections()]
+            [SCISetting navigationCellWithTitle:@"Export Backup" subtitle:@"Choose whether to include settings, gallery media, or both" icon:nil navSections:SCIExportBackupSections()],
+            [SCISetting navigationCellWithTitle:@"Import Backup" subtitle:@"Choose whether to restore settings, gallery media, or both" icon:nil navSections:SCIImportBackupSections()]
         ], nil),
         SCITopicSection(@"Liquid Glass", @[
             [SCIInterfaceSettingsProvider experimentalLiquidGlassSetting]

@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@class SCIVaultFile, SCIVaultSaveMetadata;
+@class SCIGalleryFile, SCIGallerySaveMetadata;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -17,15 +17,15 @@ typedef NS_ENUM(NSInteger, SCIMediaItemType) {
 @property (nonatomic, strong, nullable) UIImage *image;
 @property (nonatomic, strong, nullable) UIImage *thumbnail;
 @property (nonatomic, copy, nullable) NSString *title;
-/// When >= 0, `SCIVaultSaveMetadata.source` uses this value (`SCIVaultSource`). Default -1 = not set.
-@property (nonatomic, assign) NSInteger vaultSaveSource;
-@property (nonatomic, strong, nullable) SCIVaultSaveMetadata *vaultMetadata;
-@property (nonatomic, strong, nullable) SCIVaultFile *vaultFile;
-@property (nonatomic, assign) BOOL isFromVault;
+/// When >= 0, `SCIGallerySaveMetadata.source` uses this value (`SCIGallerySource`). Default -1 = not set.
+@property (nonatomic, assign) NSInteger gallerySaveSource;
+@property (nonatomic, strong, nullable) SCIGallerySaveMetadata *galleryMetadata;
+@property (nonatomic, strong, nullable) SCIGalleryFile *galleryFile;
+@property (nonatomic, assign) BOOL isFromGallery;
 
 + (instancetype)itemWithFileURL:(NSURL *)url;
 + (instancetype)itemWithImage:(UIImage *)image;
-+ (instancetype)itemWithVaultFile:(SCIVaultFile *)file;
++ (instancetype)itemWithGalleryFile:(SCIGalleryFile *)file;
 + (SCIMediaItemType)mediaTypeForFileExtension:(NSString *)extension;
 
 @end

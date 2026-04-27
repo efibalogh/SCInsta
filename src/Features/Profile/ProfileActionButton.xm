@@ -6,9 +6,9 @@
 #import "../../InstagramHeaders.h"
 #import "../../Downloader/Download.h"
 #import "../../Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
-#import "../../Shared/Vault/SCIVaultFile.h"
-#import "../../Shared/Vault/SCIVaultOriginController.h"
-#import "../../Shared/Vault/SCIVaultSaveMetadata.h"
+#import "../../Shared/Gallery/SCIGalleryFile.h"
+#import "../../Shared/Gallery/SCIGalleryOriginController.h"
+#import "../../Shared/Gallery/SCIGallerySaveMetadata.h"
 #import "../../AssetUtils.h"
 
 static NSString * const kSCIProfileActionButtonDefaultKey = @"action_button_profile_default_action";
@@ -17,7 +17,7 @@ static NSString * const kSCIProfileActionNone = @"none";
 static NSString * const kSCIProfileActionCopyInfo = @"copy_info";
 static NSString * const kSCIProfileActionViewPicture = @"view_picture";
 static NSString * const kSCIProfileActionSharePicture = @"share_picture";
-static NSString * const kSCIProfileActionSavePictureToVault = @"save_picture_vault";
+static NSString * const kSCIProfileActionSavePictureToGallery = @"save_picture_gallery";
 static NSString * const kSCIProfileActionOpenSettings = @"profile_settings";
 static NSString * const kSCIProfileCopyInfoID = @"id";
 static NSString * const kSCIProfileCopyInfoUsername = @"username";
@@ -150,7 +150,7 @@ static NSString *SCIProfileResolvedDefaultActionIdentifier(void) {
         kSCIProfileActionCopyInfo,
         kSCIProfileActionViewPicture,
         kSCIProfileActionSharePicture,
-        kSCIProfileActionSavePictureToVault,
+        kSCIProfileActionSavePictureToGallery,
         kSCIProfileActionOpenSettings
     ]];
     return [supported containsObject:identifier] ? identifier : kSCIProfileActionNone;
@@ -218,19 +218,19 @@ static void SCIProfileSharePicture(id user) {
     [delegate downloadFileWithURL:url fileExtension:SCIProfilePictureExtension(url) hudLabel:nil];
 }
 
-static void SCIProfileSavePictureToVault(id user) {
+static void SCIProfileSavePictureToGallery(id user) {
     NSURL *url = SCIProfilePictureURL(user);
     if (!url) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileVaultPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileGalleryPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
         return;
     }
 
-    SCIVaultSaveMetadata *metadata = [[SCIVaultSaveMetadata alloc] init];
-    metadata.source = (int16_t)SCIVaultSourceProfile;
-    [SCIVaultOriginController populateProfileMetadata:metadata username:SCIProfileUsername(user) user:user];
+    SCIGallerySaveMetadata *metadata = [[SCIGallerySaveMetadata alloc] init];
+    metadata.source = (int16_t)SCIGallerySourceProfile;
+    [SCIGalleryOriginController populateProfileMetadata:metadata username:SCIProfileUsername(user) user:user];
 
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionProfileVaultPicture]];
-    delegate.pendingVaultSaveMetadata = metadata;
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionProfileGalleryPicture]];
+    delegate.pendingGallerySaveMetadata = metadata;
     [delegate downloadFileWithURL:url fileExtension:SCIProfilePictureExtension(url) hudLabel:nil];
 }
 
@@ -266,10 +266,10 @@ static UIViewController *SCIProfileSourceController(id sourceObject, UIView *sou
     return controller;
 }
 
-static SCIVaultSaveMetadata *SCIProfilePictureMetadata(id user) {
-    SCIVaultSaveMetadata *metadata = [[SCIVaultSaveMetadata alloc] init];
-    metadata.source = (int16_t)SCIVaultSourceProfile;
-    [SCIVaultOriginController populateProfileMetadata:metadata username:SCIProfileUsername(user) user:user];
+static SCIGallerySaveMetadata *SCIProfilePictureMetadata(id user) {
+    SCIGallerySaveMetadata *metadata = [[SCIGallerySaveMetadata alloc] init];
+    metadata.source = (int16_t)SCIGallerySourceProfile;
+    [SCIGalleryOriginController populateProfileMetadata:metadata username:SCIProfileUsername(user) user:user];
     return metadata;
 }
 
@@ -407,8 +407,8 @@ static UIMenu *SCIProfileActionMenu(id sourceObject) {
         SCIProfileSharePicture(user);
     }]];
 
-    [items addObject:[UIAction actionWithTitle:@"Download to Vault" image:SCIProfileMenuIcon(@"photo_gallery") identifier:nil handler:^(__unused UIAction *action) {
-        SCIProfileSavePictureToVault(user);
+    [items addObject:[UIAction actionWithTitle:@"Download to Gallery" image:SCIProfileMenuIcon(@"photo_gallery") identifier:nil handler:^(__unused UIAction *action) {
+        SCIProfileSavePictureToGallery(user);
     }]];
 
     [items addObject:[UIAction actionWithTitle:@"Profile Settings" image:SCIProfileMenuIcon(@"settings") identifier:nil handler:^(__unused UIAction *action) {
@@ -451,8 +451,8 @@ static void SCIExecuteProfileDefaultAction(SCIProfileHeaderActionButton *button)
         SCIProfileViewPicture(user, button.sourceObject ?: button);
     } else if ([identifier isEqualToString:kSCIProfileActionSharePicture]) {
         SCIProfileSharePicture(user);
-    } else if ([identifier isEqualToString:kSCIProfileActionSavePictureToVault]) {
-        SCIProfileSavePictureToVault(user);
+    } else if ([identifier isEqualToString:kSCIProfileActionSavePictureToGallery]) {
+        SCIProfileSavePictureToGallery(user);
     } else if ([identifier isEqualToString:kSCIProfileActionOpenSettings]) {
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings"];
         [SCIUtils showSettingsForTopicTitle:@"Profile"];
@@ -476,7 +476,7 @@ static UIImage *SCIProfileButtonIconForDefaultAction(NSString *defaultIdentifier
     } else if ([defaultIdentifier isEqualToString:kSCIProfileActionSharePicture]) {
         resourceName = @"share";
         fallbackName = @"square.and.arrow.up";
-    } else if ([defaultIdentifier isEqualToString:kSCIProfileActionSavePictureToVault]) {
+    } else if ([defaultIdentifier isEqualToString:kSCIProfileActionSavePictureToGallery]) {
         resourceName = @"photo_gallery";
         fallbackName = @"photo.on.rectangle.angled";
     } else if ([defaultIdentifier isEqualToString:kSCIProfileActionOpenSettings]) {

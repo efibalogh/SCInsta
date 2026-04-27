@@ -2,12 +2,12 @@
 
 #import "../../InstagramHeaders.h"
 #import "../../Settings/SCISettingsViewController.h"
-#import "../../Shared/Vault/SCIVaultViewController.h"
+#import "../../Shared/Gallery/SCIGalleryViewController.h"
 
 static const void *kSCIHomeTabSettingsLongPressAssocKey = &kSCIHomeTabSettingsLongPressAssocKey;
-static const void *kSCIDirectTabVaultLongPressAssocKey = &kSCIDirectTabVaultLongPressAssocKey;
+static const void *kSCIDirectTabGalleryLongPressAssocKey = &kSCIDirectTabGalleryLongPressAssocKey;
 static const NSTimeInterval kSCIHomeTabLongPressDuration = 0.3;
-static const NSTimeInterval kSCIDirectTabVaultLongPressDuration = 1.0;
+static const NSTimeInterval kSCIDirectTabGalleryLongPressDuration = 1.0;
 
 @interface IGTabBarButton (SCIQuickActions)
 - (void)sci_addLongPressWithAction:(SEL)action marker:(const void *)marker minimumDuration:(NSTimeInterval)minimumDuration;
@@ -52,8 +52,8 @@ static const NSTimeInterval kSCIDirectTabVaultLongPressDuration = 1.0;
     NSString *identifier = self.accessibilityIdentifier ?: @"";
     if ([identifier isEqualToString:@"mainfeed-tab"] && [SCIUtils getBoolPref:@"settings_shortcut"]) {
         [self sci_addLongPressWithAction:@selector(handleHomeTabLongPress:) marker:kSCIHomeTabSettingsLongPressAssocKey minimumDuration:kSCIHomeTabLongPressDuration];
-    } else if ([identifier isEqualToString:@"direct-inbox-tab"] && [SCIUtils getBoolPref:@"header_long_press_vault"]) {
-        [self sci_addLongPressWithAction:@selector(handleDirectInboxTabLongPress:) marker:kSCIDirectTabVaultLongPressAssocKey minimumDuration:kSCIDirectTabVaultLongPressDuration];
+    } else if ([identifier isEqualToString:@"direct-inbox-tab"] && [SCIUtils getBoolPref:@"header_long_press_gallery"]) {
+        [self sci_addLongPressWithAction:@selector(handleDirectInboxTabLongPress:) marker:kSCIDirectTabGalleryLongPressAssocKey minimumDuration:kSCIDirectTabGalleryLongPressDuration];
     }
 }
 
@@ -85,6 +85,6 @@ static const NSTimeInterval kSCIDirectTabVaultLongPressDuration = 1.0;
 %new - (void)handleDirectInboxTabLongPress:(UILongPressGestureRecognizer *)sender {
     if (sender.state != UIGestureRecognizerStateBegan) return;
 
-    [SCIVaultViewController presentVault];
+    [SCIGalleryViewController presentGallery];
 }
 %end

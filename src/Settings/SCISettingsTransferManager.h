@@ -6,12 +6,12 @@ NS_ASSUME_NONNULL_BEGIN
 @interface SCISettingsTransferManager : NSObject
 
 + (instancetype)sharedManager;
-- (void)exportSettingsAndVaultFromController:(UIViewController *)controller;
-- (void)importSettingsAndVaultFromController:(UIViewController *)controller;
+- (void)exportSettingsAndGalleryFromController:(UIViewController *)controller;
+- (void)importSettingsAndGalleryFromController:(UIViewController *)controller;
 - (void)presentExportOptionsFromController:(UIViewController *)controller;
 - (void)presentImportOptionsFromController:(UIViewController *)controller;
-- (void)exportFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeVault:(BOOL)includeVault;
-- (void)importFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeVault:(BOOL)includeVault;
+- (void)exportFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeGallery:(BOOL)includeGallery;
+- (void)importFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeGallery:(BOOL)includeGallery;
 
 @end
 

@@ -3,9 +3,9 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
 #import "../../Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
-#import "../../Shared/Vault/SCIVaultFile.h"
-#import "../../Shared/Vault/SCIVaultOriginController.h"
-#import "../../Shared/Vault/SCIVaultSaveMetadata.h"
+#import "../../Shared/Gallery/SCIGalleryFile.h"
+#import "../../Shared/Gallery/SCIGalleryOriginController.h"
+#import "../../Shared/Gallery/SCIGallerySaveMetadata.h"
 
 @interface IGProfileAvatarView : UIView
 @end
@@ -111,9 +111,9 @@ static BOOL SCIShouldInterceptProfileLongPress(UILongPressGestureRecognizer *ges
     }
 
     NSString *username = SCIUsernameFromIGUser(user);
-    SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
-    meta.source = (int16_t)SCIVaultSourceProfile;
-    [SCIVaultOriginController populateProfileMetadata:meta username:username user:nil];
+    SCIGallerySaveMetadata *meta = [[SCIGallerySaveMetadata alloc] init];
+    meta.source = (int16_t)SCIGallerySourceProfile;
+    [SCIGalleryOriginController populateProfileMetadata:meta username:username user:nil];
 
     UIViewController *presentingController = [SCIUtils viewControllerForAncestralView:view];
     [SCIFullScreenMediaPlayer showRemoteImageURL:url

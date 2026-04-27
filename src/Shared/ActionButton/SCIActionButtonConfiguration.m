@@ -39,7 +39,7 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionDownloadLibrary,
                 kSCIActionDownloadShare,
                 kSCIActionCopyDownloadLink,
-                kSCIActionDownloadVault,
+                kSCIActionDownloadGallery,
                 kSCIActionExpand,
                 kSCIActionViewThumbnail,
                 kSCIActionCopyCaption,
@@ -52,7 +52,7 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionDownloadLibrary,
                 kSCIActionDownloadShare,
                 kSCIActionCopyDownloadLink,
-                kSCIActionDownloadVault,
+                kSCIActionDownloadGallery,
                 kSCIActionExpand,
                 kSCIActionViewThumbnail,
                 kSCIActionOpenTopicSettings
@@ -62,7 +62,7 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionDownloadLibrary,
                 kSCIActionDownloadShare,
                 kSCIActionCopyDownloadLink,
-                kSCIActionDownloadVault,
+                kSCIActionDownloadGallery,
                 kSCIActionExpand,
                 kSCIActionOpenTopicSettings
             ];
@@ -74,7 +74,7 @@ NSArray<SCIActionMenuSection *> *SCIActionButtonDefaultSectionsForSource(SCIActi
     NSArray<NSString *> *downloadActions = @[
         kSCIActionDownloadLibrary,
         kSCIActionDownloadShare,
-        kSCIActionDownloadVault,
+        kSCIActionDownloadGallery,
         kSCIActionViewThumbnail
     ];
     NSArray<NSString *> *copyActions = (source == SCIActionButtonSourceFeed || source == SCIActionButtonSourceReels)

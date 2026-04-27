@@ -8,7 +8,7 @@ static NSString * const kSCIProfileActionNone = @"none";
 static NSString * const kSCIProfileActionCopyInfo = @"copy_info";
 static NSString * const kSCIProfileActionViewPicture = @"view_picture";
 static NSString * const kSCIProfileActionSharePicture = @"share_picture";
-static NSString * const kSCIProfileActionSavePictureToVault = @"save_picture_vault";
+static NSString * const kSCIProfileActionSavePictureToGallery = @"save_picture_gallery";
 static NSString * const kSCIProfileActionOpenSettings = @"profile_settings";
 static NSString * const kSCIProfileDefaultCopyInfoKey = @"action_button_profile_default_copy_info_action";
 static NSString * const kSCIProfileCopyInfoID = @"id";
@@ -39,7 +39,7 @@ static UIMenu *SCIProfileActionDefaultMenu(void) {
         SCIProfileActionDefaultCommand(@"Copy Info", @"copy", kSCIProfileActionCopyInfo),
         SCIProfileActionDefaultCommand(@"View Picture", @"photo", kSCIProfileActionViewPicture),
         SCIProfileActionDefaultCommand(@"Share Picture", @"share", kSCIProfileActionSharePicture),
-        SCIProfileActionDefaultCommand(@"Download to Vault", @"photo_gallery", kSCIProfileActionSavePictureToVault),
+        SCIProfileActionDefaultCommand(@"Download to Gallery", @"photo_gallery", kSCIProfileActionSavePictureToGallery),
         SCIProfileActionDefaultCommand(@"Profile Settings", @"settings", kSCIProfileActionOpenSettings)
     ]];
 }

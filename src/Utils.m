@@ -3,7 +3,7 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import "Shared/MediaPreview/SCIMediaCacheManager.h"
-#import "Shared/Vault/SCIVaultPaths.h"
+#import "Shared/Gallery/SCIGalleryPaths.h"
 
 static NSNumber *SCINumericValueForSelector(id target, NSString *selectorName) {
     if (!target || !selectorName.length) return nil;

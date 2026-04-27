@@ -1,12 +1,12 @@
 #import "SCIMediaItem.h"
-#import "../Vault/SCIVaultFile.h"
-#import "../Vault/SCIVaultSaveMetadata.h"
+#import "../Gallery/SCIGalleryFile.h"
+#import "../Gallery/SCIGallerySaveMetadata.h"
 
 @implementation SCIMediaItem
 
 - (instancetype)init {
     if ((self = [super init])) {
-        _vaultSaveSource = -1;
+        _gallerySaveSource = -1;
     }
     return self;
 }
@@ -25,13 +25,13 @@
     return item;
 }
 
-+ (instancetype)itemWithVaultFile:(SCIVaultFile *)file {
++ (instancetype)itemWithGalleryFile:(SCIGalleryFile *)file {
     SCIMediaItem *item = [[SCIMediaItem alloc] init];
-    item.vaultFile = file;
-    item.isFromVault = YES;
+    item.galleryFile = file;
+    item.isFromGallery = YES;
     item.fileURL = [file fileURL];
-    item.mediaType = (file.mediaType == SCIVaultMediaTypeVideo) ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
-    SCIVaultSaveMetadata *meta = [[SCIVaultSaveMetadata alloc] init];
+    item.mediaType = (file.mediaType == SCIGalleryMediaTypeVideo) ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
+    SCIGallerySaveMetadata *meta = [[SCIGallerySaveMetadata alloc] init];
     meta.source = file.source;
     meta.sourceUsername = file.sourceUsername;
     meta.sourceUserPK = file.sourceUserPK;
@@ -39,9 +39,9 @@
     meta.sourceMediaPK = file.sourceMediaPK;
     meta.sourceMediaCode = file.sourceMediaCode;
     meta.sourceMediaURLString = file.sourceMediaURLString;
-    item.vaultMetadata = meta;
+    item.galleryMetadata = meta;
 
-    UIImage *thumb = [SCIVaultFile loadThumbnailForFile:file];
+    UIImage *thumb = [SCIGalleryFile loadThumbnailForFile:file];
     if (thumb) {
         item.thumbnail = thumb;
     }
