@@ -1,8 +1,8 @@
 #import <Photos/Photos.h>
+#include <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
 
 #import "SCIFullScreenMediaPlayer.h"
-#import "SCIUnderlyingPlaybackController.h"
 #import "SCIMediaItem.h"
 #import "SCIMediaCacheManager.h"
 #import "SCIFullScreenImageViewController.h"
@@ -17,14 +17,12 @@
 #import "../../Downloader/Download.h"
 
 static CGFloat const kDismissAxisLockSlop = 20.0;
-static CGFloat const kDismissProgressDenominator = 520.0;
-static CGFloat const kDismissProgressCommit = 0.34;
-static CGFloat const kDismissVelocityCommit = 980.0;
-static CGFloat const kDismissFinishDuration = 0.24;
-static CGFloat const kDismissCancelSpringDamping = 0.9;
-static CGFloat const kDismissMinScale = 0.92;
-static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshShortDelay = 0.18;
-static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
+static CGFloat const kDismissDistanceRatio = 50.0 / 667.0;
+static CGFloat const kDismissMaximumDuration = 0.45;
+static CGFloat const kDismissReturnVelocityAnimationRatio = 0.00007;
+static CGFloat const kDismissMinimumVelocity = 1.0;
+static CGFloat const kDismissMinimumDuration = 0.12;
+static CGFloat const kDismissFinalBackdropAlpha = 0.1;
 static CGFloat const kVaultPreviewMenuIconPointSize = 22.0;
 
 static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
@@ -32,7 +30,22 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
                                    pointSize:kVaultPreviewMenuIconPointSize];
 }
 
-@interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
+static UIViewController *SCIPreviewPresenterForContext(SCIFullScreenPlaybackSource playbackSource,
+                                                       UIViewController *sourceController) {
+    if ((playbackSource == SCIFullScreenPlaybackSourceStories ||
+         playbackSource == SCIFullScreenPlaybackSourceDirect) &&
+        sourceController.view.window) {
+        return sourceController;
+    }
+
+    return topMostController();
+}
+
+static CGPoint SCICenterForBounds(CGRect bounds) {
+    return CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+}
+
+@interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, UIViewControllerTransitioningDelegate, UIViewControllerAnimatedTransitioning, UIViewControllerInteractiveTransitioning, SCIFullScreenContentDelegate>
 
 @property (nonatomic, strong) NSArray<SCIMediaItem *> *items;
 @property (nonatomic, assign) NSInteger currentIndex;
@@ -51,7 +64,7 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
 @property (nonatomic, strong) UIButton *deleteVaultButton;
 @property (nonatomic, strong) UIButton *shareButton;
 @property (nonatomic, strong) UIButton *clipboardButton;
-@property (nonatomic, strong) UIButton *vaultMoreButton;
+@property (nonatomic, strong) UIButton *vaultOriginButton;
 
 @property (nonatomic, assign) BOOL isToolbarVisible;
 @property (nonatomic, assign) BOOL isSingleItemMode;
@@ -59,11 +72,18 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
 @property (nonatomic, assign) BOOL dismissPanDecided;
 @property (nonatomic, assign) BOOL dismissPanIsVertical;
 @property (nonatomic, weak) UIScrollView *pageScrollView;
+@property (nonatomic, assign) BOOL interactiveDismissalInProgress;
+@property (nonatomic, assign) CGPoint interactiveDismissAnchorPoint;
+@property (nonatomic, strong, nullable) id<UIViewControllerContextTransitioning> interactiveDismissTransitionContext;
 
-@property (nonatomic, strong) SCIUnderlyingPlaybackController *underlyingPlaybackController;
-@property (nonatomic, assign) NSInteger underlyingPlaybackRefreshGeneration;
+@property (nonatomic, assign) SCIFullScreenPlaybackSource playbackSource;
+@property (nonatomic, weak, nullable) UIView *playbackSourceView;
+@property (nonatomic, weak, nullable) UIViewController *playbackSourceController;
+@property (nonatomic, copy, nullable) SCIMediaPreviewPlaybackBlock pausePlaybackBlock;
+@property (nonatomic, copy, nullable) SCIMediaPreviewPlaybackBlock resumePlaybackBlock;
+@property (nonatomic, assign) BOOL explicitPlaybackPauseActive;
 
-/// Opaque black behind page content (letterboxing); alpha fades during dismiss so OverFullScreen content shows through.
+/// Opaque black behind page content (letterboxing); alpha fades during interactive dismiss.
 @property (nonatomic, strong) UIView *presentationBackdropView;
 
 @end
@@ -159,7 +179,9 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
                 metadata:metadata
           playbackSource:SCIFullScreenPlaybackSourceUnknown
               sourceView:nil
-              controller:nil];
+              controller:nil
+           pausePlayback:nil
+          resumePlayback:nil];
 }
 
 + (void)showMediaItems:(NSArray<SCIMediaItem *> *)items
@@ -167,7 +189,9 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
               metadata:(SCIVaultSaveMetadata *)metadata
         playbackSource:(SCIFullScreenPlaybackSource)playbackSource
             sourceView:(UIView *)sourceView
-            controller:(UIViewController *)controller {
+            controller:(UIViewController *)controller
+         pausePlayback:(SCIMediaPreviewPlaybackBlock)pausePlayback
+        resumePlayback:(SCIMediaPreviewPlaybackBlock)resumePlayback {
     if (items.count == 0) return;
 
     if (metadata) {
@@ -182,8 +206,12 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     player.isFromVault = NO;
-    [player configurePlaybackContextWithSource:playbackSource sourceView:sourceView controller:controller];
-    UIViewController *presenter = topMostController();
+    [player configurePlaybackContextWithSource:playbackSource
+                                    sourceView:sourceView
+                                    controller:controller
+                                 pausePlayback:pausePlayback
+                                resumePlayback:resumePlayback];
+    UIViewController *presenter = SCIPreviewPresenterForContext(playbackSource, controller);
     [player playItems:items startingAtIndex:adjustedIndex fromViewController:presenter];
 }
 
@@ -196,14 +224,18 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
            metadata:metadata
      playbackSource:SCIFullScreenPlaybackSourceUnknown
          sourceView:nil
-         controller:nil];
+         controller:nil
+      pausePlayback:nil
+     resumePlayback:nil];
 }
 
 + (void)showImage:(UIImage *)image
          metadata:(SCIVaultSaveMetadata *)metadata
    playbackSource:(SCIFullScreenPlaybackSource)playbackSource
        sourceView:(UIView *)sourceView
-       controller:(UIViewController *)controller {
+       controller:(UIViewController *)controller
+    pausePlayback:(SCIMediaPreviewPlaybackBlock)pausePlayback
+   resumePlayback:(SCIMediaPreviewPlaybackBlock)resumePlayback {
     if (!image) return;
     SCIMediaItem *item = [SCIMediaItem itemWithImage:image];
     item.vaultMetadata = metadata;
@@ -213,8 +245,13 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
     item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    [player configurePlaybackContextWithSource:playbackSource sourceView:sourceView controller:controller];
-    [player playItems:@[item] startingAtIndex:0 fromViewController:topMostController()];
+    [player configurePlaybackContextWithSource:playbackSource
+                                    sourceView:sourceView
+                                    controller:controller
+                                 pausePlayback:pausePlayback
+                                resumePlayback:resumePlayback];
+    UIViewController *presenter = SCIPreviewPresenterForContext(playbackSource, controller);
+    [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
 }
 
 + (void)showRemoteImageURL:(NSURL *)url {
@@ -226,14 +263,18 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
                     metadata:metadata
               playbackSource:SCIFullScreenPlaybackSourceUnknown
                   sourceView:nil
-                  controller:nil];
+                  controller:nil
+               pausePlayback:nil
+              resumePlayback:nil];
 }
 
 + (void)showRemoteImageURL:(NSURL *)url
                   metadata:(SCIVaultSaveMetadata *)metadata
             playbackSource:(SCIFullScreenPlaybackSource)playbackSource
                 sourceView:(UIView *)sourceView
-                controller:(UIViewController *)controller {
+                controller:(UIViewController *)controller
+             pausePlayback:(SCIMediaPreviewPlaybackBlock)pausePlayback
+            resumePlayback:(SCIMediaPreviewPlaybackBlock)resumePlayback {
     if (!url) return;
 
     SCIMediaItem *item = [SCIMediaItem itemWithFileURL:url];
@@ -244,8 +285,12 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
     item.vaultSaveSource = metadata ? (NSInteger)metadata.source : -1;
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
-    [player configurePlaybackContextWithSource:playbackSource sourceView:sourceView controller:controller];
-    UIViewController *presenter = topMostController();
+    [player configurePlaybackContextWithSource:playbackSource
+                                    sourceView:sourceView
+                                    controller:controller
+                                 pausePlayback:pausePlayback
+                                resumePlayback:resumePlayback];
+    UIViewController *presenter = SCIPreviewPresenterForContext(playbackSource, controller);
     [player playItems:@[item] startingAtIndex:0 fromViewController:presenter];
 }
 
@@ -261,10 +306,15 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
 
 - (void)configurePlaybackContextWithSource:(SCIFullScreenPlaybackSource)playbackSource
                                 sourceView:(UIView *)sourceView
-                                controller:(UIViewController *)controller {
-    self.underlyingPlaybackController = [[SCIUnderlyingPlaybackController alloc] initWithPlaybackSource:playbackSource
-                                                                                              sourceView:sourceView
-                                                                                              controller:controller];
+                                controller:(UIViewController *)controller
+                             pausePlayback:(SCIMediaPreviewPlaybackBlock)pausePlayback
+                            resumePlayback:(SCIMediaPreviewPlaybackBlock)resumePlayback {
+    self.playbackSource = playbackSource;
+    self.playbackSourceView = sourceView;
+    self.playbackSourceController = controller;
+    self.pausePlaybackBlock = pausePlayback;
+    self.resumePlaybackBlock = resumePlayback;
+    self.explicitPlaybackPauseActive = NO;
 }
 
 #pragma mark - Present
@@ -278,11 +328,12 @@ fromViewController:(UIViewController *)presenter {
     _isSingleItemMode = (items.count <= 1);
     _isToolbarVisible = YES;
 
-    [self beginUnderlyingPlaybackSuppression];
-
-    // Over full screen so the black backdrop can fade to reveal the app during dismiss (same idea as vault).
-    self.modalPresentationStyle = self.isFromVault ? UIModalPresentationOverFullScreen : UIModalPresentationCurrentContext;
-    self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+    [self beginPreviewPlaybackSuppressionIfNeeded];
+    self.modalPresentationStyle = [self shouldUseLifecycleSuppressingPresentation]
+        ? UIModalPresentationFullScreen
+        : UIModalPresentationOverFullScreen;
+    self.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
+    self.transitioningDelegate = self;
     [presenter presentViewController:self animated:YES completion:nil];
 }
 
@@ -303,16 +354,8 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    [self refreshUnderlyingPlaybackSuppression];
-    if (![self.underlyingPlaybackController hasSuppressedSessions]) {
-        [self scheduleDeferredUnderlyingPlaybackRefreshes];
-    }
     [self prepareViewControllerForDisplay:self.pageViewController.viewControllers.firstObject];
     [self prepareAdjacentViewControllersAroundIndex:self.currentIndex];
-}
-
-- (void)dealloc {
-    [self cancelDeferredUnderlyingPlaybackRefreshes];
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -438,14 +481,13 @@ fromViewController:(UIViewController *)presenter {
     [_bottomBar addSubview:_clipboardButton];
 
     if (_isFromVault) {
+        _vaultOriginButton = SCIMediaChromeBottomButton(@"more", @"More");
+        [_bottomBar addSubview:_vaultOriginButton];
+
         _deleteVaultButton = SCIMediaChromeBottomButton(@"trash", @"Delete from Vault");
         _deleteVaultButton.tintColor = [UIColor systemRedColor];
         [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteVaultButton];
-
-        _vaultMoreButton = SCIMediaChromeBottomButton(@"more", @"More");
-        _vaultMoreButton.showsMenuAsPrimaryAction = YES;
-        [_bottomBar addSubview:_vaultMoreButton];
     } else {
         _saveVaultButton = SCIMediaChromeBottomButton(@"photo_gallery", @"Save to Vault");
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
@@ -453,7 +495,7 @@ fromViewController:(UIViewController *)presenter {
     }
 
     NSArray<UIView *> *row = _isFromVault
-        ? @[_savePhotosButton, _shareButton, _clipboardButton, _deleteVaultButton, _vaultMoreButton]
+        ? @[_savePhotosButton, _shareButton, _clipboardButton, _vaultOriginButton, _deleteVaultButton]
         : @[_savePhotosButton, _shareButton, _clipboardButton, _saveVaultButton];
 
     SCIMediaChromeInstallBottomRow(_bottomBar, row);
@@ -637,7 +679,7 @@ fromViewController:(UIViewController *)presenter {
 - (void)updateUI {
     [self updateCounter];
     [self updateFavoriteButton];
-    [self updateVaultMoreButton];
+    [self updateVaultOriginButton];
 }
 
 - (void)updateCounter {
@@ -729,15 +771,56 @@ fromViewController:(UIViewController *)presenter {
     return [UIMenu menuWithTitle:@"" children:actions];
 }
 
-- (void)updateVaultMoreButton {
-    if (!_vaultMoreButton) return;
+- (void)performSingleVaultOriginAction {
+    SCIVaultFile *file = self.currentItem.vaultFile;
+    if (file.hasOpenableProfile && !file.hasOpenableOriginalMedia) {
+        [self openProfileForCurrentVaultItem];
+        return;
+    }
+    if (file.hasOpenableOriginalMedia && !file.hasOpenableProfile) {
+        [self openOriginalPostForCurrentVaultItem];
+    }
+}
+
+- (void)updateVaultOriginButton {
+    if (!_vaultOriginButton) return;
 
     SCIVaultFile *file = self.currentItem.vaultFile;
-    BOOL hasActions = file.hasOpenableOriginalMedia || file.hasOpenableProfile;
-    _vaultMoreButton.hidden = !file;
-    _vaultMoreButton.enabled = hasActions;
-    _vaultMoreButton.menu = [self vaultOriginMenuForCurrentItem];
-    _vaultMoreButton.alpha = hasActions ? 1.0 : 0.55;
+    BOOL hasOriginal = file.hasOpenableOriginalMedia;
+    BOOL hasProfile = file.hasOpenableProfile;
+    NSInteger actionCount = (hasOriginal ? 1 : 0) + (hasProfile ? 1 : 0);
+
+    _vaultOriginButton.hidden = !file;
+    [_vaultOriginButton removeTarget:self action:@selector(performSingleVaultOriginAction) forControlEvents:UIControlEventTouchUpInside];
+
+    if (actionCount <= 0) {
+        [_vaultOriginButton setImage:SCIMediaChromeBottomIcon(@"more") forState:UIControlStateNormal];
+        _vaultOriginButton.accessibilityLabel = @"More";
+        _vaultOriginButton.enabled = NO;
+        _vaultOriginButton.alpha = 0.55;
+        _vaultOriginButton.menu = nil;
+        _vaultOriginButton.showsMenuAsPrimaryAction = NO;
+        return;
+    }
+
+    _vaultOriginButton.enabled = YES;
+    _vaultOriginButton.alpha = 1.0;
+
+    if (actionCount == 1) {
+        NSString *resourceName = hasProfile ? @"profile" : @"external_link";
+        NSString *label = hasProfile ? @"Open Profile" : @"Open Original Post";
+        [_vaultOriginButton setImage:SCIMediaChromeBottomIcon(resourceName) forState:UIControlStateNormal];
+        _vaultOriginButton.accessibilityLabel = label;
+        _vaultOriginButton.menu = nil;
+        _vaultOriginButton.showsMenuAsPrimaryAction = NO;
+        [_vaultOriginButton addTarget:self action:@selector(performSingleVaultOriginAction) forControlEvents:UIControlEventTouchUpInside];
+        return;
+    }
+
+    [_vaultOriginButton setImage:SCIMediaChromeBottomIcon(@"more") forState:UIControlStateNormal];
+    _vaultOriginButton.accessibilityLabel = @"More";
+    _vaultOriginButton.menu = [self vaultOriginMenuForCurrentItem];
+    _vaultOriginButton.showsMenuAsPrimaryAction = YES;
 }
 
 #pragma mark - Toolbar Toggle
@@ -766,50 +849,46 @@ fromViewController:(UIViewController *)presenter {
 
 #pragma mark - Playback Suppression
 
-- (void)ensureUnderlyingPlaybackController {
-    if (!self.underlyingPlaybackController) {
-        self.underlyingPlaybackController = [[SCIUnderlyingPlaybackController alloc] initWithPlaybackSource:SCIFullScreenPlaybackSourceUnknown
-                                                                                                  sourceView:nil
-                                                                                                  controller:nil];
+- (BOOL)shouldUseLifecycleSuppressingPresentation {
+    switch (self.playbackSource) {
+        case SCIFullScreenPlaybackSourceFeed:
+        case SCIFullScreenPlaybackSourceReels:
+        case SCIFullScreenPlaybackSourceProfile:
+        case SCIFullScreenPlaybackSourceStories:
+        case SCIFullScreenPlaybackSourceDirect:
+            return YES;
+        case SCIFullScreenPlaybackSourceUnknown:
+        default:
+            return NO;
     }
 }
 
-- (void)beginUnderlyingPlaybackSuppression {
-    [self ensureUnderlyingPlaybackController];
-    [self.underlyingPlaybackController beginSuppressionExcludingPreviewView:self.isViewLoaded ? self.view : nil];
+- (BOOL)shouldUseExplicitPlaybackCallbacks {
+    switch (self.playbackSource) {
+        case SCIFullScreenPlaybackSourceStories:
+        case SCIFullScreenPlaybackSourceDirect:
+            return YES;
+        case SCIFullScreenPlaybackSourceFeed:
+        case SCIFullScreenPlaybackSourceReels:
+        case SCIFullScreenPlaybackSourceProfile:
+        case SCIFullScreenPlaybackSourceUnknown:
+        default:
+            return NO;
+    }
 }
 
-- (void)cancelDeferredUnderlyingPlaybackRefreshes {
-    self.underlyingPlaybackRefreshGeneration++;
+- (void)beginPreviewPlaybackSuppressionIfNeeded {
+    if ([self shouldUseExplicitPlaybackCallbacks] && self.pausePlaybackBlock && !self.explicitPlaybackPauseActive) {
+        self.pausePlaybackBlock();
+        self.explicitPlaybackPauseActive = YES;
+    }
 }
 
-- (void)refreshUnderlyingPlaybackSuppression {
-    [self ensureUnderlyingPlaybackController];
-    [self.underlyingPlaybackController refreshAndApplySuppressionExcludingPreviewView:self.isViewLoaded ? self.view : nil];
-}
-
-- (void)scheduleDeferredUnderlyingPlaybackRefreshes {
-    [self cancelDeferredUnderlyingPlaybackRefreshes];
-    NSInteger generation = self.underlyingPlaybackRefreshGeneration;
-    __weak typeof(self) weakSelf = self;
-
-    void (^scheduleRefresh)(NSTimeInterval) = ^(NSTimeInterval delay) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf || strongSelf.underlyingPlaybackRefreshGeneration != generation || !strongSelf.view.window) {
-                return;
-            }
-            [strongSelf refreshUnderlyingPlaybackSuppression];
-        });
-    };
-
-    scheduleRefresh(kUnderlyingPlaybackDeferredRefreshShortDelay);
-    scheduleRefresh(kUnderlyingPlaybackDeferredRefreshLongDelay);
-}
-
-- (void)restoreUnderlyingPlaybackIfNeeded {
-    [self cancelDeferredUnderlyingPlaybackRefreshes];
-    [self.underlyingPlaybackController restorePlaybackIfNeeded];
+- (void)restorePreviewPlaybackIfNeeded {
+    if (self.explicitPlaybackPauseActive && self.resumePlaybackBlock) {
+        self.resumePlaybackBlock();
+    }
+    self.explicitPlaybackPauseActive = NO;
 }
 
 #pragma mark - Actions
@@ -818,7 +897,7 @@ fromViewController:(UIViewController *)presenter {
     [self cleanupAll];
     [self dismissViewControllerAnimated:YES completion:^{
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self restoreUnderlyingPlaybackIfNeeded];
+            [self restorePreviewPlaybackIfNeeded];
         });
         if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
             [self.delegate fullScreenMediaPlayerDidDismiss];
@@ -1170,53 +1249,45 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
+    [self beginInteractiveDismissalIfNeeded];
+    if (!self.interactiveDismissTransitionContext) return;
+
     CGFloat dy = ty;
     CGFloat absDy = fabs(dy);
-    CGFloat resistedDy = dy * 0.82;
-    CGFloat progress = MIN(1.0, absDy / kDismissProgressDenominator);
-    CGFloat scale = MAX(kDismissMinScale, 1.0 - progress * (1.0 - kDismissMinScale));
+    CGFloat maximumBackdropDelta = MAX(1.0, CGRectGetHeight(self.view.bounds) / 2.0);
+    CGFloat deltaRatio = MIN(1.0, absDy / maximumBackdropDelta);
+    CGFloat backdropAlpha = 1.0 - (deltaRatio * (1.0 - kDismissFinalBackdropAlpha));
 
     switch (pan.state) {
         case UIGestureRecognizerStateChanged: {
-            CGAffineTransform translate = CGAffineTransformMakeTranslation(0, resistedDy);
-            _pageViewController.view.transform = CGAffineTransformScale(translate, scale, scale);
-            self.presentationBackdropView.alpha = MAX(0.0, 1.0 - progress * 1.1);
-            CGFloat fade = (_isToolbarVisible ? 1.0 : 0.0) * (1.0 - progress * 1.2);
-            _topToolbar.alpha = MAX(0.0, fade);
-            if (_bottomBar) _bottomBar.alpha = MAX(0.0, fade);
+            [self updateInteractiveDismissalWithVerticalDelta:dy backdropAlpha:backdropAlpha];
             break;
         }
         case UIGestureRecognizerStateEnded:
         case UIGestureRecognizerStateCancelled: {
-            BOOL commit = progress > kDismissProgressCommit || fabs(velocity.y) > kDismissVelocityCommit;
+            CGFloat dismissDistance = kDismissDistanceRatio * CGRectGetHeight(self.view.bounds);
+            BOOL commit = pan.state != UIGestureRecognizerStateCancelled && absDy > dismissDistance;
             if (commit) {
                 CGFloat direction = dy >= 0.0 ? 1.0 : -1.0;
-                CGFloat vy = MAX(fabs(velocity.y), 400.0);
-                CGFloat extra = self.view.bounds.size.height - absDy + 80.0;
-                CGFloat duration = MIN(kDismissFinishDuration, extra / vy);
-                duration = MAX(0.18, duration);
+                CGFloat finalCenterY = self.interactiveDismissAnchorPoint.y + direction * CGRectGetHeight(self.view.bounds);
+                CGFloat vy = MAX(fabs(velocity.y), kDismissMinimumVelocity);
+                CGFloat duration = fabs(finalCenterY - _pageViewController.view.center.y) / vy;
+                duration = MIN(duration, kDismissMaximumDuration);
+                duration = MAX(kDismissMinimumDuration, duration);
 
-                [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseIn | UIViewAnimationOptionBeginFromCurrentState animations:^{
-                    CGAffineTransform translate = CGAffineTransformMakeTranslation(0, direction * (self.view.bounds.size.height + 60.0));
-                    self->_pageViewController.view.transform = CGAffineTransformScale(translate, kDismissMinScale, kDismissMinScale);
+                [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState animations:^{
+                    self->_pageViewController.view.center = CGPointMake(self.interactiveDismissAnchorPoint.x, finalCenterY);
                     self.presentationBackdropView.alpha = 0.0;
                     self->_topToolbar.alpha = 0.0;
                     if (self->_bottomBar) self->_bottomBar.alpha = 0.0;
                 } completion:^(BOOL finished) {
-                    [self cleanupAll];
-                    [self dismissViewControllerAnimated:NO completion:^{
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [self restoreUnderlyingPlaybackIfNeeded];
-                        });
-                        if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
-                            [self.delegate fullScreenMediaPlayerDidDismiss];
-                        }
-                    }];
+                    [self finishInteractiveDismissal];
                 }];
             } else {
-                CGFloat springVel = (CGFloat)fmin(fmax(-velocity.y / 1400.0, -6.0), 6.0);
-                [UIView animateWithDuration:0.42 delay:0 usingSpringWithDamping:kDismissCancelSpringDamping initialSpringVelocity:springVel options:UIViewAnimationOptionBeginFromCurrentState animations:^{
-                    self->_pageViewController.view.transform = CGAffineTransformIdentity;
+                CGFloat duration = fabs(velocity.y) * kDismissReturnVelocityAnimationRatio + 0.2;
+                [self removeTransitionToViewForCancelledInteractiveDismissalIfNeeded];
+                [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState animations:^{
+                    self->_pageViewController.view.center = self.interactiveDismissAnchorPoint;
                     self.presentationBackdropView.alpha = 1.0;
                     CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
                     self->_topToolbar.alpha = alpha;
@@ -1226,6 +1297,7 @@ fromViewController:(UIViewController *)presenter {
                     if ([currentVC isKindOfClass:[SCIFullScreenImageViewController class]]) {
                         [(SCIFullScreenImageViewController *)currentVC resetZoomIfNeeded];
                     }
+                    [self cancelInteractiveDismissal];
                 }];
             }
             _dismissPanDecided = NO;
@@ -1233,7 +1305,10 @@ fromViewController:(UIViewController *)presenter {
             break;
         }
         case UIGestureRecognizerStateFailed: {
-            if (_dismissPanDecided && _dismissPanIsVertical) {
+            if (self.interactiveDismissTransitionContext) {
+                [self removeTransitionToViewForCancelledInteractiveDismissalIfNeeded];
+                [self cancelInteractiveDismissal];
+            } else if (_dismissPanDecided && _dismissPanIsVertical) {
                 [self resetDismissInteractiveStateAnimated:YES];
             }
             _dismissPanDecided = NO;
@@ -1252,6 +1327,7 @@ fromViewController:(UIViewController *)presenter {
     _pageScrollView.scrollEnabled = YES;
     void (^animations)(void) = ^{
         self->_pageViewController.view.transform = CGAffineTransformIdentity;
+        self->_pageViewController.view.center = SCICenterForBounds(self.view.bounds);
         self.presentationBackdropView.alpha = 1.0;
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
         self->_topToolbar.alpha = alpha;
@@ -1264,11 +1340,95 @@ fromViewController:(UIViewController *)presenter {
     }
 }
 
+#pragma mark - Interactive Dismissal Transition
+
+- (void)beginInteractiveDismissalIfNeeded {
+    if (self.interactiveDismissalInProgress) return;
+
+    self.interactiveDismissalInProgress = YES;
+    self.interactiveDismissAnchorPoint = self.pageViewController.view.center;
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)updateInteractiveDismissalWithVerticalDelta:(CGFloat)verticalDelta backdropAlpha:(CGFloat)backdropAlpha {
+    id<UIViewControllerContextTransitioning> transitionContext = self.interactiveDismissTransitionContext;
+    UIView *fromView = [transitionContext viewForKey:UITransitionContextFromViewKey];
+    UIView *toView = [transitionContext viewForKey:UITransitionContextToViewKey];
+
+    if (toView && !toView.superview) {
+        UIViewController *toViewController = [transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
+        toView.frame = [transitionContext finalFrameForViewController:toViewController];
+        if (![toView isDescendantOfView:transitionContext.containerView]) {
+            [transitionContext.containerView addSubview:toView];
+        }
+        [transitionContext.containerView bringSubviewToFront:fromView ?: self.view];
+    }
+
+    self.pageViewController.view.center = CGPointMake(self.interactiveDismissAnchorPoint.x,
+                                                      self.interactiveDismissAnchorPoint.y + verticalDelta);
+    self.presentationBackdropView.alpha = backdropAlpha;
+    CGFloat fade = (self.isToolbarVisible ? 1.0 : 0.0) * backdropAlpha;
+    self.topToolbar.alpha = MAX(0.0, fade);
+    if (self.bottomBar) self.bottomBar.alpha = MAX(0.0, fade);
+}
+
+- (void)removeTransitionToViewForCancelledInteractiveDismissalIfNeeded {
+    id<UIViewControllerContextTransitioning> transitionContext = self.interactiveDismissTransitionContext;
+    if (transitionContext.presentationStyle != UIModalPresentationFullScreen) return;
+
+    UIView *toView = [transitionContext viewForKey:UITransitionContextToViewKey];
+    [toView removeFromSuperview];
+}
+
+- (void)finishInteractiveDismissal {
+    id<UIViewControllerContextTransitioning> transitionContext = self.interactiveDismissTransitionContext;
+    [transitionContext finishInteractiveTransition];
+    [transitionContext completeTransition:!transitionContext.transitionWasCancelled];
+    self.interactiveDismissTransitionContext = nil;
+    self.interactiveDismissalInProgress = NO;
+
+    [self cleanupAll];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self restorePreviewPlaybackIfNeeded];
+    });
+    if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
+        [self.delegate fullScreenMediaPlayerDidDismiss];
+    }
+}
+
+- (void)cancelInteractiveDismissal {
+    id<UIViewControllerContextTransitioning> transitionContext = self.interactiveDismissTransitionContext;
+    [transitionContext cancelInteractiveTransition];
+    [transitionContext completeTransition:NO];
+    self.interactiveDismissTransitionContext = nil;
+    self.interactiveDismissalInProgress = NO;
+    self.pageViewController.view.transform = CGAffineTransformIdentity;
+    self.pageViewController.view.center = SCICenterForBounds(self.view.bounds);
+}
+
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
+    return self.interactiveDismissalInProgress ? self : nil;
+}
+
+- (id<UIViewControllerInteractiveTransitioning>)interactionControllerForDismissal:(id<UIViewControllerAnimatedTransitioning>)animator {
+    return self.interactiveDismissalInProgress ? self : nil;
+}
+
+- (NSTimeInterval)transitionDuration:(id<UIViewControllerContextTransitioning>)transitionContext {
+    return kDismissMaximumDuration;
+}
+
+- (void)animateTransition:(id<UIViewControllerContextTransitioning>)transitionContext {
+    [transitionContext completeTransition:!transitionContext.transitionWasCancelled];
+}
+
+- (void)startInteractiveTransition:(id<UIViewControllerContextTransitioning>)transitionContext {
+    self.interactiveDismissTransitionContext = transitionContext;
+}
+
 #pragma mark - Cleanup
 
 - (void)cleanupAll {
-    [self cancelDeferredUnderlyingPlaybackRefreshes];
-
     for (UIViewController *controller in self.controllerCache.allValues) {
         if ([controller respondsToSelector:@selector(cleanup)]) {
             [(id)controller cleanup];

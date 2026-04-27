@@ -234,6 +234,64 @@ static void SCIProfileSavePictureToVault(id user) {
     [delegate downloadFileWithURL:url fileExtension:SCIProfilePictureExtension(url) hudLabel:nil];
 }
 
+static UIView *SCIProfileSourceView(id sourceObject) {
+    if ([sourceObject isKindOfClass:[UIView class]]) {
+        return (UIView *)sourceObject;
+    }
+    if ([sourceObject isKindOfClass:[UIViewController class]]) {
+        return [(UIViewController *)sourceObject view];
+    }
+    id view = SCIProfileSafeValue(sourceObject, @"view");
+    return [view isKindOfClass:[UIView class]] ? (UIView *)view : nil;
+}
+
+static UIViewController *SCIProfileSourceController(id sourceObject, UIView *sourceView) {
+    if ([sourceObject isKindOfClass:[UIViewController class]]) {
+        return (UIViewController *)sourceObject;
+    }
+    UIViewController *controller = nil;
+    id value = SCIProfileSafeValue(sourceObject, @"viewController");
+    if ([value isKindOfClass:[UIViewController class]]) {
+        controller = (UIViewController *)value;
+    }
+    if (!controller) {
+        value = SCIProfileSafeValue(sourceObject, @"_viewController");
+        if ([value isKindOfClass:[UIViewController class]]) {
+            controller = (UIViewController *)value;
+        }
+    }
+    if (!controller && sourceView) {
+        controller = [SCIUtils nearestViewControllerForView:sourceView];
+    }
+    return controller;
+}
+
+static SCIVaultSaveMetadata *SCIProfilePictureMetadata(id user) {
+    SCIVaultSaveMetadata *metadata = [[SCIVaultSaveMetadata alloc] init];
+    metadata.source = (int16_t)SCIVaultSourceProfile;
+    [SCIVaultOriginController populateProfileMetadata:metadata username:SCIProfileUsername(user) user:user];
+    return metadata;
+}
+
+static void SCIProfileViewPicture(id user, id sourceObject) {
+    NSURL *url = SCIProfilePictureURL(user);
+    if (!url) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
+        return;
+    }
+
+    UIView *sourceView = SCIProfileSourceView(sourceObject);
+    UIViewController *sourceController = SCIProfileSourceController(sourceObject, sourceView);
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo"];
+    [SCIFullScreenMediaPlayer showRemoteImageURL:url
+                                        metadata:SCIProfilePictureMetadata(user)
+                                  playbackSource:SCIFullScreenPlaybackSourceProfile
+                                      sourceView:sourceView
+                                      controller:sourceController
+                                   pausePlayback:nil
+                                  resumePlayback:nil];
+}
+
 @interface SCIProfileHeaderActionButton : UIButton
 @property (nonatomic, weak) id sourceObject;
 @property (nonatomic, assign) BOOL sciDidConfigure;
@@ -342,13 +400,7 @@ static UIMenu *SCIProfileActionMenu(id sourceObject) {
     [items addObject:SCIProfileCopyInfoMenu(user)];
 
     [items addObject:[UIAction actionWithTitle:@"View Picture" image:SCIProfileMenuIcon(@"photo") identifier:nil handler:^(__unused UIAction *action) {
-        NSURL *url = SCIProfilePictureURL(user);
-        if (!url) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
-            return;
-        }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo"];
-        [SCIFullScreenMediaPlayer showRemoteImageURL:url profileUsername:SCIProfileUsername(user)];
+        SCIProfileViewPicture(user, sourceObject);
     }]];
 
     [items addObject:[UIAction actionWithTitle:@"Share Picture" image:SCIProfileMenuIcon(@"share") identifier:nil handler:^(__unused UIAction *action) {
@@ -396,11 +448,7 @@ static void SCIExecuteProfileDefaultAction(SCIProfileHeaderActionButton *button)
     if ([identifier isEqualToString:kSCIProfileActionCopyInfo]) {
         SCIProfileExecuteCopyInfoAction(user, SCIProfileResolvedDefaultCopyInfoIdentifier());
     } else if ([identifier isEqualToString:kSCIProfileActionViewPicture]) {
-        NSURL *url = SCIProfilePictureURL(user);
-        if (url) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo"];
-            [SCIFullScreenMediaPlayer showRemoteImageURL:url profileUsername:SCIProfileUsername(user)];
-        }
+        SCIProfileViewPicture(user, button.sourceObject ?: button);
     } else if ([identifier isEqualToString:kSCIProfileActionSharePicture]) {
         SCIProfileSharePicture(user);
     } else if ([identifier isEqualToString:kSCIProfileActionSavePictureToVault]) {

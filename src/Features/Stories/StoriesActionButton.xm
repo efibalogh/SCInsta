@@ -29,10 +29,22 @@ static id SCIStoryMediaFromOverlay(UIView *overlayView) {
 	return media;
 }
 
+static UIViewController *SCIStoryControllerFromOverlay(UIView *overlayView) {
+	if (!overlayView) return nil;
+
+	id ancestorController = SCIObjectForSelector(overlayView, @"_viewControllerForAncestor");
+	if ([ancestorController isKindOfClass:[UIViewController class]]) {
+		return (UIViewController *)ancestorController;
+	}
+
+	return [SCIUtils nearestViewControllerForView:overlayView];
+}
+
 static SCIActionButtonContext *SCIStoriesActionContext(UIView *overlayView) {
 	SCIActionButtonContext *context = [[SCIActionButtonContext alloc] init];
 	context.source = SCIActionButtonSourceStories;
 	context.view = overlayView;
+	context.controller = SCIStoryControllerFromOverlay(overlayView);
 	context.settingsTitle = SCIActionButtonTopicTitleForSource(SCIActionButtonSourceStories);
 	context.supportedActions = SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceStories);
 	context.mediaResolver = ^id (SCIActionButtonContext *resolvedContext) {

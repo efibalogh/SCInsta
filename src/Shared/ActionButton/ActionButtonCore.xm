@@ -44,6 +44,7 @@ static const void *kSCIActionButtonLastMenuActionAssocKey = &kSCIActionButtonLas
 
 static void SCIPauseDirectPlaybackFromController(UIViewController *controller);
 static void SCIResumeDirectPlaybackFromController(UIViewController *controller);
+static BOOL SCIActionIdentifierOpensPreview(NSString *identifier);
 void SCIPauseStoryPlaybackFromOverlaySubview(UIView *overlayView);
 void SCIResumeStoryPlaybackFromOverlaySubview(UIView *overlayView);
 SCIActionButtonContext *SCIActionButtonContextFromButton(UIButton *button);
@@ -93,6 +94,7 @@ willDisplayMenuForConfiguration:(id)configuration
 		objc_setAssociatedObject(strongSelf, kSCIActionButtonLastMenuActionAssocKey, nil, OBJC_ASSOCIATION_COPY_NONATOMIC);
 		if (!context) return;
 		if ([lastAction isEqualToString:kSCIActionOpenTopicSettings]) return;
+		if (SCIActionIdentifierOpensPreview(lastAction)) return;
 
 		if (context.source == SCIActionButtonSourceStories) {
 			SCIResumeStoryPlaybackFromOverlaySubview(context.view);
@@ -225,6 +227,92 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButton
 		return [SCIAssetUtils instagramIconNamed:@"repost" pointSize:size];
 	}
 	return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"%@%@", iconName, append] pointSize:size];
+}
+
+static SCIFullScreenPlaybackSource SCIPlaybackSourceForActionSource(SCIActionButtonSource source) {
+    switch (source) {
+        case SCIActionButtonSourceFeed:
+            return SCIFullScreenPlaybackSourceFeed;
+        case SCIActionButtonSourceProfile:
+            return SCIFullScreenPlaybackSourceProfile;
+        case SCIActionButtonSourceReels:
+            return SCIFullScreenPlaybackSourceReels;
+        case SCIActionButtonSourceStories:
+            return SCIFullScreenPlaybackSourceStories;
+        case SCIActionButtonSourceDirect:
+            return SCIFullScreenPlaybackSourceDirect;
+        default:
+            return SCIFullScreenPlaybackSourceUnknown;
+    }
+}
+
+static void SCIPausePlaybackForPreviewContext(SCIActionButtonContext *context) {
+    if (!context) return;
+
+    switch (context.source) {
+        case SCIActionButtonSourceStories:
+            SCIPauseStoryPlaybackFromOverlaySubview(context.view);
+            return;
+        case SCIActionButtonSourceDirect:
+            SCIPauseDirectPlaybackFromController(context.controller);
+            return;
+        case SCIActionButtonSourceFeed:
+        case SCIActionButtonSourceReels:
+        case SCIActionButtonSourceProfile:
+        default:
+            return;
+    }
+}
+
+static void SCIResumePlaybackForPreviewContext(SCIActionButtonContext *context) {
+    if (!context) return;
+
+    switch (context.source) {
+        case SCIActionButtonSourceStories:
+            SCIResumeStoryPlaybackFromOverlaySubview(context.view);
+            return;
+        case SCIActionButtonSourceDirect:
+            SCIResumeDirectPlaybackFromController(context.controller);
+            return;
+        case SCIActionButtonSourceFeed:
+        case SCIActionButtonSourceReels:
+        case SCIActionButtonSourceProfile:
+        default:
+            return;
+    }
+}
+
+static BOOL SCIActionIdentifierOpensPreview(NSString *identifier) {
+    return [identifier isEqualToString:kSCIActionExpand] ||
+           [identifier isEqualToString:kSCIActionViewThumbnail];
+}
+
+static SCIMediaPreviewPlaybackBlock SCIPausePlaybackBlockForContext(SCIActionButtonContext *context) {
+    if (!context) return nil;
+    __weak UIView *sourceView = context.view;
+    __weak UIViewController *sourceController = context.controller;
+    SCIActionButtonSource source = context.source;
+    return [^{
+        SCIActionButtonContext *previewContext = [[SCIActionButtonContext alloc] init];
+        previewContext.source = source;
+        previewContext.view = sourceView;
+        previewContext.controller = sourceController;
+        SCIPausePlaybackForPreviewContext(previewContext);
+    } copy];
+}
+
+static SCIMediaPreviewPlaybackBlock SCIResumePlaybackBlockForContext(SCIActionButtonContext *context) {
+    if (!context) return nil;
+    __weak UIView *sourceView = context.view;
+    __weak UIViewController *sourceController = context.controller;
+    SCIActionButtonSource source = context.source;
+    return [^{
+        SCIActionButtonContext *previewContext = [[SCIActionButtonContext alloc] init];
+        previewContext.source = source;
+        previewContext.view = sourceView;
+        previewContext.controller = sourceController;
+        SCIResumePlaybackForPreviewContext(previewContext);
+    } copy];
 }
 
 UIImage *SCIActionButtonMenuIconForIdentifier(NSString *identifier, CGFloat size) {
@@ -845,7 +933,13 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *me
 		CGImageRelease(imageRef);
 
 		dispatch_async(dispatch_get_main_queue(), ^{
-			[SCIFullScreenMediaPlayer showImage:image metadata:metadata playbackSource:(SCIFullScreenPlaybackSource)context.source sourceView:context.view controller:context.controller];
+			[SCIFullScreenMediaPlayer showImage:image
+                                      metadata:metadata
+                                playbackSource:SCIPlaybackSourceForActionSource(context.source)
+                                    sourceView:context.view
+                                    controller:context.controller
+                                 pausePlayback:SCIPausePlaybackBlockForContext(context)
+                                resumePlayback:SCIResumePlaybackBlockForContext(context)];
 		});
 	});
 }
@@ -915,7 +1009,14 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		if (shouldShowFeedbackPill) {
 			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
 		}
-		[SCIFullScreenMediaPlayer showMediaItems:playerItems startingAtIndex:clampedIndex metadata:meta playbackSource:(SCIFullScreenPlaybackSource)context.source sourceView:context.view controller:context.controller];
+		[SCIFullScreenMediaPlayer showMediaItems:playerItems
+                                startingAtIndex:clampedIndex
+                                       metadata:meta
+                                 playbackSource:SCIPlaybackSourceForActionSource(context.source)
+                                     sourceView:context.view
+                                     controller:context.controller
+                                  pausePlayback:SCIPausePlaybackBlockForContext(context)
+                                 resumePlayback:SCIResumePlaybackBlockForContext(context)];
 		return YES;
 	}
 
@@ -938,7 +1039,13 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
                 UIImage *image = data ? [UIImage imageWithData:data] : nil;
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (image) {
-                        [SCIFullScreenMediaPlayer showImage:image metadata:thumbnailMeta playbackSource:(SCIFullScreenPlaybackSource)context.source sourceView:context.view controller:context.controller];
+                        [SCIFullScreenMediaPlayer showImage:image
+                                                  metadata:thumbnailMeta
+                                            playbackSource:SCIPlaybackSourceForActionSource(context.source)
+                                                sourceView:context.view
+                                                controller:context.controller
+                                             pausePlayback:SCIPausePlaybackBlockForContext(context)
+                                            resumePlayback:SCIResumePlaybackBlockForContext(context)];
                     } else {
 		                SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
                     }
@@ -1031,11 +1138,8 @@ BOOL SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonContext *co
 
 	SCIVaultSaveMetadata *meta = SCIVaultMetadata(context.source, username, metadataObject);
 
-	if (context.source == SCIActionButtonSourceStories && isDefaultTap) {
-		SCIPauseStoryPlaybackFromOverlaySubview(context.view);
-	}
-	if (context.source == SCIActionButtonSourceDirect && isDefaultTap) {
-		SCIPauseDirectPlaybackFromController(context.controller);
+	if (isDefaultTap && !SCIActionIdentifierOpensPreview(identifier)) {
+		SCIPausePlaybackForPreviewContext(context);
 	}
 
 	return SCIExecuteCommonAction(identifier, context, currentEntry, entries, resolvedIndex, username, meta, media);

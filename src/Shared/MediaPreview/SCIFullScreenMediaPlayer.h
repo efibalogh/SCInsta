@@ -10,7 +10,10 @@ typedef NS_ENUM(NSInteger, SCIFullScreenPlaybackSource) {
     SCIFullScreenPlaybackSourceReels = 2,
     SCIFullScreenPlaybackSourceStories = 3,
     SCIFullScreenPlaybackSourceDirect = 4,
+    SCIFullScreenPlaybackSourceProfile = 5,
 };
+
+typedef void (^SCIMediaPreviewPlaybackBlock)(void);
 
 @protocol SCIFullScreenMediaPlayerDelegate <NSObject>
 @optional
@@ -47,7 +50,9 @@ fromViewController:(UIViewController *)presenter;
               metadata:(nullable SCIVaultSaveMetadata *)metadata
         playbackSource:(SCIFullScreenPlaybackSource)playbackSource
             sourceView:(nullable UIView *)sourceView
-            controller:(nullable UIViewController *)controller;
+            controller:(nullable UIViewController *)controller
+         pausePlayback:(nullable SCIMediaPreviewPlaybackBlock)pausePlayback
+        resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
 
 + (void)showImage:(UIImage *)image;
 + (void)showImage:(UIImage *)image metadata:(nullable SCIVaultSaveMetadata *)metadata;
@@ -55,14 +60,18 @@ fromViewController:(UIViewController *)presenter;
          metadata:(nullable SCIVaultSaveMetadata *)metadata
    playbackSource:(SCIFullScreenPlaybackSource)playbackSource
        sourceView:(nullable UIView *)sourceView
-       controller:(nullable UIViewController *)controller;
+       controller:(nullable UIViewController *)controller
+    pausePlayback:(nullable SCIMediaPreviewPlaybackBlock)pausePlayback
+   resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
 + (void)showRemoteImageURL:(NSURL *)url;
 + (void)showRemoteImageURL:(NSURL *)url metadata:(nullable SCIVaultSaveMetadata *)metadata;
 + (void)showRemoteImageURL:(NSURL *)url
                   metadata:(nullable SCIVaultSaveMetadata *)metadata
             playbackSource:(SCIFullScreenPlaybackSource)playbackSource
                 sourceView:(nullable UIView *)sourceView
-                controller:(nullable UIViewController *)controller;
+                controller:(nullable UIViewController *)controller
+             pausePlayback:(nullable SCIMediaPreviewPlaybackBlock)pausePlayback
+            resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
 /// Profile / avatar long-press: sets vault source + optional username for “Save to Vault”.
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(nullable NSString *)username;
 

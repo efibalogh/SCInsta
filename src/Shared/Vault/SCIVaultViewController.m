@@ -29,6 +29,7 @@ static NSString * const kFavoritesAtTopKey = @"show_favorites_at_top";
 static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
 static CGFloat const kVaultMenuIconPointSize = 22.0;
+static CGFloat const kVaultBottomBarInsetHeight = 44.0;
 
 static UIImage *SCIVaultMenuActionIcon(NSString *resourceName) {
     return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
@@ -54,7 +55,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                        NSFetchedResultsControllerDelegate,
                                        SCIVaultSortViewControllerDelegate,
                                        SCIVaultFilterViewControllerDelegate,
-                                       UIAdaptivePresentationControllerDelegate>
+                                       UIAdaptivePresentationControllerDelegate,
+                                       UISearchResultsUpdating>
 
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, strong) NSFetchedResultsController *fetchedResultsController;
@@ -80,6 +82,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 @property (nonatomic, assign) BOOL filterFavoritesOnly;
 @property (nonatomic, assign) BOOL selectionMode;
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedFileIDs;
+@property (nonatomic, strong) UISearchController *searchController;
+@property (nonatomic, copy) NSString *searchQuery;
 
 @end
 
@@ -145,6 +149,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     [self setupCenteredTitle];
     [self setupNavigationItems];
+    [self setupSearchController];
     [self setupBottomToolbar];
     [self setupCollectionView];
     [self setupEmptyState];
@@ -164,12 +169,17 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self applyVaultNavigationChrome];
+    [self installBottomToolbarIfNeeded];
     [self refreshNavigationItems];
     [self refreshBottomToolbarItems];
+    [self updateCollectionInsets];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    if (self.bottomBar.superview) {
+        [self.bottomBar removeFromSuperview];
+    }
     if (self.navigationController.viewControllers.firstObject != self) return;
     if (self.isMovingFromParentViewController) return;
     if (self.isBeingDismissed || self.navigationController.isBeingDismissed) {
@@ -210,18 +220,37 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self refreshNavigationItems];
 }
 
+- (void)setupSearchController {
+    UISearchController *controller = [[UISearchController alloc] initWithSearchResultsController:nil];
+    controller.obscuresBackgroundDuringPresentation = NO;
+    controller.hidesNavigationBarDuringPresentation = NO;
+    controller.searchResultsUpdater = self;
+    controller.searchBar.placeholder = @"Search...";
+    self.searchController = controller;
+    self.navigationItem.searchController = controller;
+    self.navigationItem.hidesSearchBarWhenScrolling = YES;
+    if (@available(iOS 26.0, *)) {
+        @try {
+            [self.navigationItem setValue:@2 forKey:@"preferredSearchBarPlacement"];
+        } @catch (__unused NSException *exception) {
+        }
+    }
+    self.definesPresentationContext = YES;
+}
+
 - (void)refreshNavigationItems {
     if (self.selectionMode) {
         NSArray<SCIVaultFile *> *files = [self visibleVaultFiles];
         BOOL allSelected = files.count > 0 && self.selectedFileIDs.count == files.count;
+        self.navigationItem.rightBarButtonItems = nil;
         self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Cancel"
                                                                                   style:UIBarButtonItemStylePlain
                                                                                  target:self
                                                                                  action:@selector(exitSelectionMode)];
         self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:(allSelected ? @"Deselect All" : @"Select All")
-                                                                                   style:UIBarButtonItemStylePlain
-                                                                                  target:self
-                                                                                  action:@selector(selectAllVisibleFiles)];
+                                                                                  style:UIBarButtonItemStylePlain
+                                                                                 target:self
+                                                                                 action:@selector(selectAllVisibleFiles)];
         return;
     }
 
@@ -231,12 +260,34 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         self.navigationItem.leftBarButtonItem = nil;
     }
 
-    self.navigationItem.rightBarButtonItem = SCIMediaChromeTopBarButtonItem(@"settings", self, @selector(pushSettings));
+    self.navigationItem.rightBarButtonItem = nil;
+    NSMutableArray<UIBarButtonItem *> *items = [NSMutableArray array];
+    if (self.navigationController.viewControllers.firstObject == self) {
+        [items addObject:SCIMediaChromeTopBarButtonItem(@"settings", self, @selector(pushSettings))];
+    }
+    UIBarButtonItem *selectItem = SCIMediaChromeTopBarButtonItem(@"circle_check", self, @selector(enterSelectionMode));
+    [items addObject:selectItem];
+    self.navigationItem.rightBarButtonItems = items;
 }
 
 - (void)setupBottomToolbar {
-    self.bottomBar = SCIMediaChromeInstallBottomBar(self.view);
+    [self installBottomToolbarIfNeeded];
     [self refreshBottomToolbarItems];
+}
+
+- (void)installBottomToolbarIfNeeded {
+    UIView *hostView = self.navigationController.view ?: self.view;
+    if (self.bottomBar && self.bottomBar.superview == hostView) {
+        return;
+    }
+
+    if (self.bottomBar.superview) {
+        [self.bottomBar removeFromSuperview];
+        self.bottomBar = nil;
+        self.bottomBarStack = nil;
+    }
+
+    self.bottomBar = SCIMediaChromeInstallBottomBar(hostView);
 }
 
 - (UIButton *)vaultBottomBarButtonWithResource:(NSString *)resourceName accessibility:(NSString *)label {
@@ -244,8 +295,12 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 }
 
 - (void)refreshBottomToolbarItems {
+    [self installBottomToolbarIfNeeded];
     [self.bottomBarStack removeFromSuperview];
     self.bottomBarStack = nil;
+
+    UIButton *searchBtn = [self vaultBottomBarButtonWithResource:@"search" accessibility:@"Search"];
+    [searchBtn addTarget:self action:@selector(activateSearch) forControlEvents:UIControlEventTouchUpInside];
 
     if (self.selectionMode) {
         UIButton *shareBtn = [self vaultBottomBarButtonWithResource:@"share" accessibility:@"Share selected"];
@@ -261,7 +316,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [deleteBtn addTarget:self action:@selector(deleteSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
         deleteBtn.tintColor = [SCIUtils SCIColor_InstagramDestructive];
 
-        self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, @[shareBtn, moveBtn, favoriteBtn, deleteBtn]);
+        self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, @[shareBtn, moveBtn, favoriteBtn, deleteBtn, searchBtn]);
         return;
     }
 
@@ -279,10 +334,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     UIButton *folderBtn = [self vaultBottomBarButtonWithResource:@"folder" accessibility:@"New folder"];
     [folderBtn addTarget:self action:@selector(presentCreateFolder) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *selectBtn = [self vaultBottomBarButtonWithResource:@"circle_check" accessibility:@"Select"];
-    [selectBtn addTarget:self action:@selector(enterSelectionMode) forControlEvents:UIControlEventTouchUpInside];
-
-    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn, selectBtn];
+    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn, searchBtn];
 
     self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, row);
 }
@@ -298,6 +350,9 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     _collectionView.dataSource = self;
     _collectionView.delegate = self;
     _collectionView.alwaysBounceVertical = YES;
+    if (@available(iOS 7.0, *)) {
+        _collectionView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
+    }
     [_collectionView registerClass:[SCIVaultGridCell class] forCellWithReuseIdentifier:kGridCellID];
     [_collectionView registerClass:[SCIVaultListCollectionCell class] forCellWithReuseIdentifier:kListCellID];
     [_collectionView registerClass:[SCIVaultFolderCell class] forCellWithReuseIdentifier:kFolderCellID];
@@ -305,10 +360,26 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     [NSLayoutConstraint activateConstraints:@[
         [_collectionView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [_collectionView.bottomAnchor constraintEqualToAnchor:self.bottomBar.topAnchor],
+        [_collectionView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [_collectionView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_collectionView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];
+}
+
+- (void)viewSafeAreaInsetsDidChange {
+    [super viewSafeAreaInsetsDidChange];
+    [self updateCollectionInsets];
+}
+
+- (void)updateCollectionInsets {
+    CGFloat bottomInset = kVaultBottomBarInsetHeight + self.view.safeAreaInsets.bottom;
+    UIEdgeInsets contentInsets = self.collectionView.contentInset;
+    contentInsets.bottom = bottomInset;
+    self.collectionView.contentInset = contentInsets;
+
+    UIEdgeInsets indicatorInsets = self.collectionView.scrollIndicatorInsets;
+    indicatorInsets.bottom = bottomInset;
+    self.collectionView.scrollIndicatorInsets = indicatorInsets;
 }
 
 - (UICollectionViewLayout *)layoutForViewMode:(SCIVaultViewMode)mode {
@@ -396,7 +467,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 - (void)updateEmptyState {
     NSInteger files = self.fetchedResultsController.fetchedObjects.count;
-    NSInteger folders = self.subfolders.count;
+    NSInteger folders = [self showsFolderSection] ? self.subfolders.count : 0;
     BOOL hasFilters = self.filterTypes.count > 0 || self.filterSources.count > 0 || self.filterFavoritesOnly;
 
     BOOL isEmpty = (files == 0 && folders == 0);
@@ -435,10 +506,19 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [sortDescriptors insertObject:[NSSortDescriptor sortDescriptorWithKey:@"isFavorite" ascending:NO] atIndex:0];
     }
     request.sortDescriptors = sortDescriptors;
-    request.predicate = [SCIVaultFilterViewController predicateForTypes:self.filterTypes
-                                                                sources:self.filterSources
-                                                          favoritesOnly:self.filterFavoritesOnly
-                                                             folderPath:self.currentFolderPath];
+    NSPredicate *basePredicate = [SCIVaultFilterViewController predicateForTypes:self.filterTypes
+                                                                         sources:self.filterSources
+                                                                   favoritesOnly:self.filterFavoritesOnly
+                                                                      folderPath:self.currentFolderPath];
+    NSString *query = [self.searchQuery stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (query.length == 0) {
+        request.predicate = basePredicate;
+        return request;
+    }
+
+    NSPredicate *searchPredicate = [NSPredicate predicateWithFormat:@"(sourceUsername CONTAINS[cd] %@) OR (customName CONTAINS[cd] %@) OR (relativePath CONTAINS[cd] %@)",
+                                    query, query, query];
+    request.predicate = [NSCompoundPredicate andPredicateWithSubpredicates:@[basePredicate, searchPredicate]];
     return request;
 }
 
@@ -463,6 +543,10 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 #pragma mark - Subfolders
 
 - (void)reloadSubfolders {
+    if (self.searchQuery.length > 0) {
+        self.subfolders = @[];
+        return;
+    }
     // Subfolders are derived from distinct `folderPath` values on files whose path
     // is a descendant of the current path.
     NSManagedObjectContext *ctx = [SCIVaultCoreDataStack shared].viewContext;
@@ -504,7 +588,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 #pragma mark - UICollectionViewDataSource
 
 - (BOOL)showsFolderSection {
-    return self.viewMode == SCIVaultViewModeList;
+    return self.viewMode == SCIVaultViewModeList && self.searchQuery.length == 0;
 }
 
 - (BOOL)isFolderIndexPath:(NSIndexPath *)indexPath {
@@ -744,6 +828,28 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     }
     self.navigationItem.rightBarButtonItem.title = (self.selectedFileIDs.count == files.count && files.count > 0) ? @"Deselect All" : @"Select All";
     [self.collectionView reloadData];
+}
+
+- (void)activateSearch {
+    CGFloat revealOffsetY = -self.collectionView.adjustedContentInset.top;
+    if (self.collectionView.contentOffset.y > revealOffsetY) {
+        [self.collectionView setContentOffset:CGPointMake(self.collectionView.contentOffset.x, revealOffsetY) animated:NO];
+        [self.collectionView layoutIfNeeded];
+        [self.navigationController.navigationBar layoutIfNeeded];
+    }
+    self.searchController.active = YES;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.searchController.searchBar becomeFirstResponder];
+    });
+}
+
+- (void)updateSearchResultsForSearchController:(UISearchController *)searchController {
+    NSString *nextQuery = searchController.searchBar.text ?: @"";
+    if ((self.searchQuery ?: @"").length == nextQuery.length && [(self.searchQuery ?: @"") isEqualToString:nextQuery]) {
+        return;
+    }
+    self.searchQuery = nextQuery;
+    [self refetch];
 }
 
 - (void)shareSelectedFiles {
