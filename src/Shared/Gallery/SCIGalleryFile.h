@@ -45,24 +45,24 @@ typedef NS_ENUM(int16_t, SCIGallerySource) {
 @property (nonatomic) double durationSeconds;
 
 + (nullable SCIGalleryFile *)saveFileToGallery:(NSURL *)fileURL
-                                    source:(SCIGallerySource)source
-                                 mediaType:(SCIGalleryMediaType)mediaType
-                                     error:(NSError **)error;
+                                        source:(SCIGallerySource)source
+                                     mediaType:(SCIGalleryMediaType)mediaType
+                                         error:(NSError **)error;
 
 /// Convenience: adds to gallery inside the given folder.
 + (nullable SCIGalleryFile *)saveFileToGallery:(NSURL *)fileURL
-                                    source:(SCIGallerySource)source
-                                 mediaType:(SCIGalleryMediaType)mediaType
-                                folderPath:(nullable NSString *)folderPath
-                                     error:(NSError **)error;
+                                        source:(SCIGallerySource)source
+                                     mediaType:(SCIGalleryMediaType)mediaType
+                                    folderPath:(nullable NSString *)folderPath
+                                         error:(NSError **)error;
 
 /// When `metadata` is non-nil, its fields override `source` and populate list UI. File is probed for any missing dimensions/duration.
 + (nullable SCIGalleryFile *)saveFileToGallery:(NSURL *)fileURL
-                                    source:(SCIGallerySource)source
-                                 mediaType:(SCIGalleryMediaType)mediaType
-                                folderPath:(nullable NSString *)folderPath
-                                  metadata:(nullable SCIGallerySaveMetadata *)metadata
-                                     error:(NSError **)error;
+                                        source:(SCIGallerySource)source
+                                     mediaType:(SCIGalleryMediaType)mediaType
+                                    folderPath:(nullable NSString *)folderPath
+                                      metadata:(nullable SCIGallerySaveMetadata *)metadata
+                                         error:(NSError **)error;
 
 - (BOOL)removeWithError:(NSError *_Nullable *_Nullable)error;
 

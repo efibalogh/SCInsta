@@ -261,7 +261,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                 }
             } else {
                 if (self.progressView) {
-                    [self.progressView showError:@"Failed to save to gallery"];
+                    [self.progressView showError:@"Failed to save to Gallery"];
                 }
                 SCIReleaseActiveDownloadDelegate(self);
             }

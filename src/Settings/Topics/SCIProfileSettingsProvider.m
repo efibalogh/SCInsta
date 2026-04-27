@@ -39,7 +39,7 @@ static UIMenu *SCIProfileActionDefaultMenu(void) {
         SCIProfileActionDefaultCommand(@"Copy Info", @"copy", kSCIProfileActionCopyInfo),
         SCIProfileActionDefaultCommand(@"View Picture", @"photo", kSCIProfileActionViewPicture),
         SCIProfileActionDefaultCommand(@"Share Picture", @"share", kSCIProfileActionSharePicture),
-        SCIProfileActionDefaultCommand(@"Download to Gallery", @"photo_gallery", kSCIProfileActionSavePictureToGallery),
+        SCIProfileActionDefaultCommand(@"Save to Gallery", @"media", kSCIProfileActionSavePictureToGallery),
         SCIProfileActionDefaultCommand(@"Profile Settings", @"settings", kSCIProfileActionOpenSettings)
     ]];
 }

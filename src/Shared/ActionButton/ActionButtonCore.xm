@@ -209,13 +209,13 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButton
 		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"link%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadGallery]) {
-		return [SCIAssetUtils instagramIconNamed:@"photo_gallery" pointSize:size];
+		return [SCIAssetUtils instagramIconNamed:@"media" pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
 		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"expand%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
-		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"photo%@", append] pointSize:size];
+		return [SCIAssetUtils instagramIconNamed:@"photo_gallery" pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionCopyCaption]) {
 		return [SCIAssetUtils instagramIconNamed:@"caption" pointSize:size];
@@ -742,26 +742,24 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 }
 
 static CGSize SCICustomButtonIconDisplaySize(NSString *identifier, SCIActionButtonSource source, UIImage *image, UIButton *button) {
-	if (!image) return CGSizeZero;
+    if (!image) return CGSizeZero;
 
-	CGFloat width = image.size.width;
-	CGFloat height = image.size.height;
-	if (source == SCIActionButtonSourceReels &&
-		([identifier isEqualToString:kSCIActionDownloadShare] ||
-		 [identifier isEqualToString:kSCIActionViewThumbnail] ||
-		 [identifier isEqualToString:kSCIActionDownloadGallery])) {
-		if ([identifier isEqualToString:kSCIActionDownloadGallery]) {
-			width = 28.0;
-			height = 28.0;
-		} else {
-		width = 40.0;
-		height = 40.0;
-		}
-	}
+    CGFloat width = image.size.width;
+    CGFloat height = image.size.height;
 
-	CGFloat maxWidth = CGRectGetWidth(button.bounds) > 0.0 ? CGRectGetWidth(button.bounds) : 44.0;
-	CGFloat maxHeight = CGRectGetHeight(button.bounds) > 0.0 ? CGRectGetHeight(button.bounds) : 44.0;
-	return CGSizeMake(MAX(1.0, MIN(maxWidth, width)), MAX(1.0, MIN(maxHeight, height)));
+    if (source == SCIActionButtonSourceReels &&
+        ([identifier isEqualToString:kSCIActionDownloadShare] ||
+         [identifier isEqualToString:kSCIActionViewThumbnail] ||
+         [identifier isEqualToString:kSCIActionDownloadGallery])) {
+        
+        width = height = ([identifier isEqualToString:kSCIActionDownloadGallery] ||
+                          [identifier isEqualToString:kSCIActionViewThumbnail]) ? 28.0 : 40.0;
+    }
+
+    CGFloat maxWidth = CGRectGetWidth(button.bounds) > 0.0 ? CGRectGetWidth(button.bounds) : 44.0;
+    CGFloat maxHeight = CGRectGetHeight(button.bounds) > 0.0 ? CGRectGetHeight(button.bounds) : 44.0;
+    
+    return CGSizeMake(MAX(1.0, MIN(maxWidth, width)), MAX(1.0, MIN(maxHeight, height)));
 }
 
 static UIImageView *SCIEnsureCustomIconImageView(UIButton *button) {
@@ -1023,7 +1021,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
 		if (!currentEntry.videoURL) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_filled"];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_gallery"];
 			}
 			return YES;
 		}
@@ -1055,7 +1053,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		    SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
         }
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opening thumbnail" subtitle:nil iconResource:@"photo_filled"];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opening thumbnail" subtitle:nil iconResource:@"photo_gallery"];
 		}
 		return YES;
 	}

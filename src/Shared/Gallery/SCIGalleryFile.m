@@ -541,7 +541,7 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         case SCIGallerySourceReels:   return @"reels";
         case SCIGallerySourceProfile: return @"profile";
         case SCIGallerySourceDMs:     return @"messages";
-        case SCIGallerySourceThumbnail: return @"photo";
+        case SCIGallerySourceThumbnail: return @"photo_gallery";
         case SCIGallerySourceOther:
         default:                    return @"media";
     }

@@ -142,9 +142,9 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 
     NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenGallery duration:1.4
-                                     title:@"Opened gallery media"
+                                     title:@"Opened Gallery media"
                                   subtitle:nil
-                              iconResource:@"photo_gallery"
+                              iconResource:@"media"
                                       tone:SCIFeedbackPillToneInfo];
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
@@ -489,7 +489,7 @@ fromViewController:(UIViewController *)presenter {
         [_deleteGalleryButton addTarget:self action:@selector(deleteFromGallery) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteGalleryButton];
     } else {
-        _saveGalleryButton = SCIMediaChromeBottomButton(@"photo_gallery", @"Save to Gallery");
+        _saveGalleryButton = SCIMediaChromeBottomButton(@"media", @"Save to Gallery");
         [_saveGalleryButton addTarget:self action:@selector(saveToGallery) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveGalleryButton];
     }
@@ -1160,7 +1160,7 @@ fromViewController:(UIViewController *)presenter {
 
     if (_items.count == 0) {
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:1.5
-                                         title:@"Deleted from gallery"
+                                         title:@"Deleted from Gallery"
                                       subtitle:nil
                                   iconResource:@"circle_check_filled"
                                           tone:SCIFeedbackPillToneSuccess];
@@ -1187,7 +1187,7 @@ fromViewController:(UIViewController *)presenter {
     [self prepareAdjacentViewControllersAroundIndex:_currentIndex];
     [self updateUI];
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:1.5
-                                     title:@"Deleted from gallery"
+                                     title:@"Deleted from Gallery"
                                   subtitle:nil
                               iconResource:@"circle_check_filled"
                                       tone:SCIFeedbackPillToneSuccess];

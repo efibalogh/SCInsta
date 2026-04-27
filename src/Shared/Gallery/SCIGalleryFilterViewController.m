@@ -5,19 +5,6 @@
 static CGFloat const kSCIGalleryFilterChipLabelPointSize = 16.0;
 static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
 
-static NSString *SCIGallerySourceFallbackSymbol(SCIGallerySource source) {
-    switch (source) {
-        case SCIGallerySourceFeed:      return @"rectangle.stack";
-        case SCIGallerySourceStories:   return @"rectangle.portrait.on.rectangle.portrait.angled";
-        case SCIGallerySourceReels:     return @"film.stack";
-        case SCIGallerySourceProfile:   return @"person.crop.circle";
-        case SCIGallerySourceDMs:       return @"bubble.left.and.bubble.right";
-        case SCIGallerySourceThumbnail: return @"photo.on.rectangle";
-        case SCIGallerySourceOther:
-        default:                      return @"tray";
-    }
-}
-
 @interface SCIGalleryFilterChip : UIButton
 @property (nonatomic, assign) NSInteger itemTag;
 @property (nonatomic, assign) BOOL selectedChip;
@@ -162,8 +149,8 @@ static NSString *SCIGallerySourceFallbackSymbol(SCIGallerySource source) {
     row.distribution = UIStackViewDistributionFillEqually;
 
     NSArray *defs = @[
-        @{@"label": @"Images", @"resource": @"photo", @"fallback": @"photo.fill", @"tag": @(SCIGalleryMediaTypeImage)},
-        @{@"label": @"Videos", @"resource": @"video", @"fallback": @"video.fill", @"tag": @(SCIGalleryMediaTypeVideo)},
+        @{@"label": @"Images", @"resource": @"photo", @"tag": @(SCIGalleryMediaTypeImage)},
+        @{@"label": @"Videos", @"resource": @"video", @"tag": @(SCIGalleryMediaTypeVideo)},
     ];
     for (NSDictionary *d in defs) {
         NSInteger tag = [d[@"tag"] integerValue];

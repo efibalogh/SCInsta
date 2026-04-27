@@ -350,9 +350,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     _collectionView.dataSource = self;
     _collectionView.delegate = self;
     _collectionView.alwaysBounceVertical = YES;
-    if (@available(iOS 7.0, *)) {
-        _collectionView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
-    }
+    _collectionView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     [_collectionView registerClass:[SCIGalleryGridCell class] forCellWithReuseIdentifier:kGridCellID];
     [_collectionView registerClass:[SCIGalleryListCollectionCell class] forCellWithReuseIdentifier:kListCellID];
     [_collectionView registerClass:[SCIGalleryFolderCell class] forCellWithReuseIdentifier:kFolderCellID];
@@ -427,7 +425,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 
     UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
     label.translatesAutoresizingMaskIntoConstraints = NO;
-    label.text = @"No files in gallery";
+    label.text = @"No files in Gallery";
     label.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     label.font = [UIFont systemFontOfSize:17 weight:UIFontWeightMedium];
     label.textAlignment = NSTextAlignmentCenter;
@@ -477,7 +475,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     if (isEmpty && hasFilters) {
         self.emptyStateLabel.text = @"No matching files";
     } else {
-        self.emptyStateLabel.text = @"No files in gallery";
+        self.emptyStateLabel.text = @"No files in Gallery";
     }
 }
 
@@ -1030,7 +1028,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
                                           tone:SCIFeedbackPillToneError];
             } else {
                 [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryDeleteFile duration:1.5
-                                                 title:@"Deleted from gallery"
+                                                 title:@"Deleted from Gallery"
                                               subtitle:nil
                                           iconResource:@"circle_check_filled"
                                                   tone:SCIFeedbackPillToneSuccess];

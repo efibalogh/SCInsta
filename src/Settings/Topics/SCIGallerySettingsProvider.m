@@ -10,7 +10,7 @@
 + (SCISetting *)rootSetting {
     return [SCISetting buttonCellWithTitle:@"Gallery"
                                   subtitle:@""
-                                      icon:SCISettingsInstagramIcon(@"photo_gallery", 24.0)
+                                      icon:SCISettingsInstagramIcon(@"media", 24.0)
                                     action:^(void) {
         [SCIGalleryViewController presentGallery];
     }];

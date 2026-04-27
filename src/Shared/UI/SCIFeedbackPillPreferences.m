@@ -60,9 +60,9 @@ NSArray<NSDictionary *> *SCIFeedbackPillPreferenceSections(void) {
                 SCIFeedbackPillItem(kSCIFeedbackActionDownloadLibrary, @"Download", @"download"),
                 SCIFeedbackPillItem(kSCIFeedbackActionDownloadShare, @"Share", @"share"),
                 SCIFeedbackPillItem(kSCIFeedbackActionCopyDownloadLink, @"Copy Download Link", @"link"),
-                SCIFeedbackPillItem(kSCIFeedbackActionDownloadGallery, @"Download to Gallery", @"photo_gallery"),
+                SCIFeedbackPillItem(kSCIFeedbackActionDownloadGallery, @"Save to Gallery", @"media"),
                 SCIFeedbackPillItem(kSCIFeedbackActionExpand, @"Expand", @"expand"),
-                SCIFeedbackPillItem(kSCIFeedbackActionViewThumbnail, @"View Thumbnail", @"photo"),
+                SCIFeedbackPillItem(kSCIFeedbackActionViewThumbnail, @"View Thumbnail", @"photo_gallery"),
                 SCIFeedbackPillItem(kSCIFeedbackActionCopyCaption, @"Copy Caption", @"caption"),
                 SCIFeedbackPillItem(kSCIFeedbackActionOpenTopicSettings, @"Open Topic Settings", @"settings"),
                 SCIFeedbackPillItem(kSCIFeedbackActionRepost, @"Repost", @"repost")
@@ -82,7 +82,7 @@ NSArray<NSDictionary *> *SCIFeedbackPillPreferenceSections(void) {
                 SCIFeedbackPillItem(kSCIFeedbackActionProfileCopyInfo, @"Copy Profile Info", @"copy"),
                 SCIFeedbackPillItem(kSCIFeedbackActionProfileViewPicture, @"View Profile Picture", @"photo"),
                 SCIFeedbackPillItem(kSCIFeedbackActionProfileSharePicture, @"Share Profile Picture", @"share"),
-                SCIFeedbackPillItem(kSCIFeedbackActionProfileGalleryPicture, @"Save Profile Picture to Gallery", @"photo_gallery"),
+                SCIFeedbackPillItem(kSCIFeedbackActionProfileGalleryPicture, @"Save Profile Picture to Gallery", @"media"),
                 SCIFeedbackPillItem(kSCIFeedbackActionProfileOpenSettings, @"Open Profile Settings", @"settings")
             ]
         },
@@ -90,11 +90,11 @@ NSArray<NSDictionary *> *SCIFeedbackPillPreferenceSections(void) {
             @"title": @"Media Preview",
             @"items": @[
                 SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewSavePhotos, @"Save to Photos", @"download"),
-                SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewSaveGallery, @"Save to Gallery", @"photo_gallery"),
+                SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewSaveGallery, @"Save to Gallery", @"media"),
                 SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewShare, @"Share Media", @"share"),
                 SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewCopy, @"Copy Media", @"copy"),
                 SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewDeleteGallery, @"Delete Gallery Media", @"trash"),
-                SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewOpenGallery, @"Open Gallery Media", @"photo_gallery")
+                SCIFeedbackPillItem(kSCIFeedbackActionMediaPreviewOpenGallery, @"Open Gallery Media", @"media")
             ]
         },
         @{

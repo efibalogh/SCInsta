@@ -555,9 +555,7 @@ void SCIPresentStoryMentionsSheet(UIView *overlayView) {
         sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
         sheet.prefersEdgeAttachedInCompactHeight = YES;
         sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = YES;
-        if (@available(iOS 15.0, *)) {
-            sheet.prefersGrabberVisible = YES;
-        }
+        sheet.prefersGrabberVisible = YES;
     // }
 
     [presenter presentViewController:nav animated:YES completion:nil];

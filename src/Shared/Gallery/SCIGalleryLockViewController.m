@@ -253,20 +253,20 @@ static NSInteger const kPasscodeLength = 4;
     switch (self.mode) {
         case SCIGalleryLockModeUnlock:
             self.titleLabel.text = @"Enter Passcode";
-            self.subtitleLabel.text = @"Enter your passcode to unlock the gallery";
+            self.subtitleLabel.text = @"Enter your passcode to unlock the Gallery";
             break;
 
         case SCIGalleryLockModeSetPasscode:
             self.titleLabel.text = self.firstPasscode ? @"Confirm Passcode" : @"New Passcode";
             self.subtitleLabel.text = self.firstPasscode
                 ? @"Re-enter your new passcode"
-                : @"Create a passcode to protect your gallery";
+                : @"Create a passcode to protect your Gallery";
             break;
 
         case SCIGalleryLockModeChangePasscode:
             if (!self.hasVerifiedOldPasscode) {
                 self.titleLabel.text = @"Enter Current Passcode";
-                self.subtitleLabel.text = @"Enter your current gallery passcode";
+                self.subtitleLabel.text = @"Enter your current Gallery passcode";
             } else {
                 self.titleLabel.text = self.firstPasscode ? @"Confirm Passcode" : @"New Passcode";
                 self.subtitleLabel.text = self.firstPasscode

@@ -407,7 +407,7 @@ static UIMenu *SCIProfileActionMenu(id sourceObject) {
         SCIProfileSharePicture(user);
     }]];
 
-    [items addObject:[UIAction actionWithTitle:@"Download to Gallery" image:SCIProfileMenuIcon(@"photo_gallery") identifier:nil handler:^(__unused UIAction *action) {
+    [items addObject:[UIAction actionWithTitle:@"Save to Gallery" image:SCIProfileMenuIcon(@"media") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileSavePictureToGallery(user);
     }]];
 
@@ -465,26 +465,19 @@ static void SCIProfileDefaultTapHandler(id target, SEL _cmd) {
 
 static UIImage *SCIProfileButtonIconForDefaultAction(NSString *defaultIdentifier) {
     NSString *resourceName = @"action";
-    NSString *fallbackName = @"gearshape";
 
     if ([defaultIdentifier isEqualToString:kSCIProfileActionCopyInfo]) {
         resourceName = @"copy";
-        fallbackName = @"doc.on.doc";
     } else if ([defaultIdentifier isEqualToString:kSCIProfileActionViewPicture]) {
         resourceName = @"photo";
-        fallbackName = @"photo";
     } else if ([defaultIdentifier isEqualToString:kSCIProfileActionSharePicture]) {
         resourceName = @"share";
-        fallbackName = @"square.and.arrow.up";
     } else if ([defaultIdentifier isEqualToString:kSCIProfileActionSavePictureToGallery]) {
-        resourceName = @"photo_gallery";
-        fallbackName = @"photo.on.rectangle.angled";
+        resourceName = @"media";
     } else if ([defaultIdentifier isEqualToString:kSCIProfileActionOpenSettings]) {
         resourceName = @"settings";
-        fallbackName = @"gearshape";
     }
 
-    (void)fallbackName;
     return [SCIAssetUtils instagramIconNamed:resourceName
                                    pointSize:kSCIProfileActionIconPointSize];
 }

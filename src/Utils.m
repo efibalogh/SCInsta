@@ -244,22 +244,20 @@ static SCIFeedbackPillTone SCIToastToneForIconResource(NSString *iconResource) {
 
 static UIView *SCIFeedbackPresentationView(void) {
     UIWindowScene *windowScene = SCIFeedbackPresentationWindowScene();
-    if (@available(iOS 13.0, *)) {
-        if (windowScene) {
-            if (!sSCIFeedbackOverlayWindow || sSCIFeedbackOverlayWindow.windowScene != windowScene) {
-                sSCIFeedbackOverlayRootViewController = [[SCIFeedbackOverlayRootViewController alloc] init];
-                sSCIFeedbackOverlayWindow = [[SCIFeedbackPassthroughWindow alloc] initWithWindowScene:windowScene];
-                sSCIFeedbackOverlayWindow.rootViewController = sSCIFeedbackOverlayRootViewController;
-                sSCIFeedbackOverlayWindow.backgroundColor = UIColor.clearColor;
-                sSCIFeedbackOverlayWindow.opaque = NO;
-                sSCIFeedbackOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
-                sSCIFeedbackOverlayWindow.frame = windowScene.coordinateSpace.bounds;
-            }
-
-            sSCIFeedbackOverlayRootViewController.view.frame = sSCIFeedbackOverlayWindow.bounds;
-            sSCIFeedbackOverlayWindow.hidden = NO;
-            return sSCIFeedbackOverlayRootViewController.view;
+    if (windowScene) {
+        if (!sSCIFeedbackOverlayWindow || sSCIFeedbackOverlayWindow.windowScene != windowScene) {
+            sSCIFeedbackOverlayRootViewController = [[SCIFeedbackOverlayRootViewController alloc] init];
+            sSCIFeedbackOverlayWindow = [[SCIFeedbackPassthroughWindow alloc] initWithWindowScene:windowScene];
+            sSCIFeedbackOverlayWindow.rootViewController = sSCIFeedbackOverlayRootViewController;
+            sSCIFeedbackOverlayWindow.backgroundColor = UIColor.clearColor;
+            sSCIFeedbackOverlayWindow.opaque = NO;
+            sSCIFeedbackOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
+            sSCIFeedbackOverlayWindow.frame = windowScene.coordinateSpace.bounds;
         }
+
+        sSCIFeedbackOverlayRootViewController.view.frame = sSCIFeedbackOverlayWindow.bounds;
+        sSCIFeedbackOverlayWindow.hidden = NO;
+        return sSCIFeedbackOverlayRootViewController.view;
     }
 
     UIWindow *window = SCIPrimaryPresentationWindow();

@@ -72,7 +72,7 @@ fromViewController:(UIViewController *)presenter;
                 controller:(nullable UIViewController *)controller
              pausePlayback:(nullable SCIMediaPreviewPlaybackBlock)pausePlayback
             resumePlayback:(nullable SCIMediaPreviewPlaybackBlock)resumePlayback;
-/// Profile / avatar long-press: sets gallery source + optional username for “Save to Gallery”.
+/// Profile / avatar long-press: sets Gallery source + optional username for “Save to Gallery”.
 + (void)showRemoteImageURL:(NSURL *)url profileUsername:(nullable NSString *)username;
 
 @end

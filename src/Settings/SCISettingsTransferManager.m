@@ -100,10 +100,8 @@ static BOOL SCICopyItemReplacingDestination(NSString *sourcePath, NSString *dest
 }
 
 static UTType *SCISettingsTransferArchiveType(void) {
-    if (@available(iOS 14.0, *)) {
-        UTType *type = [UTType typeWithFilenameExtension:@"scinstaexport" conformingToType:UTTypeData];
-        if (type) return type;
-    }
+    UTType *type = [UTType typeWithFilenameExtension:@"scinstaexport" conformingToType:UTTypeData];
+    if (type) return type;
     return nil;
 }
 
@@ -273,19 +271,9 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     }
 
     NSURL *archiveURL = [NSURL fileURLWithPath:archivePath isDirectory:NO];
-    if (@available(iOS 14.0, *)) {
-        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[archiveURL] asCopy:YES];
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share"];
-        [controller presentViewController:picker animated:YES completion:nil];
-    } else {
-        UIActivityViewController *activityController = [[UIActivityViewController alloc] initWithActivityItems:@[archiveURL] applicationActivities:nil];
-        if (activityController.popoverPresentationController) {
-            activityController.popoverPresentationController.sourceView = controller.view;
-            activityController.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(controller.view.bounds), CGRectGetMidY(controller.view.bounds), 1.0, 1.0);
-        }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share"];
-        [controller presentViewController:activityController animated:YES completion:nil];
-    }
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[archiveURL] asCopy:YES];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share"];
+    [controller presentViewController:picker animated:YES completion:nil];
 }
 
 - (void)importFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeGallery:(BOOL)includeGallery {
@@ -294,16 +282,12 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     self.pendingImportSettings = includeSettings;
     self.pendingImportGallery = includeGallery;
     UIDocumentPickerViewController *picker = nil;
-    if (@available(iOS 14.0, *)) {
-        UTType *archiveType = SCISettingsTransferArchiveType();
-        NSMutableArray<UTType *> *contentTypes = [NSMutableArray array];
-        if (archiveType) [contentTypes addObject:archiveType];
-        [contentTypes addObject:UTTypeFolder];
-        [contentTypes addObject:UTTypeData];
-        picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:YES];
-    } else {
-        picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.data", @"public.folder"] inMode:UIDocumentPickerModeImport];
-    }
+    UTType *archiveType = SCISettingsTransferArchiveType();
+    NSMutableArray<UTType *> *contentTypes = [NSMutableArray array];
+    if (archiveType) [contentTypes addObject:archiveType];
+    [contentTypes addObject:UTTypeFolder];
+    [contentTypes addObject:UTTypeData];
+    picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:YES];
     picker.delegate = self;
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:1.4 title:@"Choose an export bundle" subtitle:nil iconResource:@"download"];
     [controller presentViewController:picker animated:YES completion:nil];
@@ -375,8 +359,8 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     if (scoped) [url stopAccessingSecurityScopedResource];
 
     NSString *subtitle = importSettings && importGallery
-        ? @"Settings and gallery media were restored. Reconfigure gallery lock if needed."
-        : (importSettings ? @"Settings were restored." : @"Gallery media were restored. Reconfigure gallery lock if needed.");
+        ? @"Settings and Gallery media were restored. Reconfigure Gallery lock if needed."
+        : (importSettings ? @"Settings were restored." : @"Gallery media were restored. Reconfigure Gallery lock if needed.");
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import complete" subtitle:subtitle iconResource:@"circle_check_filled"];
     [SCIUtils showRestartConfirmation];
 }
