@@ -12,7 +12,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryBiometryType) {
 /// Manages the gallery passcode lock and biometric unlock.
 ///
 /// Passcode hashes are stored in the keychain under service
-/// `com.socuul.scinsta.gallery.passcode`, using SHA256 of `SCIGallery_<passcode>_Salt`.
+/// `com.socuul.scinsta.gallery.passcode`, using PBKDF2-HMAC-SHA256 with per-passcode random salt.
 /// The "enabled" flag is stored in NSUserDefaults under `scinsta_gallery_lock_enabled`.
 @interface SCIGalleryManager : NSObject
 

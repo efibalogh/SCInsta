@@ -1,10 +1,14 @@
 #import "SCIGalleryManager.h"
 #import <LocalAuthentication/LocalAuthentication.h>
 #import <Security/Security.h>
-#import <CommonCrypto/CommonDigest.h>
+#import <CommonCrypto/CommonKeyDerivation.h>
 
 static NSString * const kLockEnabledKey = @"scinsta_gallery_lock_enabled";
 static NSString * const kKeychainService = @"com.socuul.scinsta.gallery.passcode";
+static NSString * const kPBKDF2RecordPrefix = @"pbkdf2-sha256";
+static uint32_t const kPBKDF2Rounds = 210000;
+static size_t const kPBKDF2SaltLength = 16;
+static size_t const kPBKDF2KeyLength = 32;
 
 @implementation SCIGalleryManager
 
@@ -48,21 +52,80 @@ static NSString * const kKeychainService = @"com.socuul.scinsta.gallery.passcode
 
 #pragma mark - Passcode hashing
 
-- (NSString *)hashPasscode:(NSString *)passcode saltPrefix:(NSString *)saltPrefix {
-    NSString *salted = [NSString stringWithFormat:@"%@_%@_Salt", saltPrefix, passcode];
-    NSData *data = [salted dataUsingEncoding:NSUTF8StringEncoding];
-    unsigned char md[CC_SHA256_DIGEST_LENGTH];
-    CC_SHA256(data.bytes, (CC_LONG)data.length, md);
+- (NSData *)pbkdf2HashForPasscode:(NSString *)passcode
+                             salt:(NSData *)salt
+                           rounds:(uint32_t)rounds
+                        keyLength:(size_t)keyLength {
+    NSData *passcodeData = [passcode dataUsingEncoding:NSUTF8StringEncoding];
+    if (passcodeData.length == 0 || salt.length == 0 || rounds == 0 || keyLength == 0) return nil;
 
-    NSMutableString *hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
-    for (NSUInteger i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
-        [hex appendFormat:@"%02x", md[i]];
-    }
-    return hex;
+    NSMutableData *derivedKey = [NSMutableData dataWithLength:keyLength];
+    int status = CCKeyDerivationPBKDF(kCCPBKDF2,
+                                      passcodeData.bytes,
+                                      passcodeData.length,
+                                      salt.bytes,
+                                      salt.length,
+                                      kCCPRFHmacAlgSHA256,
+                                      rounds,
+                                      derivedKey.mutableBytes,
+                                      keyLength);
+    if (status != 0) return nil;
+    return derivedKey;
 }
 
-- (NSString *)hashPasscode:(NSString *)passcode {
-    return [self hashPasscode:passcode saltPrefix:@"SCIGallery"];
+- (NSData *)randomSaltData {
+    NSMutableData *salt = [NSMutableData dataWithLength:kPBKDF2SaltLength];
+    int status = SecRandomCopyBytes(kSecRandomDefault, salt.length, salt.mutableBytes);
+    if (status != errSecSuccess) return nil;
+    return salt;
+}
+
+- (NSString *)pbkdf2RecordForPasscode:(NSString *)passcode {
+    NSData *salt = [self randomSaltData];
+    if (salt.length == 0) return nil;
+
+    NSData *hash = [self pbkdf2HashForPasscode:passcode
+                                          salt:salt
+                                        rounds:kPBKDF2Rounds
+                                     keyLength:kPBKDF2KeyLength];
+    if (hash.length == 0) return nil;
+
+    NSString *saltB64 = [salt base64EncodedStringWithOptions:0];
+    NSString *hashB64 = [hash base64EncodedStringWithOptions:0];
+    return [NSString stringWithFormat:@"%@$%u$%@$%@", kPBKDF2RecordPrefix, kPBKDF2Rounds, saltB64, hashB64];
+}
+
+- (BOOL)parsePBKDF2Record:(NSString *)record
+                   rounds:(uint32_t *)rounds
+                     salt:(NSData * __autoreleasing *)salt
+                     hash:(NSData * __autoreleasing *)hash {
+    NSArray<NSString *> *parts = [record componentsSeparatedByString:@"$"];
+    if (parts.count != 4) return NO;
+    if (![parts[0] isEqualToString:kPBKDF2RecordPrefix]) return NO;
+
+    NSUInteger parsedRounds = (NSUInteger)[parts[1] integerValue];
+    if (parsedRounds == 0 || parsedRounds > UINT32_MAX) return NO;
+
+    NSData *parsedSalt = [[NSData alloc] initWithBase64EncodedString:parts[2] options:0];
+    NSData *parsedHash = [[NSData alloc] initWithBase64EncodedString:parts[3] options:0];
+    if (parsedSalt.length == 0 || parsedHash.length == 0) return NO;
+
+    if (rounds) *rounds = (uint32_t)parsedRounds;
+    if (salt) *salt = parsedSalt;
+    if (hash) *hash = parsedHash;
+    return YES;
+}
+
+- (BOOL)isEqualInConstantTime:(NSData *)lhs other:(NSData *)rhs {
+    if (lhs.length != rhs.length) return NO;
+
+    const uint8_t *left = lhs.bytes;
+    const uint8_t *right = rhs.bytes;
+    uint8_t diff = 0;
+    for (NSUInteger i = 0; i < lhs.length; i++) {
+        diff |= (left[i] ^ right[i]);
+    }
+    return diff == 0;
 }
 
 #pragma mark - Keychain
@@ -113,8 +176,9 @@ static NSString * const kKeychainService = @"com.socuul.scinsta.gallery.passcode
 - (BOOL)setPasscode:(NSString *)passcode {
     if (passcode.length < 4 || passcode.length > 6) return NO;
 
-    NSString *hash = [self hashPasscode:passcode];
-    if (![self storePasscodeHash:hash]) return NO;
+    NSString *record = [self pbkdf2RecordForPasscode:passcode];
+    if (record.length == 0) return NO;
+    if (![self storePasscodeHash:record]) return NO;
 
     self.isLockEnabled = YES;
     _isUnlocked = YES;
@@ -132,8 +196,18 @@ static NSString * const kKeychainService = @"com.socuul.scinsta.gallery.passcode
     NSString *stored = [self getStoredPasscodeHash];
     if (stored.length == 0) return NO;
 
-    NSString *candidate = [self hashPasscode:passcode];
-    BOOL match = [stored isEqualToString:candidate];
+    uint32_t rounds = 0;
+    NSData *salt = nil;
+    NSData *storedHash = nil;
+    if (![self parsePBKDF2Record:stored rounds:&rounds salt:&salt hash:&storedHash]) {
+        return NO;
+    }
+
+    NSData *candidateHash = [self pbkdf2HashForPasscode:passcode
+                                                   salt:salt
+                                                 rounds:rounds
+                                              keyLength:storedHash.length];
+    BOOL match = (candidateHash.length == storedHash.length) && [self isEqualInConstantTime:candidateHash other:storedHash];
     if (match) _isUnlocked = YES;
     return match;
 }
