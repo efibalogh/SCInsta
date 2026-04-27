@@ -1,9 +1,11 @@
 #import "SCIVaultGridCell.h"
 #import "SCIVaultFile.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 @interface SCIVaultGridCell ()
 
+@property (nonatomic, strong) SCIVaultFile *file;
 @property (nonatomic, strong) UIImageView *thumbnailView;
 @property (nonatomic, strong) UIImageView *videoBadge;
 @property (nonatomic, strong) UIImageView *favoriteBadge;
@@ -29,8 +31,7 @@
 
         _videoBadge = [[UIImageView alloc] initWithFrame:CGRectZero];
         _videoBadge.translatesAutoresizingMaskIntoConstraints = NO;
-        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightSemibold];
-        _videoBadge.image = [UIImage systemImageNamed:@"play.fill" withConfiguration:cfg];
+        _videoBadge.image = [SCIAssetUtils instagramIconNamed:@"video_filled" pointSize:12.0];
         _videoBadge.tintColor = [UIColor whiteColor];
         _videoBadge.hidden = YES;
 
@@ -45,11 +46,7 @@
 
         _favoriteBadge = [[UIImageView alloc] initWithFrame:CGRectZero];
         _favoriteBadge.translatesAutoresizingMaskIntoConstraints = NO;
-        UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightBold];
-        UIImage *favImg = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:16];
-        if (!favImg) {
-            favImg = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
-        }
+        UIImage *favImg = [SCIAssetUtils instagramIconNamed:@"heart_filled" pointSize:16.0];
         _favoriteBadge.image = favImg;
         _favoriteBadge.contentMode = UIViewContentModeScaleAspectFit;
         _favoriteBadge.tintColor = [SCIUtils SCIColor_InstagramFavorite];
@@ -96,6 +93,7 @@
 
 - (void)prepareForReuse {
     [super prepareForReuse];
+    self.file = nil;
     self.thumbnailView.image = nil;
     self.videoBadge.hidden = YES;
     [self.contentView viewWithTag:100].hidden = YES;
@@ -108,17 +106,13 @@
 
 - (UIImage *)selectionBadgeImageSelected:(BOOL)selected {
     NSString *resourceName = selected ? @"circle_check_filled" : @"circle";
-    UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:20.0];
-    if (image) {
-        return image;
-    }
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
-    return [UIImage systemImageNamed:(selected ? @"checkmark.circle.fill" : @"circle") withConfiguration:cfg];
+    return [SCIAssetUtils instagramIconNamed:resourceName pointSize:20.0];
 }
 
 - (void)configureWithVaultFile:(SCIVaultFile *)file
                  selectionMode:(BOOL)selectionMode
                       selected:(BOOL)selected {
+    self.file = file;
     UIImage *thumb = [SCIVaultFile loadThumbnailForFile:file];
     if (thumb) {
         self.thumbnailView.image = thumb;
@@ -126,7 +120,7 @@
         self.thumbnailView.image = nil;
         __weak typeof(self) weakSelf = self;
         [SCIVaultFile generateThumbnailForFile:file completion:^(BOOL success) {
-            if (success && weakSelf) {
+            if (success && weakSelf && weakSelf.file == file) {
                 UIImage *newThumb = [UIImage imageWithContentsOfFile:[file thumbnailPath]];
                 if (newThumb) {
                     weakSelf.thumbnailView.image = newThumb;

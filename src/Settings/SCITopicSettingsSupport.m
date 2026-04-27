@@ -1,6 +1,7 @@
 #import "SCITopicSettingsSupport.h"
 #import "SCIEditActionsListViewController.h"
 
+#import "../AssetUtils.h"
 #import "../Utils.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../Shared/ActionButton/SCIActionButtonConfiguration.h"
@@ -18,11 +19,29 @@ NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString *footer)
     return [section copy];
 }
 
+UIImage *SCISettingsInstagramIcon(NSString *name, CGFloat pointSize) {
+    return [SCIAssetUtils instagramIconNamed:name pointSize:pointSize];
+}
+
+UIImage *SCISettingsSystemIcon(NSString *name, CGFloat pointSize, UIImageSymbolWeight weight) {
+    return [SCIAssetUtils resolvedImageNamed:name
+                                   pointSize:pointSize
+                                      weight:weight
+                                      source:SCIResolvedImageSourceSystemSymbol
+                               renderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
+SCISetting *SCISettingApplyIconTint(SCISetting *setting, UIColor *tintColor) {
+    setting.iconTintColor = tintColor;
+    return setting;
+}
+
 SCISetting *SCITopicNavigationSetting(NSString *title, NSString *iconName, CGFloat iconSize, NSArray *sections) {
-    return [SCISetting navigationCellWithTitle:title
-                                      subtitle:@""
-                                          icon:[SCISymbol resourceSymbolWithName:iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:iconSize]
-                                   navSections:sections];
+    return SCISettingApplyIconTint([SCISetting navigationCellWithTitle:title
+                                                              subtitle:@""
+                                                                  icon:SCISettingsInstagramIcon(iconName, iconSize)
+                                                           navSections:sections],
+                                   [SCIUtils SCIColor_InstagramPrimaryText]);
 }
 
 static UICommand *SCIMenuCommand(NSString *title, NSString *imageName, NSString *fallback, NSString *defaultsKey, NSString *value, BOOL requiresRestart) {
@@ -35,12 +54,12 @@ static UICommand *SCIMenuCommand(NSString *title, NSString *imageName, NSString 
         propertyList[@"requiresRestart"] = @YES;
     }
 
-    UIImage *image = nil;
-    if (imageName.length > 0) {
-        image = [[SCISymbol resourceSymbolWithName:imageName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
-    } else if (fallback.length > 0) {
-        image = [[SCISymbol symbolWithName:fallback color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
-    }
+    UIImage *image = [SCIAssetUtils resolvedImageNamed:imageName
+                                    fallbackSystemName:fallback
+                                             pointSize:22.0
+                                                weight:UIImageSymbolWeightRegular
+                                                source:(imageName.length > 0 ? SCIResolvedImageSourceInstagramIcon : SCIResolvedImageSourceSystemSymbol)
+                                         renderingMode:UIImageRenderingModeAlwaysTemplate];
 
     return [UICommand commandWithTitle:title
                                  image:image
@@ -139,13 +158,13 @@ UIMenu *SCICacheAutoClearMenu(void) {
 NSArray *SCIDevExampleSections(void) {
     return @[
         SCITopicSection(@"_ Example", @[
-            [SCISetting staticCellWithTitle:@"Static Cell" subtitle:@"" icon:[SCISymbol symbolWithName:@"tablecells"]],
+            [SCISetting staticCellWithTitle:@"Static Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"tablecells", 18.0, UIImageSymbolWeightRegular)],
             [SCISetting switchCellWithTitle:@"Switch Cell" subtitle:@"Tap the switch" defaultsKey:@"test_switch_cell"],
             [SCISetting switchCellWithTitle:@"Switch Cell (Restart)" subtitle:@"Tap the switch" defaultsKey:@"test_switch_cell_restart" requiresRestart:YES],
             [SCISetting stepperCellWithTitle:@"Stepper Cell" subtitle:@"I have %@%@" defaultsKey:@"test_stepper_cell" min:-10 max:1000 step:5.5 label:@"$" singularLabel:@"$"],
-            [SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using icon" icon:[SCISymbol symbolWithName:@"link" color:[UIColor systemTealColor] size:20.0] url:@"https://google.com"],
+            SCISettingApplyIconTint([SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using icon" icon:SCISettingsSystemIcon(@"link", 20.0, UIImageSymbolWeightRegular) url:@"https://google.com"], [UIColor systemTealColor]),
             [SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using image" imageUrl:@"https://i.imgur.com/c9CbytZ.png" url:@"https://google.com"],
-            [SCISetting buttonCellWithTitle:@"Button Cell" subtitle:@"" icon:[SCISymbol symbolWithName:@"oval.inset.filled"] action:^(void) { [SCIUtils showConfirmation:^(void){}]; }],
+            [SCISetting buttonCellWithTitle:@"Button Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"oval.inset.filled", 18.0, UIImageSymbolWeightRegular) action:^(void) { [SCIUtils showConfirmation:^(void){}]; }],
             [SCISetting menuCellWithTitle:@"Menu Cell" subtitle:@"Change the value on the right" menu:[UIMenu menuWithChildren:@[
                 [UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[
                     SCIMenuCommand(@"ABC", nil, nil, @"test_menu_cell", @"abc", NO),
@@ -153,7 +172,7 @@ NSArray *SCIDevExampleSections(void) {
                 ]],
                 SCIMenuCommand(@"Requires Restart", nil, nil, @"test_menu_cell", @"requires_restart", YES)
             ]]],
-            [SCISetting navigationCellWithTitle:@"Navigation Cell" subtitle:@"" icon:[SCISymbol symbolWithName:@"rectangle.stack"] navSections:@[SCITopicSection(@"", @[], nil)]]
+            [SCISetting navigationCellWithTitle:@"Navigation Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"rectangle.stack", 18.0, UIImageSymbolWeightRegular) navSections:@[SCITopicSection(@"", @[], nil)]]
         ], @"_ Example")
     ];
 }

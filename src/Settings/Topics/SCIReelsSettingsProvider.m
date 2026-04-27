@@ -9,7 +9,7 @@ static NSString * const kSCIReelsActionButtonDefaultActionKey = @"action_button_
 @implementation SCIReelsSettingsProvider
 
 + (SCISetting *)rootSetting {
-    return SCITopicNavigationSetting(@"Reels", @"reels_prism", 24.0, @[
+    return SCITopicNavigationSetting(@"Reels", @"reels", 24.0, @[
         SCITopicSection(@"Action Button", @[
             [SCISetting switchCellWithTitle:@"Enable Action Button" subtitle:@"Adds the action button to reels" defaultsKey:kSCIReelsActionButtonEnabledKey],
             [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:SCIActionButtonDefaultActionMenu(kSCIReelsActionButtonDefaultActionKey, @"Reels", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceReels))],

@@ -13,6 +13,7 @@
 #import "../Vault/SCIVaultOriginController.h"
 #import "../Vault/SCIVaultSaveMetadata.h"
 #import "../Vault/SCIVaultCoreDataStack.h"
+#import "../../AssetUtils.h"
 #import "../../Downloader/Download.h"
 
 static CGFloat const kDismissAxisLockSlop = 20.0;
@@ -26,16 +27,9 @@ static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshShortDelay = 0.18;
 static NSTimeInterval const kUnderlyingPlaybackDeferredRefreshLongDelay = 0.55;
 static CGFloat const kVaultPreviewMenuIconPointSize = 22.0;
 
-static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName, NSString *systemName) {
-    UIImage *image = resourceName.length > 0
-        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kVaultPreviewMenuIconPointSize]
-        : nil;
-    if (!image) {
-        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:kVaultPreviewMenuIconPointSize
-                                                                                                     weight:UIImageSymbolWeightRegular];
-        image = [UIImage systemImageNamed:systemName withConfiguration:configuration];
-    }
-    return image;
+static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName) {
+    return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
+                                   pointSize:kVaultPreviewMenuIconPointSize];
 }
 
 @interface SCIFullScreenMediaPlayer () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate, SCIFullScreenContentDelegate>
@@ -122,7 +116,6 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName, NSString *system
                                  title:@"No files found"
                               subtitle:nil
                           iconResource:@"search"
-               fallbackSystemImageName:@"magnifyingglass"
                                   tone:SCIFeedbackPillToneError];
         return;
     }
@@ -132,7 +125,6 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName, NSString *system
                                      title:@"Opened vault media"
                                   subtitle:nil
                               iconResource:@"photo_gallery"
-                   fallbackSystemImageName:@"photo.on.rectangle.angled"
                                       tone:SCIFeedbackPillToneInfo];
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
@@ -368,7 +360,7 @@ fromViewController:(UIViewController *)presenter {
 
     _closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _closeButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_closeButton setImage:SCIMediaChromeTopIcon(@"xmark", @"xmark") forState:UIControlStateNormal];
+    [_closeButton setImage:SCIMediaChromeTopIcon(@"xmark") forState:UIControlStateNormal];
     _closeButton.tintColor = [UIColor labelColor];
     _closeButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
     [_closeButton addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -411,7 +403,7 @@ fromViewController:(UIViewController *)presenter {
     if (_isFromVault) {
         _topFavoriteButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _topFavoriteButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_topFavoriteButton setImage:SCIMediaChromeTopIcon(@"heart", @"heart") forState:UIControlStateNormal];
+        [_topFavoriteButton setImage:SCIMediaChromeTopIcon(@"heart") forState:UIControlStateNormal];
         _topFavoriteButton.tintColor = [UIColor labelColor];
         _topFavoriteButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentRight;
         [_topFavoriteButton addTarget:self action:@selector(favoriteTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -433,29 +425,29 @@ fromViewController:(UIViewController *)presenter {
 - (void)setupBottomBar {
     _bottomBar = SCIMediaChromeInstallBottomBar(self.view);
 
-    _savePhotosButton = SCIMediaChromeBottomButton(@"arrow.down.to.line", @"download", @"Save to Photos");
+    _savePhotosButton = SCIMediaChromeBottomButton(@"download", @"Save to Photos");
     [_savePhotosButton addTarget:self action:@selector(saveToPhotos) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_savePhotosButton];
 
-    _shareButton = SCIMediaChromeBottomButton(@"square.and.arrow.up", @"share", @"Share");
+    _shareButton = SCIMediaChromeBottomButton(@"share", @"Share");
     [_shareButton addTarget:self action:@selector(shareMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_shareButton];
 
-    _clipboardButton = SCIMediaChromeBottomButton(@"doc.on.doc", @"copy", @"Copy");
+    _clipboardButton = SCIMediaChromeBottomButton(@"copy", @"Copy");
     [_clipboardButton addTarget:self action:@selector(copyMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_clipboardButton];
 
     if (_isFromVault) {
-        _deleteVaultButton = SCIMediaChromeBottomButton(@"trash", @"trash", @"Delete from Vault");
+        _deleteVaultButton = SCIMediaChromeBottomButton(@"trash", @"Delete from Vault");
         _deleteVaultButton.tintColor = [UIColor systemRedColor];
         [_deleteVaultButton addTarget:self action:@selector(deleteFromVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_deleteVaultButton];
 
-        _vaultMoreButton = SCIMediaChromeBottomButton(@"ellipsis.circle", @"more", @"More");
+        _vaultMoreButton = SCIMediaChromeBottomButton(@"more", @"More");
         _vaultMoreButton.showsMenuAsPrimaryAction = YES;
         [_bottomBar addSubview:_vaultMoreButton];
     } else {
-        _saveVaultButton = SCIMediaChromeBottomButton(@"tray.and.arrow.down", @"photo_gallery", @"Save to Vault");
+        _saveVaultButton = SCIMediaChromeBottomButton(@"photo_gallery", @"Save to Vault");
         [_saveVaultButton addTarget:self action:@selector(saveToVault) forControlEvents:UIControlEventTouchUpInside];
         [_bottomBar addSubview:_saveVaultButton];
     }
@@ -666,8 +658,8 @@ fromViewController:(UIViewController *)presenter {
     SCIMediaItem *item = [self currentItem];
     BOOL isFav = item.vaultFile.isFavorite;
     UIImage *img = isFav
-        ? SCIMediaChromeTopIcon(@"heart_filled", @"heart.fill")
-        : SCIMediaChromeTopIcon(@"heart", @"heart");
+        ? SCIMediaChromeTopIcon(@"heart_filled")
+        : SCIMediaChromeTopIcon(@"heart");
 
     if (!item.vaultFile) {
         _topFavoriteButton.hidden = YES;
@@ -684,14 +676,13 @@ fromViewController:(UIViewController *)presenter {
                              title:title
                           subtitle:@"The original content may no longer exist."
                       iconResource:@"error_filled"
-           fallbackSystemImageName:@"exclamationmark.circle.fill"
                               tone:SCIFeedbackPillToneError];
 }
 
 - (void)openOriginalPostForCurrentVaultItem {
     SCIVaultFile *file = self.currentItem.vaultFile;
     if ([SCIVaultOriginController openOriginalPostForVaultFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link" fallbackSystemImageName:@"arrow.up.right.square" tone:SCIFeedbackPillToneInfo];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link"];
     } else {
         [self showVaultOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionVaultOpenOriginal];
     }
@@ -700,7 +691,7 @@ fromViewController:(UIViewController *)presenter {
 - (void)openProfileForCurrentVaultItem {
     SCIVaultFile *file = self.currentItem.vaultFile;
     if ([SCIVaultOriginController openProfileForVaultFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile" fallbackSystemImageName:@"person.crop.circle" tone:SCIFeedbackPillToneInfo];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile"];
     } else {
         [self showVaultOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionVaultOpenProfile];
     }
@@ -713,7 +704,7 @@ fromViewController:(UIViewController *)presenter {
 
     if (file.hasOpenableOriginalMedia) {
         [actions addObject:[UIAction actionWithTitle:@"Open Original Post"
-                                               image:SCIVaultPreviewMenuIcon(@"external_link", @"arrow.up.right.square")
+                                               image:SCIVaultPreviewMenuIcon(@"external_link")
                                           identifier:nil
                                              handler:^(__unused UIAction *action) {
             [weakSelf openOriginalPostForCurrentVaultItem];
@@ -722,7 +713,7 @@ fromViewController:(UIViewController *)presenter {
 
     if (file.hasOpenableProfile) {
         [actions addObject:[UIAction actionWithTitle:@"Open Profile"
-                                               image:SCIVaultPreviewMenuIcon(@"profile", @"person.crop.circle")
+                                               image:SCIVaultPreviewMenuIcon(@"profile")
                                           identifier:nil
                                              handler:^(__unused UIAction *action) {
             [weakSelf openProfileForCurrentVaultItem];
@@ -891,14 +882,12 @@ fromViewController:(UIViewController *)presenter {
                                  title:@"Saved to Photos"
                               subtitle:nil
                           iconResource:@"circle_check_filled"
-               fallbackSystemImageName:@"checkmark.circle.fill"
                                   tone:SCIFeedbackPillToneSuccess];
     } else {
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos duration:3.0
                                  title:@"Failed to save"
                               subtitle:error.localizedDescription
                           iconResource:@"error_filled"
-               fallbackSystemImageName:@"exclamationmark.circle.fill"
                                   tone:SCIFeedbackPillToneError];
     }
 }
@@ -912,7 +901,6 @@ fromViewController:(UIViewController *)presenter {
                                  title:@"No media to save"
                               subtitle:nil
                           iconResource:@"media"
-               fallbackSystemImageName:@"photo.on.rectangle"
                                   tone:SCIFeedbackPillToneError];
         return;
     }
@@ -982,7 +970,6 @@ fromViewController:(UIViewController *)presenter {
                                  title:@"Saved to Vault"
                               subtitle:nil
                           iconResource:@"circle_check_filled"
-               fallbackSystemImageName:@"checkmark.circle.fill"
                                   tone:SCIFeedbackPillToneSuccess];
     } else {
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
@@ -990,7 +977,6 @@ fromViewController:(UIViewController *)presenter {
                                  title:@"Failed to save"
                               subtitle:msg
                           iconResource:@"error_filled"
-               fallbackSystemImageName:@"exclamationmark.circle.fill"
                                   tone:SCIFeedbackPillToneError];
     }
 }
@@ -1006,7 +992,6 @@ fromViewController:(UIViewController *)presenter {
                                          title:@"Opened share sheet"
                                       subtitle:nil
                                   iconResource:@"share"
-                       fallbackSystemImageName:@"square.and.arrow.up"
                                           tone:SCIFeedbackPillToneInfo];
         UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[activityItem] applicationActivities:nil];
         if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && _shareButton) {
@@ -1039,7 +1024,6 @@ fromViewController:(UIViewController *)presenter {
                                      title:@"Copied photo to clipboard"
                                   subtitle:nil
                               iconResource:@"copy_filled"
-                   fallbackSystemImageName:@"doc.on.doc.fill"
                                       tone:SCIFeedbackPillToneSuccess];
         }
     } else {
@@ -1050,7 +1034,6 @@ fromViewController:(UIViewController *)presenter {
                                      title:@"Copied video to clipboard"
                                   subtitle:nil
                               iconResource:@"copy_filled"
-                   fallbackSystemImageName:@"doc.on.doc.fill"
                                       tone:SCIFeedbackPillToneSuccess];
         }
     }
@@ -1083,7 +1066,6 @@ fromViewController:(UIViewController *)presenter {
                                  title:@"Failed to delete"
                               subtitle:err.localizedDescription
                           iconResource:@"error_filled"
-               fallbackSystemImageName:@"exclamationmark.circle.fill"
                                   tone:SCIFeedbackPillToneError];
         return;
     }
@@ -1102,7 +1084,6 @@ fromViewController:(UIViewController *)presenter {
                                          title:@"Deleted from vault"
                                       subtitle:nil
                                   iconResource:@"circle_check_filled"
-                       fallbackSystemImageName:@"checkmark.circle.fill"
                                           tone:SCIFeedbackPillToneSuccess];
         [self closeTapped];
         return;
@@ -1130,7 +1111,6 @@ fromViewController:(UIViewController *)presenter {
                                      title:@"Deleted from vault"
                                   subtitle:nil
                               iconResource:@"circle_check_filled"
-                   fallbackSystemImageName:@"checkmark.circle.fill"
                                       tone:SCIFeedbackPillToneSuccess];
 }
 

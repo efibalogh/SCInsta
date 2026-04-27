@@ -1,11 +1,12 @@
 #import "SCIMediaChrome.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 CGFloat const SCIMediaChromeTopBarContentHeight = 44.0;
 CGFloat const SCIMediaChromeBottomBarHeight = 44.0;
 
-static CGFloat const kSCIMediaChromeTopIconPointSize = 17.0;
-static CGFloat const kSCIMediaChromeBottomIconPointSize = 16.0;
+static CGFloat const kSCIMediaChromeTopIconPointSize = 24.0;
+static CGFloat const kSCIMediaChromeBottomIconPointSize = 24.0;
 
 UIBlurEffect *SCIMediaChromeBlurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
@@ -25,28 +26,18 @@ UILabel *SCIMediaChromeTitleLabel(NSString *text) {
     return label;
 }
 
-UIImage *SCIMediaChromeTopIcon(NSString *resourceName, NSString *systemName) {
-    UIImage *img = resourceName.length ? [SCIUtils sci_resourceImageNamed:resourceName template:YES] : nil;
-    if (!img) {
-        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:kSCIMediaChromeTopIconPointSize
-                                                                                          weight:UIImageSymbolWeightRegular];
-        img = [UIImage systemImageNamed:systemName withConfiguration:cfg];
-    }
-    return img;
+UIImage *SCIMediaChromeTopIcon(NSString *resourceName) {
+    return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
+                                   pointSize:kSCIMediaChromeTopIconPointSize];
 }
 
-UIImage *SCIMediaChromeBottomIcon(NSString *resourceName, NSString *systemName) {
-    UIImage *img = resourceName.length ? [SCIUtils sci_resourceImageNamed:resourceName template:YES] : nil;
-    if (!img) {
-        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:kSCIMediaChromeBottomIconPointSize
-                                                                                           weight:UIImageSymbolWeightRegular];
-        img = [UIImage systemImageNamed:systemName withConfiguration:cfg];
-    }
-    return img;
+UIImage *SCIMediaChromeBottomIcon(NSString *resourceName) {
+    return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
+                                   pointSize:kSCIMediaChromeBottomIconPointSize];
 }
 
-UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, NSString *systemName, id target, SEL action) {
-    return [[UIBarButtonItem alloc] initWithImage:SCIMediaChromeTopIcon(resourceName, systemName)
+UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action) {
+    return [[UIBarButtonItem alloc] initWithImage:SCIMediaChromeTopIcon(resourceName)
                                             style:UIBarButtonItemStylePlain
                                            target:target
                                            action:action];
@@ -62,8 +53,7 @@ UIView *SCIMediaChromeInstallBottomBar(UIView *hostView) {
     blurView.backgroundColor = [[SCIUtils SCIColor_InstagramBackground] colorWithAlphaComponent:0.82];
     [bar addSubview:blurView];
     [NSLayoutConstraint activateConstraints:@[
-        [blurView.topAnchor constraintEqualToAnchor:bar.topAnchor],
-        [blurView.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor],
+        [blurView.topAnchor constraintEqualToAnchor:bar.topAnchor], [blurView.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor],
         [blurView.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [blurView.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
     ]];
@@ -89,10 +79,10 @@ UIView *SCIMediaChromeInstallBottomBar(UIView *hostView) {
     return bar;
 }
 
-UIButton *SCIMediaChromeBottomButton(NSString *symbolName, NSString *resourceName, NSString *accessibilityLabel) {
+UIButton *SCIMediaChromeBottomButton(NSString *resourceName, NSString *accessibilityLabel) {
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     btn.translatesAutoresizingMaskIntoConstraints = NO;
-    [btn setImage:SCIMediaChromeBottomIcon(resourceName, symbolName) forState:UIControlStateNormal];
+    [btn setImage:SCIMediaChromeBottomIcon(resourceName) forState:UIControlStateNormal];
     btn.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     btn.accessibilityLabel = accessibilityLabel;
     return btn;

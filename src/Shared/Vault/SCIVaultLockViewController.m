@@ -1,5 +1,6 @@
 #import "SCIVaultLockViewController.h"
 #import "SCIVaultManager.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 static NSInteger const kPasscodeLength = 4;
@@ -188,11 +189,7 @@ static NSInteger const kPasscodeLength = 4;
                 [rowStack addArrangedSubview:spacer];
             } else if (n == -2) {
                 UIButton *del = [self createKeypadButton:nil tag:-2];
-                UIImage *deleteIcon = [SCIUtils sci_resourceImageNamed:@"backspace" template:YES maxPointSize:24.0];
-                if (!deleteIcon) {
-                    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:24 weight:UIImageSymbolWeightRegular];
-                    deleteIcon = [UIImage systemImageNamed:@"delete.left" withConfiguration:cfg];
-                }
+                UIImage *deleteIcon = [SCIAssetUtils instagramIconNamed:@"backspace" pointSize:24.0];
                 [del setImage:deleteIcon forState:UIControlStateNormal];
                 [del setTitle:@"" forState:UIControlStateNormal];
                 del.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];

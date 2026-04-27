@@ -9,12 +9,12 @@ UIBlurEffect *SCIMediaChromeBlurEffect(void);
 void SCIApplyMediaChromeNavigationBar(UINavigationBar *bar);
 
 UILabel *SCIMediaChromeTitleLabel(NSString *text);
-UIImage *SCIMediaChromeTopIcon(NSString *resourceName, NSString *systemName);
-UIImage *SCIMediaChromeBottomIcon(NSString *resourceName, NSString *systemName);
-UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, NSString *systemName, id target, SEL action);
+UIImage *SCIMediaChromeTopIcon(NSString *resourceName);
+UIImage *SCIMediaChromeBottomIcon(NSString *resourceName);
+UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action);
 
 UIView *SCIMediaChromeInstallBottomBar(UIView *hostView);
-UIButton *SCIMediaChromeBottomButton(NSString *symbolName, NSString *resourceName, NSString *accessibilityLabel);
+UIButton *SCIMediaChromeBottomButton(NSString *resourceName, NSString *accessibilityLabel);
 UIStackView *SCIMediaChromeInstallBottomRow(UIView *bottomBar, NSArray<UIView *> *row);
 
 NS_ASSUME_NONNULL_END

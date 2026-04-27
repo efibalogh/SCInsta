@@ -1,6 +1,7 @@
 #import "SCIProfileSettingsProvider.h"
 
 #import "../SCITopicSettingsSupport.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 static NSString * const kSCIProfileActionNone = @"none";
@@ -17,20 +18,12 @@ static NSString * const kSCIProfileCopyInfoBio = @"bio";
 static NSString * const kSCIProfileCopyInfoLink = @"link";
 static CGFloat const kSCIProfileSettingsMenuIconPointSize = 22.0;
 
-static UIImage *SCIProfileSettingsMenuIcon(NSString *resourceName, NSString *fallbackSystemName) {
-    UIImage *image = resourceName.length > 0
-        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kSCIProfileSettingsMenuIconPointSize]
-        : nil;
-    if (!image && fallbackSystemName.length > 0) {
-        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:kSCIProfileSettingsMenuIconPointSize
-                                                                                                     weight:UIImageSymbolWeightRegular];
-        image = [UIImage systemImageNamed:fallbackSystemName withConfiguration:configuration];
-    }
-    return image;
+static UIImage *SCIProfileSettingsMenuIcon(NSString *resourceName) {
+    return [SCIAssetUtils instagramIconNamed:resourceName pointSize:kSCIProfileSettingsMenuIconPointSize];
 }
 
-static UICommand *SCIProfileActionDefaultCommand(NSString *title, NSString *resourceName, NSString *systemImageName, NSString *value) {
-    UIImage *image = SCIProfileSettingsMenuIcon(resourceName, systemImageName);
+static UICommand *SCIProfileActionDefaultCommand(NSString *title, NSString *resourceName, NSString *value) {
+    UIImage *image = SCIProfileSettingsMenuIcon(resourceName);
     return [UICommand commandWithTitle:title
                                  image:image
                                 action:@selector(menuChanged:)
@@ -42,17 +35,17 @@ static UICommand *SCIProfileActionDefaultCommand(NSString *title, NSString *reso
 
 static UIMenu *SCIProfileActionDefaultMenu(void) {
     return [UIMenu menuWithChildren:@[
-        SCIProfileActionDefaultCommand(@"None", @"action", @"option", kSCIProfileActionNone),
-        SCIProfileActionDefaultCommand(@"Copy Info", @"copy", @"doc.on.doc", kSCIProfileActionCopyInfo),
-        SCIProfileActionDefaultCommand(@"View Picture", @"photo", @"photo", kSCIProfileActionViewPicture),
-        SCIProfileActionDefaultCommand(@"Share Picture", @"share", @"square.and.arrow.up", kSCIProfileActionSharePicture),
-        SCIProfileActionDefaultCommand(@"Download to Vault", @"photo_gallery", @"photo.on.rectangle.angled", kSCIProfileActionSavePictureToVault),
-        SCIProfileActionDefaultCommand(@"Profile Settings", @"settings", @"gearshape", kSCIProfileActionOpenSettings)
+        SCIProfileActionDefaultCommand(@"None", @"action", kSCIProfileActionNone),
+        SCIProfileActionDefaultCommand(@"Copy Info", @"copy", kSCIProfileActionCopyInfo),
+        SCIProfileActionDefaultCommand(@"View Picture", @"photo", kSCIProfileActionViewPicture),
+        SCIProfileActionDefaultCommand(@"Share Picture", @"share", kSCIProfileActionSharePicture),
+        SCIProfileActionDefaultCommand(@"Download to Vault", @"photo_gallery", kSCIProfileActionSavePictureToVault),
+        SCIProfileActionDefaultCommand(@"Profile Settings", @"settings", kSCIProfileActionOpenSettings)
     ]];
 }
 
-static UICommand *SCIProfileDefaultCopyInfoCommand(NSString *title, NSString *resourceName, NSString *systemImageName, NSString *value) {
-    UIImage *image = SCIProfileSettingsMenuIcon(resourceName, systemImageName);
+static UICommand *SCIProfileDefaultCopyInfoCommand(NSString *title, NSString *resourceName, NSString *value) {
+    UIImage *image = SCIProfileSettingsMenuIcon(resourceName);
     return [UICommand commandWithTitle:title
                                  image:image
                                 action:@selector(menuChanged:)
@@ -64,18 +57,18 @@ static UICommand *SCIProfileDefaultCopyInfoCommand(NSString *title, NSString *re
 
 static UIMenu *SCIProfileDefaultCopyInfoMenu(void) {
     return [UIMenu menuWithChildren:@[
-        SCIProfileDefaultCopyInfoCommand(@"ID", @"key", @"key", kSCIProfileCopyInfoID),
-        SCIProfileDefaultCopyInfoCommand(@"Username", @"username", @"person", kSCIProfileCopyInfoUsername),
-        SCIProfileDefaultCopyInfoCommand(@"Name", @"text", @"textformat", kSCIProfileCopyInfoName),
-        SCIProfileDefaultCopyInfoCommand(@"Bio", @"caption", @"captions.bubble", kSCIProfileCopyInfoBio),
-        SCIProfileDefaultCopyInfoCommand(@"Profile Link", @"link", @"link", kSCIProfileCopyInfoLink)
+        SCIProfileDefaultCopyInfoCommand(@"ID", @"key", kSCIProfileCopyInfoID),
+        SCIProfileDefaultCopyInfoCommand(@"Username", @"username", kSCIProfileCopyInfoUsername),
+        SCIProfileDefaultCopyInfoCommand(@"Name", @"text", kSCIProfileCopyInfoName),
+        SCIProfileDefaultCopyInfoCommand(@"Bio", @"caption", kSCIProfileCopyInfoBio),
+        SCIProfileDefaultCopyInfoCommand(@"Profile Link", @"link", kSCIProfileCopyInfoLink)
     ]];
 }
 
 @implementation SCIProfileSettingsProvider
 
 + (SCISetting *)rootSetting {
-    return SCITopicNavigationSetting(@"Profile", @"profile", 22.0, @[
+    return SCITopicNavigationSetting(@"Profile", @"profile", 24.0, @[
         SCITopicSection(@"Action Button", @[
             [SCISetting switchCellWithTitle:@"Enable Action Button" subtitle:@"Adds an action button to profile pages" defaultsKey:@"action_button_profile_enabled"],
             [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this profile tool. Long press opens the full menu" menu:SCIProfileActionDefaultMenu()],

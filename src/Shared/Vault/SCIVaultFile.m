@@ -6,6 +6,34 @@
 
 static CGFloat const kThumbnailSize = 300.0;
 
+static NSCache<NSString *, UIImage *> *SCIVaultThumbnailCache(void) {
+    static NSCache<NSString *, UIImage *> *cache;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [[NSCache alloc] init];
+        cache.countLimit = 200;
+    });
+    return cache;
+}
+
+static dispatch_queue_t SCIVaultThumbnailStateQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("com.scinsta.vault.thumbnail-state", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
+static NSMutableDictionary<NSString *, NSMutableArray<void(^)(BOOL success)> *> *SCIVaultThumbnailCompletions(void) {
+    static NSMutableDictionary<NSString *, NSMutableArray<void(^)(BOOL success)> *> *completions;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        completions = [NSMutableDictionary dictionary];
+    });
+    return completions;
+}
+
 static NSString *SCIVaultNormalizedExtension(NSString * _Nullable origExt, SCIVaultMediaType mediaType) {
     NSString *e = origExt.length ? origExt.lowercaseString : @"";
     static NSSet<NSString *> *imageExts;
@@ -510,7 +538,7 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
     switch (source) {
         case SCIVaultSourceFeed:    return @"feed";
         case SCIVaultSourceStories: return @"story";
-        case SCIVaultSourceReels:   return @"reels_prism";
+        case SCIVaultSourceReels:   return @"reels";
         case SCIVaultSourceProfile: return @"profile";
         case SCIVaultSourceDMs:     return @"messages";
         case SCIVaultSourceThumbnail: return @"photo";
@@ -525,6 +553,46 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
     NSString *filePath = [file filePath];
     NSString *thumbPath = [file thumbnailPath];
     int16_t mediaType = file.mediaType;
+    NSCache<NSString *, UIImage *> *cache = SCIVaultThumbnailCache();
+
+    UIImage *cachedThumb = [cache objectForKey:thumbPath];
+    if (cachedThumb || [file thumbnailExists]) {
+        if (!cachedThumb) {
+            cachedThumb = [UIImage imageWithContentsOfFile:thumbPath];
+            if (cachedThumb) {
+                [cache setObject:cachedThumb forKey:thumbPath];
+            }
+        }
+        if (completion) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                completion(cachedThumb != nil);
+            });
+        }
+        return;
+    }
+
+    __block BOOL shouldGenerate = NO;
+    dispatch_sync(SCIVaultThumbnailStateQueue(), ^{
+        NSMutableDictionary<NSString *, NSMutableArray<void(^)(BOOL success)> *> *pending = SCIVaultThumbnailCompletions();
+        NSMutableArray<void(^)(BOOL success)> *callbacks = pending[thumbPath];
+        if (callbacks) {
+            if (completion) {
+                [callbacks addObject:[completion copy]];
+            }
+            return;
+        }
+
+        shouldGenerate = YES;
+        callbacks = [NSMutableArray array];
+        if (completion) {
+            [callbacks addObject:[completion copy]];
+        }
+        pending[thumbPath] = callbacks;
+    });
+
+    if (!shouldGenerate) {
+        return;
+    }
 
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         UIImage *thumb = nil;
@@ -552,19 +620,40 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         if (thumb) {
             NSData *jpegData = UIImageJPEGRepresentation(thumb, 0.8);
             [jpegData writeToFile:thumbPath atomically:YES];
+            [cache setObject:thumb forKey:thumbPath];
         }
 
-        if (completion) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                completion(thumb != nil);
-            });
+        __block NSArray<void(^)(BOOL success)> *callbacks = nil;
+        dispatch_sync(SCIVaultThumbnailStateQueue(), ^{
+            callbacks = [[SCIVaultThumbnailCompletions()[thumbPath] copy] ?: @[] copy];
+            [SCIVaultThumbnailCompletions() removeObjectForKey:thumbPath];
+        });
+
+        if (callbacks.count == 0) {
+            return;
         }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL success = (thumb != nil);
+            for (void (^callback)(BOOL success) in callbacks) {
+                callback(success);
+            }
+        });
     });
 }
 
 + (UIImage *)loadThumbnailForFile:(SCIVaultFile *)file {
+    NSString *thumbPath = [file thumbnailPath];
+    UIImage *cached = [SCIVaultThumbnailCache() objectForKey:thumbPath];
+    if (cached) {
+        return cached;
+    }
     if ([file thumbnailExists]) {
-        return [UIImage imageWithContentsOfFile:[file thumbnailPath]];
+        UIImage *image = [UIImage imageWithContentsOfFile:thumbPath];
+        if (image) {
+            [SCIVaultThumbnailCache() setObject:image forKey:thumbPath];
+        }
+        return image;
     }
     return nil;
 }

@@ -14,12 +14,9 @@
             NSString *identifier = item[@"identifier"];
             NSString *title = item[@"title"] ?: @"Action";
             NSString *iconName = item[@"iconName"] ?: @"info";
-            SCISymbol *icon = [SCISymbol resourceSymbolWithName:iconName
-                                                          color:[SCIUtils SCIColor_InstagramPrimaryText]
-                                                           size:20.0];
             SCISetting *setting = [SCISetting switchCellWithTitle:title
                                                          subtitle:@""
-                                                             icon:icon
+                                                             icon:SCISettingsInstagramIcon(iconName, 20.0)
                                                       defaultsKey:SCIFeedbackPillDefaultsKey(identifier)];
             setting.userInfo = @{@"defaultValue": @YES};
             [rows addObject:setting];
@@ -39,21 +36,18 @@
             @"title": @"Saved to Vault",
             @"subtitle": @"Feedback pill preview: success tone.",
             @"iconResource": @"circle_check_filled",
-            @"fallback": @"checkmark.circle.fill",
             @"tone": @(SCIFeedbackPillToneSuccess)
         },
         @{
             @"title": @"Something Went Wrong",
             @"subtitle": @"Feedback pill preview: error tone.",
             @"iconResource": @"error_filled",
-            @"fallback": @"exclamationmark.circle.fill",
             @"tone": @(SCIFeedbackPillToneError)
         },
         @{
             @"title": @"Heads Up",
             @"subtitle": @"Feedback pill preview: info tone.",
             @"iconResource": @"info_filled",
-            @"fallback": @"info.circle.fill",
             @"tone": @(SCIFeedbackPillToneInfo)
         }
     ];
@@ -65,7 +59,6 @@
                              title:config[@"title"]
                           subtitle:config[@"subtitle"]
                       iconResource:config[@"iconResource"]
-           fallbackSystemImageName:config[@"fallback"]
                               tone:[config[@"tone"] unsignedIntegerValue]];
 }
 
@@ -77,7 +70,7 @@
                                      menu:SCIFeedbackPillStyleMenu()]
         ], @"Choose between neutral or colorful pill style"),
         SCITopicSection(@"Preview", @[
-            [SCISetting buttonCellWithTitle:@"Test Feedback Pill" subtitle:@"Cycles through the success, error, and info tones" icon:[SCISymbol resourceSymbolWithName:@"info" color:[SCIUtils SCIColor_InstagramPrimaryText] size:20.0] action:^{
+            [SCISetting buttonCellWithTitle:@"Test Feedback Pill" subtitle:@"Cycles through the success, error, and info tones" icon:SCISettingsInstagramIcon(@"info", 20.0) action:^{
                 [self sci_showNextFeedbackPillPreview];
             }]
         ], nil)

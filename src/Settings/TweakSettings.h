@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 #import "SCISetting.h"
-#import "SCISymbol.h"
 #import "../Utils.h"
 #import "../Tweak.h"
 

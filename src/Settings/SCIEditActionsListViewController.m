@@ -2,8 +2,8 @@
 #include <UIKit/UIKit.h>
 
 #import "SCIActionSectionEditViewController.h"
-#import "SCISymbol.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
+#import "../AssetUtils.h"
 #import "../Utils.h"
 
 static char kSCIActionsListSwitchAssocKey;
@@ -45,7 +45,7 @@ static char kSCIActionsListSwitchAssocKey;
     } else {
         buttonStyle = UIBarButtonItemStylePlain;
     }
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[SCIUtils sci_resourceImageNamed:@"plus" template:YES]
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[SCIAssetUtils instagramIconNamed:@"plus"]
                                                                               style:buttonStyle
                                                                              target:self
                                                                              action:@selector(addSectionTapped)];
@@ -99,19 +99,19 @@ static char kSCIActionsListSwitchAssocKey;
         SCIActionMenuSection *section = self.configuration.sections[indexPath.row];
         config.text = section.title;
         config.secondaryText = section.collapsible ? @"Collapsible" : @"Inline";
-        config.image = [[SCISymbol resourceSymbolWithName:section.iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.image = [SCIAssetUtils instagramIconNamed:section.iconName pointSize:22.0];
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.showsReorderControl = YES;
     } else if (indexPath.section == 1) {
         NSString *identifier = self.configuration.unassignedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     } else {
         NSString *identifier = self.configuration.supportedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
         UISwitch *toggle = [[UISwitch alloc] init];

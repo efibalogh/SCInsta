@@ -30,7 +30,7 @@
 
 + (instancetype)staticCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
-                               icon:(nullable SCISymbol *)icon
+                               icon:(nullable UIImage *)icon
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellStatic];
     
@@ -45,7 +45,7 @@
 
 + (instancetype)linkCellWithTitle:(NSString *)title
                          subtitle:(NSString *)subtitle
-                             icon:(nullable SCISymbol *)icon
+                             icon:(nullable UIImage *)icon
                               url:(NSString *)url
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellLink];
@@ -85,7 +85,7 @@
 
 + (instancetype)switchCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
-                               icon:(SCISymbol *)icon
+                               icon:(UIImage *)icon
                         defaultsKey:(NSString *)defaultsKey
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellSwitch];
@@ -157,7 +157,7 @@
 
 + (instancetype)buttonCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
-                               icon:(nullable SCISymbol *)icon
+                               icon:(nullable UIImage *)icon
                              action:(void (^)(void))action
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellButton];
@@ -191,7 +191,7 @@
 
 + (instancetype)navigationCellWithTitle:(NSString *)title
                                subtitle:(NSString *)subtitle
-                                   icon:(nullable SCISymbol *)icon
+                                   icon:(nullable UIImage *)icon
                             navSections:(NSArray *)navSections
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellNavigation];
@@ -207,7 +207,7 @@
 
 + (instancetype)navigationCellWithTitle:(NSString *)title
                                subtitle:(NSString *)subtitle
-                                   icon:(nullable SCISymbol *)icon
+                                   icon:(nullable UIImage *)icon
                          viewController:(UIViewController *)viewController
 {
     SCISetting *setting = [[self alloc] initWithType:SCITableCellNavigation];

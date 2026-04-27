@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import "SCISymbol.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -23,7 +22,8 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 @property (nonatomic, strong) NSString *title;
 @property (nonatomic, strong) NSString *subtitle;
 
-@property (nonatomic, strong, nullable) SCISymbol *icon;
+@property (nonatomic, strong, nullable) UIImage *icon;
+@property (nonatomic, strong, nullable) UIColor *iconTintColor;
 @property (nonatomic, strong) NSString *defaultsKey;
 
 @property (nonatomic, strong) NSURL *url;
@@ -50,11 +50,11 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 
 + (instancetype)staticCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
-                               icon:(nullable SCISymbol *)icon;
+                               icon:(nullable UIImage *)icon;
 
 + (instancetype)linkCellWithTitle:(NSString *)title
                          subtitle:(NSString *)subtitle
-                             icon:(nullable SCISymbol *)icon
+                             icon:(nullable UIImage *)icon
                               url:(NSString *)url;
 
 + (instancetype)linkCellWithTitle:(NSString *)title
@@ -68,7 +68,7 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 
 + (instancetype)switchCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
-                               icon:(nullable SCISymbol *)icon
+                               icon:(nullable UIImage *)icon
                         defaultsKey:(NSString *)defaultsKey;
 
 + (instancetype)switchCellWithTitle:(NSString *)title
@@ -93,7 +93,7 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 
 + (instancetype)buttonCellWithTitle:(NSString *)title
                            subtitle:(NSString *)subtitle
-                               icon:(nullable SCISymbol *)icon
+                               icon:(nullable UIImage *)icon
                              action:(void (^)(void))action;
 
 + (instancetype)menuCellWithTitle:(NSString *)title
@@ -102,12 +102,12 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
 
 + (instancetype)navigationCellWithTitle:(NSString *)title
                                subtitle:(NSString *)subtitle
-                                   icon:(nullable SCISymbol *)icon
+                                   icon:(nullable UIImage *)icon
                             navSections:(NSArray *)navSections;
 
 + (instancetype)navigationCellWithTitle:(NSString *)title
                                subtitle:(NSString *)subtitle
-                                   icon:(nullable SCISymbol *)icon
+                                   icon:(nullable UIImage *)icon
                          viewController:(UIViewController *)viewController;
 
 

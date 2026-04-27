@@ -18,7 +18,7 @@
         SCITopicSection(@"Cache", @[
             [SCISetting buttonCellWithTitle:@"Clear Cache Now" subtitle:@"Remove temporary caches immediately" icon:nil action:^(void) {
                 [SCIUtils cleanCache];
-                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsClearCache duration:2.0 title:@"Cache cleared" subtitle:nil iconResource:@"circle_check_filled" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
+                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsClearCache duration:2.0 title:@"Cache cleared" subtitle:nil iconResource:@"circle_check_filled"];
             }],
             [SCISetting menuCellWithTitle:@"Auto Clear Cache" subtitle:@"Choose when cache should be cleared automatically while using Instagram" menu:SCICacheAutoClearMenu()]
         ], @"Automatic clearing is checked whenever Instagram becomes active. \"Always\" clears on every foreground; the other modes clear only after enough time has elapsed."),

@@ -1,4 +1,5 @@
 #import "Utils.h"
+#import "AssetUtils.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import "Shared/MediaPreview/SCIMediaCacheManager.h"
@@ -228,6 +229,17 @@ static void SCICleanupFeedbackOverlayWindowIfNeeded(void) {
     sSCIFeedbackOverlayWindow.rootViewController = nil;
     sSCIFeedbackOverlayWindow = nil;
     sSCIFeedbackOverlayRootViewController = nil;
+}
+
+static SCIFeedbackPillTone SCIToastToneForIconResource(NSString *iconResource) {
+    if ([iconResource isEqualToString:@"error_filled"]) {
+        return SCIFeedbackPillToneError;
+    }
+    if ([iconResource isEqualToString:@"circle_check_filled"] ||
+        [iconResource isEqualToString:@"copy_filled"]) {
+        return SCIFeedbackPillToneSuccess;
+    }
+    return SCIFeedbackPillToneInfo;
 }
 
 static UIView *SCIFeedbackPresentationView(void) {
@@ -1117,7 +1129,6 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
                              title:title
                           subtitle:nil
                       iconResource:@"info"
-           fallbackSystemImageName:@"info.circle.fill"
                               tone:SCIFeedbackPillToneInfo];
 }
 + (void)showToastForDuration:(double)duration title:(NSString *)title subtitle:(NSString *)subtitle {
@@ -1125,15 +1136,24 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
                              title:title
                           subtitle:subtitle
                       iconResource:@"info"
-           fallbackSystemImageName:@"info.circle.fill"
                               tone:SCIFeedbackPillToneInfo];
 }
 
 + (void)showToastForDuration:(double)duration
                        title:(NSString *)title
                     subtitle:(NSString *)subtitle
+                iconResource:(NSString *)iconResource {
+    [SCIUtils showToastForDuration:duration
+                             title:title
+                          subtitle:subtitle
+                      iconResource:iconResource
+                              tone:SCIToastToneForIconResource(iconResource)];
+}
+
++ (void)showToastForDuration:(double)duration
+                       title:(NSString *)title
+                    subtitle:(NSString *)subtitle
                 iconResource:(NSString *)iconResource
-     fallbackSystemImageName:(NSString *)fallbackSystemImageName
                         tone:(SCIFeedbackPillTone)tone {
     if (![NSThread isMainThread]) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -1141,7 +1161,6 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
                                      title:title
                                   subtitle:subtitle
                               iconResource:iconResource
-                   fallbackSystemImageName:fallbackSystemImageName
                                       tone:tone];
         });
         return;
@@ -1156,11 +1175,7 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 
     UIImage *icon = nil;
     if (iconResource.length > 0) {
-        icon = [SCIUtils sci_resourceImageNamed:iconResource template:YES maxPointSize:16.0];
-    }
-    if (!icon && fallbackSystemImageName.length > 0) {
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightSemibold];
-        icon = [UIImage systemImageNamed:fallbackSystemImageName withConfiguration:config];
+        icon = [SCIAssetUtils instagramIconNamed:iconResource pointSize:16.0];
     }
 
     NSTimeInterval effectiveDuration = (tone != SCIFeedbackPillToneError) ? kSCISuccessToastDuration : duration;
@@ -1179,8 +1194,20 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
                             duration:(double)duration
                                title:(NSString *)title
                             subtitle:(NSString *)subtitle
+                        iconResource:(NSString *)iconResource {
+    [SCIUtils showToastForActionIdentifier:actionIdentifier
+                                  duration:duration
+                                     title:title
+                                  subtitle:subtitle
+                              iconResource:iconResource
+                                      tone:SCIToastToneForIconResource(iconResource)];
+}
+
++ (void)showToastForActionIdentifier:(NSString *)actionIdentifier
+                            duration:(double)duration
+                               title:(NSString *)title
+                            subtitle:(NSString *)subtitle
                         iconResource:(NSString *)iconResource
-             fallbackSystemImageName:(NSString *)fallbackSystemImageName
                                 tone:(SCIFeedbackPillTone)tone {
     if (![SCIUtils shouldShowFeedbackPillForActionIdentifier:actionIdentifier]) {
         return;
@@ -1190,7 +1217,6 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
                              title:title
                           subtitle:subtitle
                       iconResource:iconResource
-           fallbackSystemImageName:fallbackSystemImageName
                               tone:tone];
 }
 
@@ -1249,76 +1275,6 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     }
 }
 
-// MARK: Resources (SCInsta.bundle + LiveContainer loose files / nested bundle)
-
-+ (NSBundle *)sci_resourcesBundle {
-    static NSBundle *bundle;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSFileManager *fileManager = [NSFileManager defaultManager];
-        NSMutableArray<NSString *> *candidatePaths = [NSMutableArray array];
-
-        // 1. Sideloaded IPA: cyan injects SCInsta.bundle into the .app root
-        NSString *appBundlePath = [[NSBundle mainBundle] pathForResource:@"SCInsta" ofType:@"bundle"];
-        if (appBundlePath.length) {
-            [candidatePaths addObject:appBundlePath];
-        }
-        // Also check Frameworks/ (some injectors place bundles there)
-        NSString *frameworksBundlePath = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"Frameworks/SCInsta.bundle"];
-        [candidatePaths addObject:frameworksBundlePath];
-
-        // 2. LiveContainer: Documents/Tweaks/SCInsta/SCInsta.bundle
-        NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-        if (documentsPath.length) {
-            [candidatePaths addObject:[documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta/SCInsta.bundle"]];
-        }
-
-        // 3. Jailbroken paths
-        [candidatePaths addObjectsFromArray:@[
-            @"/var/jb/Library/Application Support/SCInsta.bundle",
-            @"/Library/Application Support/SCInsta.bundle",
-            @"/var/jb/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
-            @"/Library/MobileSubstrate/DynamicLibraries/SCInsta.bundle",
-        ]];
-
-        for (NSString *path in candidatePaths) {
-            if ([fileManager fileExistsAtPath:path]) {
-                bundle = [NSBundle bundleWithPath:path];
-                if (bundle) {
-                    break;
-                }
-            }
-        }
-
-        if (!bundle) {
-            bundle = [NSBundle bundleForClass:[SCIUtils class]];
-        }
-    });
-
-    return bundle;
-}
-
-/// `imageWithContentsOfFile:` does not infer @2x/@3x scale; without this, bitmap pixels are shown 1:1 in points (huge icons).
-static UIImage *SCIImageWithContentsOfFileApplyingScale(NSString *path) {
-    if (!path.length) {
-        return nil;
-    }
-    UIImage *img = [UIImage imageWithContentsOfFile:path];
-    if (!img) {
-        return nil;
-    }
-    CGFloat scale = 1.0;
-    if ([path containsString:@"@3x"]) {
-        scale = 3.0;
-    } else if ([path containsString:@"@2x"]) {
-        scale = 2.0;
-    }
-    if (fabs(img.scale - scale) < 0.01) {
-        return img;
-    }
-    return [UIImage imageWithCGImage:img.CGImage scale:scale orientation:img.imageOrientation];
-}
-
 + (UIImage *)sci_scaleImage:(UIImage *)image maxPointDimension:(CGFloat)maxPt {
     if (!image || maxPt <= 0) {
         return image;
@@ -1342,72 +1298,6 @@ static UIImage *SCIImageWithContentsOfFileApplyingScale(NSString *path) {
         out = [out imageWithRenderingMode:mode];
     }
     return out;
-}
-
-+ (UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate {
-    return [self sci_resourceImageNamed:name template:asTemplate maxPointSize:0];
-}
-
-+ (UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate maxPointSize:(CGFloat)maxPointSize {
-    if (!name.length) {
-        return nil;
-    }
-
-    NSBundle *resourceBundle = [self sci_resourcesBundle];
-    UIImage *image = [UIImage imageNamed:name inBundle:resourceBundle compatibleWithTraitCollection:nil];
-
-    if (!image) {
-        NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-        if (documentsPath.length) {
-            NSString *baseDir = [documentsPath stringByAppendingPathComponent:@"Tweaks/SCInsta"];
-            NSArray<NSString *> *fileNames = @[
-                [NSString stringWithFormat:@"%@@3x.png", name],
-                [NSString stringWithFormat:@"%@@2x.png", name],
-                [NSString stringWithFormat:@"%@.png", name],
-            ];
-            for (NSString *fileName in fileNames) {
-                NSString *path = [baseDir stringByAppendingPathComponent:fileName];
-                if (!path.length) {
-                    continue;
-                }
-                image = SCIImageWithContentsOfFileApplyingScale(path);
-                if (image) {
-                    break;
-                }
-            }
-        }
-    }
-
-    if (!image) {
-        NSArray<NSString *> *candidateNames = @[[NSString stringWithFormat:@"%@@3x", name], [NSString stringWithFormat:@"%@@2x", name], name];
-        for (NSString *resName in candidateNames) {
-            NSString *path = [resourceBundle pathForResource:resName ofType:@"png"];
-            if (!path.length) {
-                continue;
-            }
-            image = SCIImageWithContentsOfFileApplyingScale(path);
-            if (image) {
-                break;
-            }
-        }
-    }
-
-    if (!image) {
-        image = [UIImage imageNamed:name];
-    }
-
-    if (!image) {
-        return nil;
-    }
-
-    if (maxPointSize > 0) {
-        image = [self sci_scaleImage:image maxPointDimension:maxPointSize];
-    }
-
-    if (asTemplate) {
-        return [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    }
-    return image;
 }
 
 // Ivars

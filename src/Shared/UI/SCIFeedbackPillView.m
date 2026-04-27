@@ -1,8 +1,8 @@
 #import "SCIFeedbackPillView.h"
 #import <math.h>
+#import "../../AssetUtils.h"
 
 @interface SCIUtils : NSObject
-+ (nullable UIImage *)sci_resourceImageNamed:(NSString *)name template:(BOOL)asTemplate maxPointSize:(CGFloat)maxPointSize;
 + (UIColor *)SCIColor_Primary;
 @end
 
@@ -238,9 +238,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     _iconBadgeGradientLayer.endPoint = CGPointMake(1.0, 1.0);
     [_iconBadgeView.layer insertSublayer:_iconBadgeGradientLayer atIndex:0];
 
-    UIImage *arrowImage = [self resourceIconNamed:@"download"
-                          fallbackSystemImageName:@"arrow.down.to.line"
-                                       pointSize:14.0];
+    UIImage *arrowImage = [SCIAssetUtils instagramIconNamed:@"download"
+                                                  pointSize:16.0
+                                             renderingMode:UIImageRenderingModeAlwaysTemplate];
     _iconView = [[UIImageView alloc] initWithImage:arrowImage];
     _iconView.tintColor = [UIColor colorWithWhite:1.0 alpha:0.96];
     _iconView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -343,21 +343,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     [self applyTone:self.tone animated:NO];
 
     return self;
-}
-
-- (UIImage *)resourceIconNamed:(NSString *)resourceName
-       fallbackSystemImageName:(NSString *)fallbackSystemImageName
-                     pointSize:(CGFloat)pointSize {
-    UIImage *icon = [SCIUtils sci_resourceImageNamed:resourceName
-                                            template:YES
-                                        maxPointSize:MAX(0.0, pointSize + 2.0)];
-    if (icon) {
-        return icon;
-    }
-
-    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:pointSize
-                                                                                          weight:UIImageSymbolWeightSemibold];
-    return [UIImage systemImageNamed:fallbackSystemImageName withConfiguration:config];
 }
 
 - (void)layoutSubviews {
@@ -548,18 +533,18 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 - (UIImage *)defaultIconForTone:(SCIPillVisualTone)tone {
     switch (tone) {
         case SCIPillVisualToneSuccess:
-            return [self resourceIconNamed:@"circle_check_filled"
-                   fallbackSystemImageName:@"checkmark.circle.fill"
-                                 pointSize:14.0];
+            return [SCIAssetUtils instagramIconNamed:@"circle_check_filled"
+                                           pointSize:16.0
+                                      renderingMode:UIImageRenderingModeAlwaysTemplate];
         case SCIPillVisualToneError:
-            return [self resourceIconNamed:@"error_filled"
-                   fallbackSystemImageName:@"exclamationmark.circle.fill"
-                                 pointSize:14.0];
+            return [SCIAssetUtils instagramIconNamed:@"error_filled"
+                                           pointSize:16.0
+                                      renderingMode:UIImageRenderingModeAlwaysTemplate];
         case SCIPillVisualToneInfo:
         default:
-            return [self resourceIconNamed:@"info_filled"
-                   fallbackSystemImageName:@"info.circle.fill"
-                                 pointSize:14.0];
+            return [SCIAssetUtils instagramIconNamed:@"info_filled"
+                                           pointSize:16.0
+                                      renderingMode:UIImageRenderingModeAlwaysTemplate];
     }
 }
 
@@ -648,9 +633,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)sci_applyProgressModeInfoIcon {
-    self.iconView.image = [self resourceIconNamed:@"info_filled"
-                          fallbackSystemImageName:@"info.circle.fill"
-                                        pointSize:14.0];
+    self.iconView.image = [SCIAssetUtils instagramIconNamed:@"info_filled"
+                                                  pointSize:16.0
+                                             renderingMode:UIImageRenderingModeAlwaysTemplate];
     self.iconView.tintColor = [self iconTintForTone:SCIPillVisualToneInfo];
 }
 
@@ -792,9 +777,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)applyCancelButtonStyle {
-    UIImage *closeImage = [self resourceIconNamed:@"xmark"
-                          fallbackSystemImageName:@"xmark"
-                                       pointSize:10.0];
+    UIImage *closeImage = [SCIAssetUtils instagramIconNamed:@"xmark"
+                                                  pointSize:12.0
+                                             renderingMode:UIImageRenderingModeAlwaysTemplate];
     [self.closeButton setImage:closeImage forState:UIControlStateNormal];
     self.closeButton.tintColor = [self cancelButtonTintColor];
     self.closeButton.backgroundColor = [self cancelButtonBackgroundColor];

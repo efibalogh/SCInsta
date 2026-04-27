@@ -3,6 +3,7 @@
 #import <substrate.h>
 
 #import "../../InstagramHeaders.h"
+#import "../../AssetUtils.h"
 #import "../../Tweak.h"
 #import "../../Utils.h"
 
@@ -435,7 +436,6 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
                                  title:@"Unable to mark story as seen"
                               subtitle:nil
                           iconResource:@"error_filled"
-               fallbackSystemImageName:@"exclamationmark.circle.fill"
                                   tone:SCIFeedbackPillToneError];
         return;
     }
@@ -453,7 +453,6 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
                              title:@"Marked story as seen"
                           subtitle:nil
                       iconResource:@"circle_check_filled"
-           fallbackSystemImageName:@"checkmark.circle.fill"
                               tone:SCIFeedbackPillToneSuccess];
 }
 
@@ -585,7 +584,6 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
                                  title:@"Message not found"
                               subtitle:nil
                           iconResource:@"error_filled"
-               fallbackSystemImageName:@"exclamationmark.circle.fill"
                                   tone:SCIFeedbackPillToneError];
         return;
     }
@@ -611,7 +609,6 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
                                  title:@"Unable to mark as seen"
                               subtitle:nil
                           iconResource:@"error_filled"
-               fallbackSystemImageName:@"exclamationmark.circle.fill"
                                   tone:SCIFeedbackPillToneError];
         return;
     }
@@ -625,7 +622,6 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
                              title:@"Marked as seen"
                           subtitle:nil
                       iconResource:@"circle_check_filled"
-           fallbackSystemImageName:@"checkmark.circle.fill"
                               tone:SCIFeedbackPillToneSuccess];
 }
 
@@ -643,7 +639,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         seenButton = [UIButton buttonWithType:UIButtonTypeSystem];
         seenButton.tag = kSCIDirectSeenButtonTag;
         seenButton.adjustsImageWhenHighlighted = YES;
-        UIImage *seenImage = [SCIUtils sci_resourceImageNamed:kSCISeenMessagesBarIconResource template:YES maxPointSize:24.0] ?: [UIImage systemImageNamed:@"eye"];
+        UIImage *seenImage = [SCIAssetUtils instagramIconNamed:kSCISeenMessagesBarIconResource pointSize:24.0];
         [seenButton setImage:[seenImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
         [seenButton addTarget:controller action:@selector(sci_didTapDirectSeenButton:) forControlEvents:UIControlEventTouchUpInside];
         [overlay addSubview:seenButton];
@@ -740,7 +736,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 
     // Messages seen
     if (SCIManualMessageSeenEnabled()) {
-        UIImage *seenImg = [SCIUtils sci_resourceImageNamed:kSCISeenMessagesBarIconResource template:YES] ?: [UIImage systemImageNamed:@"checkmark.message"];
+        UIImage *seenImg = [SCIAssetUtils instagramIconNamed:kSCISeenMessagesBarIconResource pointSize:24.0];
         UIBarButtonItem *seenButton = [[UIBarButtonItem alloc] initWithImage:seenImg style:UIBarButtonItemStylePlain target:self action:@selector(seenButtonHandler:)];
         [new_items addObject:seenButton];
     }
@@ -760,7 +756,6 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
                                  title:@"Marked messages as seen"
                               subtitle:nil
                           iconResource:@"circle_check_filled"
-               fallbackSystemImageName:@"checkmark.circle.fill"
                                   tone:SCIFeedbackPillToneSuccess];
     }
 }
@@ -824,7 +819,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         seenButton = SCIStorySeenButtonWithTag((UIView *)self, kSCIStorySeenButtonTag);
         [seenButton addTarget:self action:@selector(sci_storySeenButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
 
-        UIImage *seenImage = [SCIUtils sci_resourceImageNamed:kSCISeenMessagesBarIconResource template:YES maxPointSize:24.0] ?: [UIImage systemImageNamed:@"eye"];
+        UIImage *seenImage = [SCIAssetUtils instagramIconNamed:kSCISeenMessagesBarIconResource pointSize:24.0];
         [seenButton setImage:[seenImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     }
     if (showSeenButton) SCIApplyStorySeenButtonStyle(seenButton);
@@ -835,7 +830,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
         mentionsButton = SCIStorySeenButtonWithTag((UIView *)self, kSCIStoryMentionsButtonTag);
         [mentionsButton addTarget:self action:@selector(sci_storyMentionsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
 
-        UIImage *mentionsImage = [SCIUtils sci_resourceImageNamed:kSCIStoryMentionsBarIconResource template:YES maxPointSize:24.0] ?: [UIImage systemImageNamed:@"at"];
+        UIImage *mentionsImage = [SCIAssetUtils instagramIconNamed:kSCIStoryMentionsBarIconResource pointSize:24.0];
         [mentionsButton setImage:[mentionsImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     } else if (!showMentionsButton && mentionsButton) {
         [mentionsButton removeFromSuperview];

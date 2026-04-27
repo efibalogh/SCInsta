@@ -1,5 +1,6 @@
 #import "SCIVaultListCollectionCell.h"
 #import "SCIVaultFile.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 @interface SCIVaultListCollectionCell ()
@@ -84,11 +85,7 @@
     self.dateLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentView addSubview:self.dateLabel];
 
-    UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold];
-    UIImage *favImg = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:14];
-    if (!favImg) {
-        favImg = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
-    }
+    UIImage *favImg = [SCIAssetUtils instagramIconNamed:@"heart_filled" pointSize:14.0];
     self.favoriteIcon = [[UIImageView alloc] initWithImage:favImg];
     self.favoriteIcon.contentMode = UIViewContentModeScaleAspectFit;
     self.favoriteIcon.translatesAutoresizingMaskIntoConstraints = NO;
@@ -103,11 +100,7 @@
     self.selectionIndicator.hidden = YES;
     [self.contentView addSubview:self.selectionIndicator];
 
-    UIImage *moreImg = [SCIUtils sci_resourceImageNamed:@"more" template:YES maxPointSize:22];
-    if (!moreImg) {
-        UIImageSymbolConfiguration *moreCfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
-        moreImg = [UIImage systemImageNamed:@"ellipsis" withConfiguration:moreCfg];
-    }
+    UIImage *moreImg = [SCIAssetUtils instagramIconNamed:@"more" pointSize:22.0];
     self.moreButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.moreButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.moreButton setImage:moreImg forState:UIControlStateNormal];
@@ -187,12 +180,7 @@
 
 - (UIImage *)selectionIndicatorImageSelected:(BOOL)selected {
     NSString *resourceName = selected ? @"circle_check_filled" : @"circle";
-    UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:20.0];
-    if (image) {
-        return image;
-    }
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
-    return [UIImage systemImageNamed:(selected ? @"checkmark.circle.fill" : @"circle") withConfiguration:cfg];
+    return [SCIAssetUtils instagramIconNamed:resourceName pointSize:20.0];
 }
 
 - (void)configureWithVaultFile:(SCIVaultFile *)file
@@ -205,13 +193,8 @@
     self.dateLabel.text = [file listDownloadDateString];
 
     BOOL isVideo = (file.mediaType == SCIVaultMediaTypeVideo);
-    UIImage *rowIcon = [SCIUtils sci_resourceImageNamed:(isVideo ? @"video_filled" : @"photo_filled")
-                                                template:YES
-                                            maxPointSize:12];
-    if (!rowIcon) {
-        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightMedium];
-        rowIcon = [UIImage systemImageNamed:(isVideo ? @"video.fill" : @"photo.fill") withConfiguration:cfg];
-    }
+    UIImage *rowIcon = [SCIAssetUtils instagramIconNamed:(isVideo ? @"video_filled" : @"photo_filled")
+                                               pointSize:12];
     self.rowTypeIcon.image = rowIcon;
 
     self.favoriteIcon.hidden = !file.isFavorite;

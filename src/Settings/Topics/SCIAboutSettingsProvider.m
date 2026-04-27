@@ -10,10 +10,11 @@
 + (SCISetting *)rootSetting {
     return SCITopicNavigationSetting(@"About", @"info", 24.0, @[
         SCITopicSection(@"Support", @[
-            [SCISetting linkCellWithTitle:@"Donate to the original developer"
-                                 subtitle:@""
-                                     icon:[SCISymbol resourceSymbolWithName:@"heart_filled" color:[SCIUtils SCIColor_InstagramFavorite] size:24.0]
-                                      url:@"https://ko-fi.com/SoCuul"]
+            SCISettingApplyIconTint([SCISetting linkCellWithTitle:@"Donate to the original developer"
+                                                         subtitle:@""
+                                                             icon:SCISettingsInstagramIcon(@"heart_filled", 24.0)
+                                                              url:@"https://ko-fi.com/SoCuul"],
+                                   [SCIUtils SCIColor_InstagramFavorite])
         ], @"Consider donating to support this tweak's development"),
         SCITopicSection(@"Credits", @[
             [SCISetting linkCellWithTitle:@"Socuul"
@@ -32,13 +33,13 @@
         SCITopicSection(@"Information", @[
             [SCISetting staticCellWithTitle:@"Tweak"
                                    subtitle:SCIVersionString
-                                       icon:[SCISymbol resourceSymbolWithName:@"action" color:[SCIUtils SCIColor_InstagramPrimaryText] size:24.0]],
+                                       icon:SCISettingsInstagramIcon(@"action", 24.0)],
             [SCISetting staticCellWithTitle:@"Instagram"
                                    subtitle:[SCIUtils IGVersionString]
-                                       icon:[SCISymbol resourceSymbolWithName:@"app" color:[SCIUtils SCIColor_InstagramPrimaryText] size:24.0]],
+                                       icon:SCISettingsInstagramIcon(@"app", 24.0)],
             [SCISetting staticCellWithTitle:@"Bundle ID"
                                    subtitle:[[NSBundle mainBundle] bundleIdentifier]
-                                       icon:[SCISymbol resourceSymbolWithName:@"key" color:[SCIUtils SCIColor_InstagramPrimaryText] size:24.0]]
+                                       icon:SCISettingsInstagramIcon(@"key", 24.0)]
         ], nil)
     ]);
 }

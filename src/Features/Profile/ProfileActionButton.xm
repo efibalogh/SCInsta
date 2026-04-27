@@ -9,6 +9,7 @@
 #import "../../Shared/Vault/SCIVaultFile.h"
 #import "../../Shared/Vault/SCIVaultOriginController.h"
 #import "../../Shared/Vault/SCIVaultSaveMetadata.h"
+#import "../../AssetUtils.h"
 
 static NSString * const kSCIProfileActionButtonDefaultKey = @"action_button_profile_default_action";
 static NSString * const kSCIProfileActionButtonDefaultCopyInfoKey = @"action_button_profile_default_copy_info_action";
@@ -27,16 +28,9 @@ static CGFloat const kSCIProfileActionButtonSide = 44.0;
 static CGFloat const kSCIProfileActionIconPointSize = 24.0;
 static CGFloat const kSCIProfileActionMenuIconPointSize = 22.0;
 
-static UIImage *SCIProfileMenuIcon(NSString *resourceName, NSString *fallbackSystemName) {
-    UIImage *image = resourceName.length > 0
-        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kSCIProfileActionMenuIconPointSize]
-        : nil;
-    if (!image && fallbackSystemName.length > 0) {
-        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:kSCIProfileActionMenuIconPointSize
-                                                                                                     weight:UIImageSymbolWeightRegular];
-        image = [UIImage systemImageNamed:fallbackSystemName withConfiguration:configuration];
-    }
-    return image;
+static UIImage *SCIProfileMenuIcon(NSString *resourceName) {
+    return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
+                                   pointSize:kSCIProfileActionMenuIconPointSize];
 }
 
 static id SCIProfileSafeValue(id target, NSString *key) {
@@ -193,11 +187,11 @@ static NSString *SCIProfilePrivacyText(id user) {
 
 static void SCIProfileCopyValue(NSString *value, NSString *successTitle) {
     if (value.length == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];
         return;
     }
     UIPasteboard.generalPasteboard.string = value;
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:1.6 title:successTitle subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:1.6 title:successTitle subtitle:nil iconResource:@"copy_filled"];
 }
 
 static void SCIProfileExecuteCopyInfoAction(id user, NSString *identifier) {
@@ -217,7 +211,7 @@ static void SCIProfileExecuteCopyInfoAction(id user, NSString *identifier) {
 static void SCIProfileSharePicture(id user) {
     NSURL *url = SCIProfilePictureURL(user);
     if (!url) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileSharePicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileSharePicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
         return;
     }
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionProfileSharePicture]];
@@ -227,7 +221,7 @@ static void SCIProfileSharePicture(id user) {
 static void SCIProfileSavePictureToVault(id user) {
     NSURL *url = SCIProfilePictureURL(user);
     if (!url) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileVaultPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileVaultPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
         return;
     }
 
@@ -309,31 +303,31 @@ static void SCIConfigureProfileActionButton(SCIProfileHeaderActionButton *button
 
 @end
 
-static UIAction *SCIProfileDisabledInfoAction(NSString *title, NSString *resourceName, NSString *fallbackSystemName) {
-    UIAction *action = [UIAction actionWithTitle:title image:SCIProfileMenuIcon(resourceName, fallbackSystemName) identifier:nil handler:^(__unused UIAction *menuAction) {}];
+static UIAction *SCIProfileDisabledInfoAction(NSString *title, NSString *resourceName) {
+    UIAction *action = [UIAction actionWithTitle:title image:SCIProfileMenuIcon(resourceName) identifier:nil handler:^(__unused UIAction *menuAction) {}];
     action.attributes = UIMenuElementAttributesDisabled;
     return action;
 }
 
 static UIMenu *SCIProfileCopyInfoMenu(id user) {
     NSMutableArray<UIMenuElement *> *children = [NSMutableArray array];
-    [children addObject:[UIAction actionWithTitle:@"Copy ID" image:SCIProfileMenuIcon(@"key", @"key") identifier:nil handler:^(__unused UIAction *action) {
+    [children addObject:[UIAction actionWithTitle:@"Copy ID" image:SCIProfileMenuIcon(@"key") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoID);
     }]];
-    [children addObject:[UIAction actionWithTitle:@"Copy Username" image:SCIProfileMenuIcon(@"username", @"person") identifier:nil handler:^(__unused UIAction *action) {
+    [children addObject:[UIAction actionWithTitle:@"Copy Username" image:SCIProfileMenuIcon(@"username") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoUsername);
     }]];
-    [children addObject:[UIAction actionWithTitle:@"Copy Name" image:SCIProfileMenuIcon(@"text", @"textformat") identifier:nil handler:^(__unused UIAction *action) {
+    [children addObject:[UIAction actionWithTitle:@"Copy Name" image:SCIProfileMenuIcon(@"text") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoName);
     }]];
-    [children addObject:[UIAction actionWithTitle:@"Copy Bio" image:SCIProfileMenuIcon(@"caption", @"captions.bubble") identifier:nil handler:^(__unused UIAction *action) {
+    [children addObject:[UIAction actionWithTitle:@"Copy Bio" image:SCIProfileMenuIcon(@"caption") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoBio);
     }]];
-    [children addObject:[UIAction actionWithTitle:@"Copy Profile Link" image:SCIProfileMenuIcon(@"link", @"link") identifier:nil handler:^(__unused UIAction *action) {
+    [children addObject:[UIAction actionWithTitle:@"Copy Profile Link" image:SCIProfileMenuIcon(@"link") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoLink);
     }]];
 
-    return [UIMenu menuWithTitle:@"Copy Info" image:SCIProfileMenuIcon(@"copy", @"doc.on.doc") identifier:nil options:0 children:children];
+    return [UIMenu menuWithTitle:@"Copy Info" image:SCIProfileMenuIcon(@"copy") identifier:nil options:0 children:children];
 }
 
 static UIMenu *SCIProfileActionMenu(id sourceObject) {
@@ -347,26 +341,26 @@ static UIMenu *SCIProfileActionMenu(id sourceObject) {
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray array];
     [items addObject:SCIProfileCopyInfoMenu(user)];
 
-    [items addObject:[UIAction actionWithTitle:@"View Picture" image:SCIProfileMenuIcon(@"photo", @"photo") identifier:nil handler:^(__unused UIAction *action) {
+    [items addObject:[UIAction actionWithTitle:@"View Picture" image:SCIProfileMenuIcon(@"photo") identifier:nil handler:^(__unused UIAction *action) {
         NSURL *url = SCIProfilePictureURL(user);
         if (!url) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
             return;
         }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo" fallbackSystemImageName:@"photo" tone:SCIFeedbackPillToneInfo];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo"];
         [SCIFullScreenMediaPlayer showRemoteImageURL:url profileUsername:SCIProfileUsername(user)];
     }]];
 
-    [items addObject:[UIAction actionWithTitle:@"Share Picture" image:SCIProfileMenuIcon(@"share", @"square.and.arrow.up") identifier:nil handler:^(__unused UIAction *action) {
+    [items addObject:[UIAction actionWithTitle:@"Share Picture" image:SCIProfileMenuIcon(@"share") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileSharePicture(user);
     }]];
 
-    [items addObject:[UIAction actionWithTitle:@"Download to Vault" image:SCIProfileMenuIcon(@"photo_gallery", @"photo.on.rectangle.angled") identifier:nil handler:^(__unused UIAction *action) {
+    [items addObject:[UIAction actionWithTitle:@"Download to Vault" image:SCIProfileMenuIcon(@"photo_gallery") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileSavePictureToVault(user);
     }]];
 
-    [items addObject:[UIAction actionWithTitle:@"Profile Settings" image:SCIProfileMenuIcon(@"settings", @"gear") identifier:nil handler:^(__unused UIAction *action) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneInfo];
+    [items addObject:[UIAction actionWithTitle:@"Profile Settings" image:SCIProfileMenuIcon(@"settings") identifier:nil handler:^(__unused UIAction *action) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings"];
         [SCIUtils showSettingsForTopicTitle:@"Profile"];
     }]];
 
@@ -374,18 +368,17 @@ static UIMenu *SCIProfileActionMenu(id sourceObject) {
     NSString *privacyText = SCIProfilePrivacyText(user);
     if (privacyText.length > 0) {
         [infoItems addObject:SCIProfileDisabledInfoAction(privacyText,
-                                                          [privacyText containsString:@"Private"] ? @"lock" : @"unlock",
-                                                          [privacyText containsString:@"Private"] ? @"lock" : @"lock.open")];
+                                                          [privacyText containsString:@"Private"] ? @"lock" : @"unlock")];
     }
 
     NSString *followers = SCIProfileInfoString(SCIProfileNumberValue(SCIProfileSafeValue(user, @"followerCount")));
     if (followers.length > 0) {
-        [infoItems addObject:SCIProfileDisabledInfoAction([NSString stringWithFormat:@"Followers: %@", followers], @"users", @"person.2")];
+        [infoItems addObject:SCIProfileDisabledInfoAction([NSString stringWithFormat:@"Followers: %@", followers], @"users")];
     }
 
     NSString *following = SCIProfileInfoString(SCIProfileNumberValue(SCIProfileSafeValue(user, @"followingCount")));
     if (following.length > 0) {
-        [infoItems addObject:SCIProfileDisabledInfoAction([NSString stringWithFormat:@"Following: %@", following], @"users", @"person.2")];
+        [infoItems addObject:SCIProfileDisabledInfoAction([NSString stringWithFormat:@"Following: %@", following], @"users")];
     }
 
     if (infoItems.count > 0) {
@@ -405,7 +398,7 @@ static void SCIExecuteProfileDefaultAction(SCIProfileHeaderActionButton *button)
     } else if ([identifier isEqualToString:kSCIProfileActionViewPicture]) {
         NSURL *url = SCIProfilePictureURL(user);
         if (url) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo" fallbackSystemImageName:@"photo" tone:SCIFeedbackPillToneInfo];
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo"];
             [SCIFullScreenMediaPlayer showRemoteImageURL:url profileUsername:SCIProfileUsername(user)];
         }
     } else if ([identifier isEqualToString:kSCIProfileActionSharePicture]) {
@@ -413,7 +406,7 @@ static void SCIExecuteProfileDefaultAction(SCIProfileHeaderActionButton *button)
     } else if ([identifier isEqualToString:kSCIProfileActionSavePictureToVault]) {
         SCIProfileSavePictureToVault(user);
     } else if ([identifier isEqualToString:kSCIProfileActionOpenSettings]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneInfo];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings"];
         [SCIUtils showSettingsForTopicTitle:@"Profile"];
     }
 }
@@ -443,12 +436,9 @@ static UIImage *SCIProfileButtonIconForDefaultAction(NSString *defaultIdentifier
         fallbackName = @"gearshape";
     }
 
-    UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kSCIProfileActionIconPointSize];
-    if (!image) {
-        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:kSCIProfileActionIconPointSize weight:UIImageSymbolWeightRegular];
-        image = [UIImage systemImageNamed:fallbackName withConfiguration:configuration];
-    }
-    return image;
+    (void)fallbackName;
+    return [SCIAssetUtils instagramIconNamed:resourceName
+                                   pointSize:kSCIProfileActionIconPointSize];
 }
 
 static void SCIConfigureProfileActionButton(SCIProfileHeaderActionButton *button) {

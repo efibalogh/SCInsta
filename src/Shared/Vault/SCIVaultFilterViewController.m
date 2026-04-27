@@ -1,17 +1,6 @@
 #import "SCIVaultFilterViewController.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
-
-static UIImage *SCIVaultFilterSymbol(NSString *resourceName, NSString *systemFallback, CGFloat pointSize) {
-    UIImage *img = resourceName.length > 0
-        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:pointSize]
-        : nil;
-    if (img) {
-        return img;
-    }
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize
-                                                                                      weight:UIImageSymbolWeightMedium];
-    return [UIImage systemImageNamed:systemFallback withConfiguration:cfg];
-}
 
 static CGFloat const kSCIVaultFilterChipLabelPointSize = 16.0;
 static CGFloat const kSCIVaultFilterChipIconPointSize = 14.0;
@@ -180,7 +169,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
         NSInteger tag = [d[@"tag"] integerValue];
         SCIVaultFilterChip *chip = [[SCIVaultFilterChip alloc] initWithTag:tag];
         [chip setTitle:d[@"label"] forState:UIControlStateNormal];
-        UIImage *icon = SCIVaultFilterSymbol(d[@"resource"], d[@"fallback"], kSCIVaultFilterChipIconPointSize);
+        UIImage *icon = [SCIAssetUtils instagramIconNamed:d[@"resource"] pointSize:kSCIVaultFilterChipIconPointSize];
         [chip setImage:icon forState:UIControlStateNormal];
         chip.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
         chip.selectedChip = [self.filterTypes containsObject:@(tag)];
@@ -215,7 +204,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
         SCIVaultSource src = (SCIVaultSource)[sources[i] integerValue];
         SCIVaultFilterChip *chip = [[SCIVaultFilterChip alloc] initWithTag:src];
         [chip setTitle:[SCIVaultFile labelForSource:src] forState:UIControlStateNormal];
-        UIImage *icon = SCIVaultFilterSymbol([SCIVaultFile symbolNameForSource:src], SCIVaultSourceFallbackSymbol(src), kSCIVaultFilterChipIconPointSize);
+        UIImage *icon = [SCIAssetUtils instagramIconNamed:[SCIVaultFile symbolNameForSource:src] pointSize:kSCIVaultFilterChipIconPointSize];
         [chip setImage:icon forState:UIControlStateNormal];
         chip.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
         chip.selectedChip = [self.filterSources containsObject:@(src)];
@@ -240,7 +229,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
     [row.heightAnchor constraintEqualToConstant:50].active = YES;
     [row addTarget:self action:@selector(favoritesRowTapped) forControlEvents:UIControlEventTouchUpInside];
 
-    UIImage *favRowIcon = [SCIUtils sci_resourceImageNamed:@"heart" template:YES maxPointSize:18] ?: [UIImage systemImageNamed:@"heart"];
+    UIImage *favRowIcon = [SCIAssetUtils instagramIconNamed:@"heart" pointSize:18.0];
     UIImageView *icon = [[UIImageView alloc] initWithImage:favRowIcon];
     icon.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
@@ -277,8 +266,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
     [row.heightAnchor constraintEqualToConstant:50].active = YES;
     [row addTarget:self action:@selector(clearFilters) forControlEvents:UIControlEventTouchUpInside];
 
-    UIImage *clearIcon = [SCIUtils sci_resourceImageNamed:@"backspace" template:YES maxPointSize:18]
-        ?: [UIImage systemImageNamed:@"delete.left"];
+    UIImage *clearIcon = [SCIAssetUtils instagramIconNamed:@"backspace" pointSize:18.0];
     UIImageView *icon = [[UIImageView alloc] initWithImage:clearIcon];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
     [row addSubview:icon];
@@ -345,14 +333,12 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
         UIColor *accent = [SCIUtils SCIColor_InstagramFavorite];
         self.favoritesRow.backgroundColor = [accent colorWithAlphaComponent:0.2];
         self.favoritesLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
-        self.favoritesLeadingIcon.image = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:14.0]
-            ?: SCIVaultFilterSymbol(nil, @"heart.fill", 14.0);
+        self.favoritesLeadingIcon.image = [SCIAssetUtils instagramIconNamed:@"heart_filled" pointSize:14.0];
         self.favoritesLeadingIcon.tintColor = accent;
     } else {
         self.favoritesRow.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
         self.favoritesLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
-        self.favoritesLeadingIcon.image = [SCIUtils sci_resourceImageNamed:@"heart" template:YES maxPointSize:14.0]
-            ?: SCIVaultFilterSymbol(nil, @"heart", 14.0);
+        self.favoritesLeadingIcon.image = [SCIAssetUtils instagramIconNamed:@"heart" pointSize:14.0];
         self.favoritesLeadingIcon.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
     }
 }

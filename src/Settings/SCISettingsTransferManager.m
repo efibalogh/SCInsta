@@ -247,7 +247,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
     if (includeVault) {
         NSError *copyError = nil;
         if (![fm copyItemAtPath:[SCIVaultPaths vaultDirectory] toPath:vaultDestination error:&copyError]) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:copyError.localizedDescription iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:copyError.localizedDescription iconResource:@"error_filled"];
             return;
         }
     }
@@ -261,21 +261,21 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
     NSData *archiveData = wrapper.serializedRepresentation;
     if (archiveData.length == 0) {
         NSString *message = wrapperError.localizedDescription ?: @"The export archive could not be created.";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled"];
         return;
     }
 
     NSString *archivePath = [root stringByAppendingPathComponent:@"SCInsta.scinstaexport"];
     if (![archiveData writeToFile:archivePath options:NSDataWritingAtomic error:&wrapperError]) {
         NSString *message = wrapperError.localizedDescription ?: @"The export archive could not be written.";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled"];
         return;
     }
 
     NSURL *archiveURL = [NSURL fileURLWithPath:archivePath isDirectory:NO];
     if (@available(iOS 14.0, *)) {
         UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[archiveURL] asCopy:YES];
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share" fallbackSystemImageName:@"square.and.arrow.up" tone:SCIFeedbackPillToneInfo];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share"];
         [controller presentViewController:picker animated:YES completion:nil];
     } else {
         UIActivityViewController *activityController = [[UIActivityViewController alloc] initWithActivityItems:@[archiveURL] applicationActivities:nil];
@@ -283,7 +283,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
             activityController.popoverPresentationController.sourceView = controller.view;
             activityController.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(controller.view.bounds), CGRectGetMidY(controller.view.bounds), 1.0, 1.0);
         }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share" fallbackSystemImageName:@"square.and.arrow.up" tone:SCIFeedbackPillToneInfo];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share"];
         [controller presentViewController:activityController animated:YES completion:nil];
     }
 }
@@ -305,7 +305,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
         picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.data", @"public.folder"] inMode:UIDocumentPickerModeImport];
     }
     picker.delegate = self;
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:1.4 title:@"Choose an export bundle" subtitle:nil iconResource:@"download" fallbackSystemImageName:@"arrow.down.doc" tone:SCIFeedbackPillToneInfo];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:1.4 title:@"Choose an export bundle" subtitle:nil iconResource:@"download"];
     [controller presentViewController:picker animated:YES completion:nil];
 }
 
@@ -345,7 +345,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
     if ((importSettings && !archiveHasSettings) || (importVault && !archiveHasVault) || (!archiveHasSettings && !archiveHasVault)) {
         if (scoped) [url stopAccessingSecurityScopedResource];
         NSString *message = archiveError.localizedDescription ?: @"Archive contents were invalid.";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import failed" subtitle:message iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import failed" subtitle:message iconResource:@"error_filled"];
         return;
     }
 
@@ -364,7 +364,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
         NSError *vaultCopyError = nil;
         if (!SCICopyItemReplacingDestination(vaultPath, [SCIVaultPaths vaultDirectory], &vaultCopyError)) {
             if (scoped) [url stopAccessingSecurityScopedResource];
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import failed" subtitle:vaultCopyError.localizedDescription iconResource:@"error_filled" fallbackSystemImageName:@"exclamationmark.circle.fill" tone:SCIFeedbackPillToneError];
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import failed" subtitle:vaultCopyError.localizedDescription iconResource:@"error_filled"];
             [[SCIVaultCoreDataStack shared] reloadPersistentContainer];
             return;
         }
@@ -377,7 +377,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeVault
     NSString *subtitle = importSettings && importVault
         ? @"Settings and vault media were restored. Reconfigure vault lock if needed."
         : (importSettings ? @"Settings were restored." : @"Vault media were restored. Reconfigure vault lock if needed.");
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import complete" subtitle:subtitle iconResource:@"circle_check_filled" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import complete" subtitle:subtitle iconResource:@"circle_check_filled"];
     [SCIUtils showRestartConfirmation];
 }
 

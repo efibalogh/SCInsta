@@ -2,7 +2,6 @@
 #import <UIKit/UIKit.h>
 #import "TweakSettings.h"
 #import "SCISetting.h"
-#import "SCISymbol.h"
 #import "../Utils.h"
 
 NS_ASSUME_NONNULL_BEGIN

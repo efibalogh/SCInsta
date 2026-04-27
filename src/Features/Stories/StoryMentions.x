@@ -2,6 +2,7 @@
 // Triggered by the @ button in story overlays (SeenButtons.x).
 
 #import "../../Utils.h"
+#import "../../AssetUtils.h"
 #import "../../InstagramHeaders.h"
 #import "../../Networking/SCIInstagramAPI.h"
 #import "../../Shared/UI/SCIMediaChrome.h"
@@ -215,7 +216,7 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
     // Empty state
     if (self.userInfos.count == 0) {
-        UIImageView *emptyIcon = [[UIImageView alloc] initWithImage:[SCIUtils sci_resourceImageNamed:@"mention" template:YES]];
+        UIImageView *emptyIcon = [[UIImageView alloc] initWithImage:[SCIAssetUtils instagramIconNamed:@"mention" pointSize:24.0]];
         emptyIcon.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
         emptyIcon.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -376,7 +377,7 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     subLabel.hidden = !fullName.length;
 
     // Default avatar
-    avatar.image = [SCIUtils sci_resourceImageNamed:@"profile" template:YES];
+    avatar.image = [SCIAssetUtils instagramIconNamed:@"profile" pointSize:24.0];
     avatar.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
 
     // Async avatar fetch

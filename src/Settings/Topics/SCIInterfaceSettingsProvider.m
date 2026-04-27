@@ -7,10 +7,10 @@
 @implementation SCIInterfaceSettingsProvider
 
 + (SCISetting *)experimentalLiquidGlassSetting {
-    return [SCISetting navigationCellWithTitle:@"Liquid Glass"
-                                      subtitle:@"Unsafe per-hook overrides for Instagram's internal liquid glass gates"
-                                          icon:[SCISymbol symbolWithName:@"exclamationmark.triangle.fill" color:[UIColor systemOrangeColor] size:24.0]
-                                   navSections:@[
+    return SCISettingApplyIconTint([SCISetting navigationCellWithTitle:@"Liquid Glass"
+                                                              subtitle:@"Unsafe per-hook overrides for Instagram's internal liquid glass gates"
+                                                                  icon:SCISettingsSystemIcon(@"exclamationmark.triangle.fill", 24.0, UIImageSymbolWeightRegular)
+                                                           navSections:@[
         SCITopicSection(@"Unsafe / Experimental", @[
             [SCISetting switchCellWithTitle:@"In-App Notifications (Launcher)" subtitle:@"Forces liquid-glass styling for in-app notification surfaces when enabled" defaultsKey:@"liquid_glass_in_app_notifications" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Context Menus (Launcher)" subtitle:@"Forces liquid-glass styling for context menus when enabled" defaultsKey:@"liquid_glass_context_menus" requiresRestart:YES],
@@ -30,7 +30,8 @@
             [SCISetting switchCellWithTitle:@"Alert Dialog Action Buttons" subtitle:@"Primary and secondary actions on IGDS alert dialogs" defaultsKey:@"liquid_glass_alert_dialog_actions" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Interactive Liquid Tab Bar" subtitle:@"Replaces IGTabBar with IGLiquidGlassInteractiveTabBar and can break navigation" defaultsKey:@"liquid_glass_interactive_tab_bar" requiresRestart:YES]
         ], @"Restart Instagram after changes. These override Instagram's internal liquid-glass gates and may crash or mis-render the UI.")
-    ]];
+    ]],
+                                   [UIColor systemOrangeColor]);
 }
 
 + (SCISetting *)rootSetting {
@@ -47,7 +48,7 @@
         SCITopicSection(@"Appearance", @[
             [SCISetting navigationCellWithTitle:@"Feedback Pill"
                                        subtitle:@"Style, preview, and choose which actions show the feedback pill"
-                                           icon:[SCISymbol resourceSymbolWithName:@"info" color:[SCIUtils SCIColor_InstagramPrimaryText] size:20.0]
+                                           icon:SCISettingsInstagramIcon(@"info", 20.0)
                                     navSections:[SCIFeedbackPillSettingsProvider sections]],
             [SCISetting switchCellWithTitle:@"Enable Teen App Icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Disable App Haptics" subtitle:@"Disables haptics and vibrations within the Instagram app" defaultsKey:@"disable_haptics"]

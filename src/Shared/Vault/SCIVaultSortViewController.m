@@ -1,17 +1,6 @@
 #import "SCIVaultSortViewController.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
-
-static UIImage *SCIVaultSortSheetIcon(NSString *resourceName, NSString *systemFallback, CGFloat pointSize) {
-    UIImage *img = resourceName.length > 0
-        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:pointSize]
-        : nil;
-    if (img) {
-        return img;
-    }
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize
-                                                                                       weight:UIImageSymbolWeightMedium];
-    return [UIImage systemImageNamed:systemFallback withConfiguration:cfg];
-}
 
 static NSString *SCIVaultSortResourceSymbol(SCIVaultSortMode mode) {
     switch (mode) {
@@ -31,25 +20,6 @@ static NSString *SCIVaultSortResourceSymbol(SCIVaultSortMode mode) {
             return @"video";
     }
     return @"sort";
-}
-
-static NSString *SCIVaultSortFallbackSymbol(SCIVaultSortMode mode) {
-    switch (mode) {
-        case SCIVaultSortModeDateAddedDesc:
-        case SCIVaultSortModeDateAddedAsc:
-            return @"calendar";
-        case SCIVaultSortModeNameAsc:
-        case SCIVaultSortModeNameDesc:
-            return @"textformat";
-        case SCIVaultSortModeSizeDesc:
-        case SCIVaultSortModeSizeAsc:
-            return @"internaldrive";
-        case SCIVaultSortModeTypeAsc:
-            return @"photo";
-        case SCIVaultSortModeTypeDesc:
-            return @"video";
-    }
-    return @"arrow.up.arrow.down";
 }
 
 @interface SCIVaultSortChip : UIButton
@@ -187,7 +157,7 @@ static NSString *SCIVaultSortFallbackSymbol(SCIVaultSortMode mode) {
             SCIVaultSortMode mode = (SCIVaultSortMode)modeNum.integerValue;
             SCIVaultSortChip *chip = [[SCIVaultSortChip alloc] initWithMode:mode];
             [chip setTitle:[SCIVaultSortViewController labelForMode:mode] forState:UIControlStateNormal];
-            UIImage *icon = SCIVaultSortSheetIcon(SCIVaultSortResourceSymbol(mode), SCIVaultSortFallbackSymbol(mode), 14.0);
+            UIImage *icon = [SCIAssetUtils instagramIconNamed:SCIVaultSortResourceSymbol(mode) pointSize:14.0];
             [chip setImage:icon forState:UIControlStateNormal];
             chip.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
             chip.selectedChip = (mode == self.currentSortMode);

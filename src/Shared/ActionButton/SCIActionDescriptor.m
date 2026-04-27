@@ -57,7 +57,7 @@
         [SCIActionDescriptor descriptorWithIdentifier:@"photo" title:@"Thumbnail" iconName:@"photo"],
         [SCIActionDescriptor descriptorWithIdentifier:@"repost" title:@"Repost" iconName:@"repost"],
         [SCIActionDescriptor descriptorWithIdentifier:@"feed" title:@"Feed" iconName:@"feed"],
-        [SCIActionDescriptor descriptorWithIdentifier:@"reels_prism" title:@"Reels" iconName:@"reels_prism"],
+        [SCIActionDescriptor descriptorWithIdentifier:@"reels" title:@"Reels" iconName:@"reels"],
         [SCIActionDescriptor descriptorWithIdentifier:@"story" title:@"Stories" iconName:@"story"],
         [SCIActionDescriptor descriptorWithIdentifier:@"messages" title:@"Messages" iconName:@"messages"],
         [SCIActionDescriptor descriptorWithIdentifier:@"profile" title:@"Profile" iconName:@"profile"],

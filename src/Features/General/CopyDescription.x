@@ -42,7 +42,6 @@
                              title:@"Copied text to clipboard"
                           subtitle:nil
                       iconResource:@"copy_filled"
-           fallbackSystemImageName:@"doc.on.doc.fill"
                               tone:SCIFeedbackPillToneSuccess];
 }
 %end

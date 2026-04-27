@@ -1,5 +1,6 @@
 #import "SCIVaultListCell.h"
 #import "SCIVaultFile.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 @interface SCIVaultListCell ()
@@ -36,10 +37,9 @@
     self.thumbnailView.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
     [self.contentView addSubview:self.thumbnailView];
 
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightBold];
     self.typeIcon = [[UIImageView alloc] init];
     self.typeIcon.translatesAutoresizingMaskIntoConstraints = NO;
-    self.typeIcon.image = [UIImage systemImageNamed:@"play.fill" withConfiguration:cfg];
+    self.typeIcon.image = [SCIAssetUtils instagramIconNamed:@"video_filled" pointSize:10.0];
     self.typeIcon.tintColor = [UIColor whiteColor];
     self.typeIcon.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.55];
     self.typeIcon.layer.cornerRadius = 9;
@@ -69,11 +69,7 @@
     self.detailLabel.numberOfLines = 1;
     [self.contentView addSubview:self.detailLabel];
 
-    UIImageSymbolConfiguration *favCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold];
-    UIImage *favImg = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:14];
-    if (!favImg) {
-        favImg = [UIImage systemImageNamed:@"heart.fill" withConfiguration:favCfg];
-    }
+    UIImage *favImg = [SCIAssetUtils instagramIconNamed:@"heart_filled" pointSize:14.0];
     self.favoriteIcon = [[UIImageView alloc] initWithImage:favImg];
     self.favoriteIcon.contentMode = UIViewContentModeScaleAspectFit;
     self.favoriteIcon.translatesAutoresizingMaskIntoConstraints = NO;

@@ -1,6 +1,7 @@
 #import "SCIVaultDeleteViewController.h"
 #import "SCIVaultCoreDataStack.h"
 #import "SCIVaultFile.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 
 typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
@@ -72,15 +73,6 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
     [self.tableView reloadData];
 }
 
-- (UIImage *)iconNamed:(NSString *)resourceName fallback:(NSString *)fallback {
-    UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:22.0];
-    if (image) {
-        return image;
-    }
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:22.0 weight:UIImageSymbolWeightRegular];
-    return [UIImage systemImageNamed:fallback withConfiguration:cfg];
-}
-
 - (SCIVaultDeleteAction *)actionWithTitle:(NSString *)title
                                  iconName:(NSString *)iconName
                                 predicate:(nullable NSPredicate *)predicate
@@ -108,7 +100,7 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
         @[
             [self actionWithTitle:@"Delete Feed Posts" iconName:@"feed" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceFeed] successTitle:@"Feed posts deleted"],
             [self actionWithTitle:@"Delete Stories" iconName:@"story" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceStories] successTitle:@"Stories deleted"],
-            [self actionWithTitle:@"Delete Reels" iconName:@"reels_prism" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceReels] successTitle:@"Reels deleted"],
+            [self actionWithTitle:@"Delete Reels" iconName:@"reels" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceReels] successTitle:@"Reels deleted"],
             [self actionWithTitle:@"Delete Thumbnails" iconName:@"photo_gallery" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceThumbnail] successTitle:@"Thumbnails deleted"],
             [self actionWithTitle:@"Delete DM Media" iconName:@"messages" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceDMs] successTitle:@"DM media deleted"],
             [self actionWithTitle:@"Delete Profile Pictures" iconName:@"profile" predicate:[NSPredicate predicateWithFormat:@"source == %d", SCIVaultSourceProfile] successTitle:@"Profile pictures deleted"]
@@ -221,7 +213,7 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
         SCIVaultDeleteUserItem *item = self.users[indexPath.row];
         cell.textLabel.text = item.displayName;
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%ld", (long)item.count];
-        cell.imageView.image = [self iconNamed:@"profile" fallback:@"person.crop.circle"];
+        cell.imageView.image = [SCIAssetUtils instagramIconNamed:@"profile" pointSize:22.0];
         return cell;
     }
 
@@ -231,7 +223,7 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
     if (count) {
         cell.detailTextLabel.text = count.integerValue > 0 ? [NSString stringWithFormat:@"%ld", (long)count.integerValue] : nil;
     }
-    cell.imageView.image = [self iconNamed:action.iconName fallback:@"trash"];
+    cell.imageView.image = [SCIAssetUtils instagramIconNamed:action.iconName pointSize:22.0];
     cell.accessoryType = action.navigatesToUsers ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
     return cell;
 }
@@ -270,7 +262,6 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
                                  title:@"No files to delete"
                               subtitle:nil
                           iconResource:@"info"
-               fallbackSystemImageName:@"info.circle.fill"
                                   tone:SCIFeedbackPillToneInfo];
         return;
     }
@@ -305,7 +296,6 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
                                  title:successTitle
                               subtitle:nil
                           iconResource:@"circle_check_filled"
-               fallbackSystemImageName:@"checkmark.circle.fill"
                                   tone:SCIFeedbackPillToneSuccess];
     }]];
     [self presentViewController:alert animated:YES completion:nil];

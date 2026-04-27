@@ -46,7 +46,6 @@ typedef BOOL (^SCIActionButtonVisibilityResolver)(id context, NSString *identifi
 #ifdef __cplusplus
 extern "C" {
 #endif
-UIImage *SCIActionButtonImage(NSString *resourceName, NSString *systemFallback, CGFloat maxPointSize);
 UIButton *SCIActionButtonWithTag(UIView *container, NSInteger tag);
 void SCIApplyButtonStyle(UIButton *button, SCIActionButtonSource source);
 BOOL SCIIsDirectVisualViewerAncestor(UIView *view);

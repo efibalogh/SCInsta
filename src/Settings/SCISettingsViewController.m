@@ -186,12 +186,13 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
     
     // Icon
     if (row.icon != nil) {
-        cellContentConfig.image = [row.icon image];
-        cellContentConfig.imageProperties.tintColor = row.icon.color;
+        cellContentConfig.image = row.icon;
+        cellContentConfig.imageProperties.tintColor = row.iconTintColor ?: [SCIUtils SCIColor_InstagramPrimaryText];
     }
 
     if ([row.userInfo[@"showsReorderGrabber"] boolValue] && row.icon != nil) {
-        cellContentConfig.image = SCISettingsReorderCompositeImage([row.icon image], row.icon.color);
+        UIColor *iconTintColor = row.iconTintColor ?: [SCIUtils SCIColor_InstagramPrimaryText];
+        cellContentConfig.image = SCISettingsReorderCompositeImage(row.icon, iconTintColor);
         cellContentConfig.imageProperties.tintColor = nil;
         cellContentConfig.imageToTextPadding = 12.0;
     }

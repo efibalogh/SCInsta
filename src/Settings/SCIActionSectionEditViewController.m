@@ -1,7 +1,7 @@
 #import "SCIActionSectionEditViewController.h"
 #import "SCIActionSectionIconPickerViewController.h"
 
-#import "SCISymbol.h"
+#import "../AssetUtils.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../Utils.h"
 
@@ -129,7 +129,7 @@ static char kSCISectionEditSwitchAssocKey;
         } else if (indexPath.row == 1) {
             config.text = @"Icon";
             config.secondaryText = [self displayTitleForSectionIconName:section.iconName];
-            config.image = [[SCISymbol resourceSymbolWithName:section.iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+            config.image = [SCIAssetUtils instagramIconNamed:section.iconName pointSize:22.0];
             config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -146,14 +146,14 @@ static char kSCISectionEditSwitchAssocKey;
     } else if (indexPath.section == 1) {
         NSString *identifier = section.actions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
         cell.showsReorderControl = YES;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else {
         NSString *identifier = self.configuration.supportedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
         NSString *owner = [self.configuration sectionIdentifierForAction:identifier];

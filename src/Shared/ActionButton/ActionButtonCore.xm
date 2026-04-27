@@ -7,6 +7,7 @@
 #import "SCIActionDescriptor.h"
 #import "../../Downloader/Download.h"
 #import "../../InstagramHeaders.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../MediaPreview/SCIMediaItem.h"
@@ -141,14 +142,6 @@ static UIViewController *SCIViewControllerForAncestorView(UIView *view) {
 	return [SCIUtils viewControllerForAncestralView:view];
 }
 
-UIImage *SCIActionButtonImage(NSString *resourceName, NSString *systemFallback, CGFloat maxPointSize) {
-	UIImage *image = [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:maxPointSize];
-	if (image) return image;
-
-	UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:maxPointSize weight:UIImageSymbolWeightRegular];
-	return [UIImage systemImageNamed:systemFallback withConfiguration:config];
-}
-
 static UIColor *SCIActionButtonTintForSource(SCIActionButtonSource source) {
 	switch (source) {
 		case SCIActionButtonSourceFeed:
@@ -205,33 +198,33 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButton
 	NSString *append = (source == SCIActionButtonSourceReels) ? @"_reels" : @"";
 	NSString *iconName = SCIActionDescriptorIconName(identifier);
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) {
-		return SCIActionButtonImage([NSString stringWithFormat:@"download%@", append], @"arrow.down.to.line", size);
+		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"download%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadShare]) {
-		return SCIActionButtonImage([NSString stringWithFormat:@"share%@", append], @"square.and.arrow.up", size);
+		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"share%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) {
-		return SCIActionButtonImage([NSString stringWithFormat:@"link%@", append], @"link", size);
+		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"link%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionDownloadVault]) {
-		return SCIActionButtonImage(@"photo_gallery", @"photo.on.rectangle.angled", size);
+		return [SCIAssetUtils instagramIconNamed:@"photo_gallery" pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
-		return SCIActionButtonImage([NSString stringWithFormat:@"expand%@", append], @"arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", size);
+		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"expand%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
-		return SCIActionButtonImage([NSString stringWithFormat:@"photo%@", append], @"photo.on.rectangle", size);
+		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"photo%@", append] pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionCopyCaption]) {
-		return SCIActionButtonImage(@"caption", @"text.quote", size);
+		return [SCIAssetUtils instagramIconNamed:@"caption" pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionOpenTopicSettings]) {
-		return SCIActionButtonImage(@"settings", @"gearshape", size);
+		return [SCIAssetUtils instagramIconNamed:@"settings" pointSize:size];
 	}
 	if ([identifier isEqualToString:kSCIActionRepost]) {
-		return SCIActionButtonImage(@"repost", @"arrow.triangle.2.circlepath", size);
+		return [SCIAssetUtils instagramIconNamed:@"repost" pointSize:size];
 	}
-	return SCIActionButtonImage([NSString stringWithFormat:@"%@%@", iconName, append], @"option", size);
+	return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"%@%@", iconName, append] pointSize:size];
 }
 
 UIImage *SCIActionButtonMenuIconForIdentifier(NSString *identifier, CGFloat size) {
@@ -653,8 +646,8 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 
 	if ([identifier isEqualToString:kSCIActionNone]) {
 		return source == SCIActionButtonSourceReels
-			? SCIActionButtonImage(@"action_reels", @"option", size)
-			: SCIActionButtonImage(@"action", @"option", size);
+			? [SCIAssetUtils instagramIconNamed:@"action_reels" pointSize:size]
+			: [SCIAssetUtils instagramIconNamed:@"action" pointSize:size];
 	}
 
 	return SCIIconForActionIdentifier(identifier, source, size);
@@ -673,8 +666,8 @@ static CGSize SCICustomButtonIconDisplaySize(NSString *identifier, SCIActionButt
 			width = 28.0;
 			height = 28.0;
 		} else {
-		width = 38.0;
-		height = 38.0;
+		width = 40.0;
+		height = 40.0;
 		}
 	}
 
@@ -829,7 +822,7 @@ static NSString *SCIActionButtonMenuSignature(SCIActionButtonContext *context,
 
 static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *metadata, SCIActionButtonContext *context) {
 	if (!videoURL) {
-		[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+		[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled"];
 		return;
 	}
 
@@ -843,7 +836,7 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *me
 		CGImageRef imageRef = [generator copyCGImageAtTime:CMTimeMakeWithSeconds(0.0, 600) actualTime:NULL error:&error];
 		if (!imageRef) {
 			dispatch_async(dispatch_get_main_queue(), ^{
-				[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:error.localizedDescription ?: @"" iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:error.localizedDescription ?: @"" iconResource:@"photo_filled"];
 			});
 			return;
 		}
@@ -874,7 +867,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		[identifier isEqualToString:kSCIActionDownloadVault]) {
 		if (!currentURL) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No downloadable media" subtitle:nil iconResource:@"download" fallbackSystemImageName:@"arrow.down.to.line" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No downloadable media" subtitle:nil iconResource:@"download"];
 			}
 			return YES;
 		}
@@ -897,14 +890,14 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
         }
 		if (!bestURL) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No link available" subtitle:nil iconResource:@"link" fallbackSystemImageName:@"link" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No link available" subtitle:nil iconResource:@"link"];
 			}
 			return YES;
 		}
 
 		[UIPasteboard generalPasteboard].string = bestURL.absoluteString ?: @"";
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Download link copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Download link copied" subtitle:nil iconResource:@"copy_filled"];
 		}
 		return YES;
 	}
@@ -913,14 +906,14 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		NSArray<SCIMediaItem *> *playerItems = SCIPlayerItemsFromEntries(entries, context.source, username, media);
 		if (playerItems.count == 0) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No media to expand" subtitle:nil iconResource:@"expand" fallbackSystemImageName:@"arrow.up.left.and.arrow.down.right" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No media to expand" subtitle:nil iconResource:@"expand"];
 			}
 			return YES;
 		}
 
 		NSInteger clampedIndex = SCIClampedIndex(resolvedIndex, (NSInteger)playerItems.count);
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand" fallbackSystemImageName:@"arrow.up.left.and.arrow.down.right" tone:SCIFeedbackPillToneInfo];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
 		}
 		[SCIFullScreenMediaPlayer showMediaItems:playerItems startingAtIndex:clampedIndex metadata:meta playbackSource:(SCIFullScreenPlaybackSource)context.source sourceView:context.view controller:context.controller];
 		return YES;
@@ -929,7 +922,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
 		if (!currentEntry.videoURL) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_filled"];
 			}
 			return YES;
 		}
@@ -955,7 +948,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		    SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
         }
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opening thumbnail" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneInfo];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opening thumbnail" subtitle:nil iconResource:@"photo_filled"];
 		}
 		return YES;
 	}
@@ -964,14 +957,14 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		NSString *caption = context.captionResolver ? context.captionResolver(context, media, entries, resolvedIndex) : nil;
 		if (caption.length == 0) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No caption available" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No caption available" subtitle:nil iconResource:@"copy_filled"];
 			}
 			return YES;
 		}
 
 		[UIPasteboard generalPasteboard].string = caption;
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Caption copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Caption copied" subtitle:nil iconResource:@"copy_filled"];
 		}
 		return YES;
 	}
@@ -979,13 +972,13 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	if ([identifier isEqualToString:kSCIActionOpenTopicSettings]) {
 		if (context.settingsTitle.length == 0) {
 			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Settings unavailable" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Settings unavailable" subtitle:nil iconResource:@"settings"];
 			}
 			return YES;
 		}
 
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened settings" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneInfo];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened settings" subtitle:nil iconResource:@"settings"];
 		}
 		[SCIUtils showSettingsForTopicTitle:context.settingsTitle];
 		return YES;
@@ -994,10 +987,10 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	if ([identifier isEqualToString:kSCIActionRepost]) {
 		BOOL handled = context.repostHandler ? context.repostHandler(context) : NO;
 		if (handled && shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened repost" subtitle:nil iconResource:@"repost" fallbackSystemImageName:@"arrow.triangle.2.circlepath" tone:SCIFeedbackPillToneInfo];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened repost" subtitle:nil iconResource:@"repost"];
 		}
 		if (!handled && shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Repost unavailable" subtitle:nil iconResource:@"repost" fallbackSystemImageName:@"arrow.triangle.2.circlepath" tone:SCIFeedbackPillToneError];
+			[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Repost unavailable" subtitle:nil iconResource:@"repost"];
 		}
 		return YES;
 	}
@@ -1011,7 +1004,7 @@ BOOL SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonContext *co
 	id media = SCIResolveMediaForContext(context);
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
 	if (entries.count == 0) {
-		[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Media not found" subtitle:nil iconResource:@"media_filled" fallbackSystemImageName:@"photo.on.rectangle" tone:SCIFeedbackPillToneError];
+		[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Media not found" subtitle:nil iconResource:@"media"];
 		return NO;
 	}
 
@@ -1192,7 +1185,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 		if (group.collapsible) {
 			UIImage *sectionImage = nil;
 			if (group.iconName.length > 0) {
-				sectionImage = [[SCIActionButtonImage(group.iconName, @"option", 22.0) imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] imageWithTintColor:[UIColor labelColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
+				sectionImage = [[[SCIAssetUtils instagramIconNamed:group.iconName pointSize:22.0] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] imageWithTintColor:[UIColor labelColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
 			}
 			UIMenu *submenu = [UIMenu menuWithTitle:title ?: @""
 											 image:sectionImage

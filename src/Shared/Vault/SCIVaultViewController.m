@@ -14,6 +14,7 @@
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../UI/SCIMediaChrome.h"
 #import "../../InstagramHeaders.h"
+#import "../../AssetUtils.h"
 #import "../../Utils.h"
 #import <CoreData/CoreData.h>
 
@@ -29,15 +30,17 @@ static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
 static CGFloat const kVaultMenuIconPointSize = 22.0;
 
-static UIImage *SCIVaultMenuActionIcon(NSString *resourceName, NSString *systemName) {
-    UIImage *img = resourceName.length > 0
-        ? [SCIUtils sci_resourceImageNamed:resourceName template:YES maxPointSize:kVaultMenuIconPointSize]
-        : nil;
-    if (!img) {
-        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:kVaultMenuIconPointSize weight:UIImageSymbolWeightRegular];
-        img = [UIImage systemImageNamed:systemName withConfiguration:cfg];
-    }
-    return img;
+static UIImage *SCIVaultMenuActionIcon(NSString *resourceName) {
+    return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
+                                   pointSize:kVaultMenuIconPointSize];
+}
+
+static NSInteger SCIVaultItemCountForFolderPath(NSManagedObjectContext *context, NSString *folderPath) {
+    if (folderPath.length == 0) return 0;
+    NSFetchRequest *request = [[NSFetchRequest alloc] initWithEntityName:@"SCIVaultFile"];
+    request.predicate = [NSPredicate predicateWithFormat:@"folderPath == %@ OR folderPath BEGINSWITH %@",
+                         folderPath, [folderPath stringByAppendingString:@"/"]];
+    return [context countForFetchRequest:request error:nil];
 }
 
 typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
@@ -223,12 +226,12 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     }
 
     if (self.navigationController.viewControllers.firstObject == self) {
-        self.navigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItem(@"xmark", @"xmark", self, @selector(dismissSelf));
+        self.navigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItem(@"xmark", self, @selector(dismissSelf));
     } else {
         self.navigationItem.leftBarButtonItem = nil;
     }
 
-    self.navigationItem.rightBarButtonItem = SCIMediaChromeTopBarButtonItem(@"settings", @"gear", self, @selector(pushSettings));
+    self.navigationItem.rightBarButtonItem = SCIMediaChromeTopBarButtonItem(@"settings", self, @selector(pushSettings));
 }
 
 - (void)setupBottomToolbar {
@@ -236,12 +239,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     [self refreshBottomToolbarItems];
 }
 
-- (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName resource:(NSString *)resourceName accessibility:(NSString *)label {
-    return SCIMediaChromeBottomButton(symbolName, resourceName, label);
-}
-
-- (UIButton *)vaultBottomBarButtonWithSymbol:(NSString *)symbolName accessibility:(NSString *)label {
-    return [self vaultBottomBarButtonWithSymbol:symbolName resource:nil accessibility:label];
+- (UIButton *)vaultBottomBarButtonWithResource:(NSString *)resourceName accessibility:(NSString *)label {
+    return SCIMediaChromeBottomButton(resourceName, label);
 }
 
 - (void)refreshBottomToolbarItems {
@@ -249,16 +248,16 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     self.bottomBarStack = nil;
 
     if (self.selectionMode) {
-        UIButton *shareBtn = [self vaultBottomBarButtonWithSymbol:@"square.and.arrow.up" resource:@"share" accessibility:@"Share selected"];
+        UIButton *shareBtn = [self vaultBottomBarButtonWithResource:@"share" accessibility:@"Share selected"];
         [shareBtn addTarget:self action:@selector(shareSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
 
-        UIButton *moveBtn = [self vaultBottomBarButtonWithSymbol:@"folder" resource:@"folder_move" accessibility:@"Move selected"];
+        UIButton *moveBtn = [self vaultBottomBarButtonWithResource:@"folder_move" accessibility:@"Move selected"];
         [moveBtn addTarget:self action:@selector(moveSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
 
-        UIButton *favoriteBtn = [self vaultBottomBarButtonWithSymbol:@"heart" resource:@"heart" accessibility:@"Favorite selected"];
+        UIButton *favoriteBtn = [self vaultBottomBarButtonWithResource:@"heart" accessibility:@"Favorite selected"];
         [favoriteBtn addTarget:self action:@selector(toggleFavoriteForSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
 
-        UIButton *deleteBtn = [self vaultBottomBarButtonWithSymbol:@"trash" resource:@"trash" accessibility:@"Delete selected"];
+        UIButton *deleteBtn = [self vaultBottomBarButtonWithResource:@"trash" accessibility:@"Delete selected"];
         [deleteBtn addTarget:self action:@selector(deleteSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
         deleteBtn.tintColor = [SCIUtils SCIColor_InstagramDestructive];
 
@@ -266,22 +265,21 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         return;
     }
 
-    UIButton *filterBtn = [self vaultBottomBarButtonWithSymbol:@"line.3.horizontal.decrease" resource:@"filter" accessibility:@"Filter"];
+    UIButton *filterBtn = [self vaultBottomBarButtonWithResource:@"filter" accessibility:@"Filter"];
     [filterBtn addTarget:self action:@selector(presentFilter) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *sortBtn = [self vaultBottomBarButtonWithSymbol:@"arrow.up.arrow.down" resource:@"sort" accessibility:@"Sort"];
+    UIButton *sortBtn = [self vaultBottomBarButtonWithResource:@"sort" accessibility:@"Sort"];
     [sortBtn addTarget:self action:@selector(presentSort) forControlEvents:UIControlEventTouchUpInside];
 
-    NSString *toggleSymbol = self.viewMode == SCIVaultViewModeGrid ? @"list.bullet" : @"square.grid.2x2";
     NSString *toggleResource = self.viewMode == SCIVaultViewModeGrid ? @"list" : @"grid";
     NSString *toggleAX = self.viewMode == SCIVaultViewModeGrid ? @"List view" : @"Grid view";
-    UIButton *toggleBtn = [self vaultBottomBarButtonWithSymbol:toggleSymbol resource:toggleResource accessibility:toggleAX];
+    UIButton *toggleBtn = [self vaultBottomBarButtonWithResource:toggleResource accessibility:toggleAX];
     [toggleBtn addTarget:self action:@selector(toggleViewMode) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *folderBtn = [self vaultBottomBarButtonWithSymbol:@"folder.badge.plus" resource:@"folder" accessibility:@"New folder"];
+    UIButton *folderBtn = [self vaultBottomBarButtonWithResource:@"folder" accessibility:@"New folder"];
     [folderBtn addTarget:self action:@selector(presentCreateFolder) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *selectBtn = [self vaultBottomBarButtonWithSymbol:@"checkmark.circle" resource:@"circle_check" accessibility:@"Select"];
+    UIButton *selectBtn = [self vaultBottomBarButtonWithResource:@"circle_check" accessibility:@"Select"];
     [selectBtn addTarget:self action:@selector(enterSelectionMode) forControlEvents:UIControlEventTouchUpInside];
 
     NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn, selectBtn];
@@ -348,11 +346,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     _emptyStateView.hidden = YES;
     [self.view addSubview:_emptyStateView];
 
-    UIImage *emptyIconImage = [SCIUtils sci_resourceImageNamed:@"photo_gallery" template:YES];
-    if (!emptyIconImage) {
-        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:56 weight:UIImageSymbolWeightLight];
-        emptyIconImage = [UIImage systemImageNamed:@"tray" withConfiguration:cfg];
-    }
+    UIImage *emptyIconImage = [SCIAssetUtils instagramIconNamed:@"media_empty"
+                                                      pointSize:96.0];
     UIImageView *icon = [[UIImageView alloc] initWithImage:emptyIconImage];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
     icon.contentMode = UIViewContentModeScaleAspectFit;
@@ -532,7 +527,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     if ([self isFolderIndexPath:indexPath]) {
         SCIVaultFolderCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kFolderCellID forIndexPath:indexPath];
         NSString *path = self.subfolders[indexPath.item];
-        [cell configureWithFolderName:[path lastPathComponent]];
+        NSInteger itemCount = SCIVaultItemCountForFolderPath([SCIVaultCoreDataStack shared].viewContext, path);
+        [cell configureWithFolderName:[path lastPathComponent] itemCount:itemCount];
         return cell;
     }
 
@@ -634,7 +630,6 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                              title:title
                           subtitle:@"The original content may no longer exist."
                       iconResource:@"error_filled"
-           fallbackSystemImageName:@"exclamationmark.circle.fill"
                               tone:SCIFeedbackPillToneError];
 }
 
@@ -644,7 +639,6 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                          title:@"Opened original post"
                                       subtitle:nil
                                   iconResource:@"external_link"
-                       fallbackSystemImageName:@"arrow.up.right.square"
                                           tone:SCIFeedbackPillToneInfo];
     } else {
         [self showVaultOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionVaultOpenOriginal];
@@ -657,7 +651,6 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                          title:@"Opened profile"
                                       subtitle:nil
                                   iconResource:@"profile"
-                       fallbackSystemImageName:@"person.crop.circle"
                                           tone:SCIFeedbackPillToneInfo];
     } else {
         [self showVaultOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionVaultOpenProfile];
@@ -824,7 +817,6 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                      title:@"Failed to delete"
                                   subtitle:firstError.localizedDescription
                               iconResource:@"error_filled"
-                   fallbackSystemImageName:@"exclamationmark.circle.fill"
                                       tone:SCIFeedbackPillToneError];
             return;
         }
@@ -832,7 +824,6 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                          title:@"Deleted selected files"
                                       subtitle:nil
                                   iconResource:@"circle_check_filled"
-                       fallbackSystemImageName:@"checkmark.circle.fill"
                                           tone:SCIFeedbackPillToneSuccess];
         [self exitSelectionMode];
     }]];
@@ -860,8 +851,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     NSString *favTitle = file.isFavorite ? @"Unfavorite" : @"Favorite";
     UIImage *favImg = file.isFavorite
-        ? SCIVaultMenuActionIcon(@"heart_filled", @"heart.fill")
-        : SCIVaultMenuActionIcon(@"heart", @"heart");
+        ? SCIVaultMenuActionIcon(@"heart_filled")
+        : SCIVaultMenuActionIcon(@"heart");
 
     UIAction *favoriteAction = [UIAction actionWithTitle:favTitle
                                                    image:favImg
@@ -871,19 +862,19 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
         [[SCIVaultCoreDataStack shared] saveContext];
     }];
 
-     UIImage *renameImg = SCIVaultMenuActionIcon(@"edit", @"pencil");
+     UIImage *renameImg = SCIVaultMenuActionIcon(@"edit");
     UIAction *renameAction = [UIAction actionWithTitle:@"Rename"
                                                  image:renameImg
                                             identifier:nil
                                                handler:^(UIAction *a) { [weakSelf renameFile:file]; }];
 
-     UIImage *moveImg = SCIVaultMenuActionIcon(@"folder_move", @"folder");
-    UIAction *moveAction = [UIAction actionWithTitle:@"Move to folder"
+     UIImage *moveImg = SCIVaultMenuActionIcon(@"folder_move");
+    UIAction *moveAction = [UIAction actionWithTitle:@"Move to Folder"
                                                image:moveImg
                                           identifier:nil
                                              handler:^(UIAction *a) { [weakSelf moveFile:file]; }];
 
-     UIImage *shareImg = SCIVaultMenuActionIcon(@"share", @"square.and.arrow.up");
+     UIImage *shareImg = SCIVaultMenuActionIcon(@"share");
     UIAction *shareAction = [UIAction actionWithTitle:@"Share"
                                                 image:shareImg
                                            identifier:nil
@@ -896,7 +887,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     UIAction *openOriginalAction = nil;
     if (file.hasOpenableOriginalMedia) {
         openOriginalAction = [UIAction actionWithTitle:@"Open Original Post"
-                                                 image:SCIVaultMenuActionIcon(@"external_link", @"arrow.up.right.square")
+                                                 image:SCIVaultMenuActionIcon(@"external_link")
                                             identifier:nil
                                                handler:^(__unused UIAction *a) {
             [weakSelf openOriginalPostForFile:file];
@@ -906,14 +897,14 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     UIAction *openProfileAction = nil;
     if (file.hasOpenableProfile) {
         openProfileAction = [UIAction actionWithTitle:@"Open Profile"
-                                                image:SCIVaultMenuActionIcon(@"profile", @"person.crop.circle")
+                                                image:SCIVaultMenuActionIcon(@"profile")
                                            identifier:nil
                                               handler:^(__unused UIAction *a) {
             [weakSelf openProfileForFile:file];
         }];
     }
 
-    UIImage *deleteImg = SCIVaultMenuActionIcon(@"trash", @"trash");
+    UIImage *deleteImg = SCIVaultMenuActionIcon(@"trash");
     UIAction *deleteAction = [UIAction actionWithTitle:@"Delete"
                                                  image:deleteImg
                                             identifier:nil
@@ -930,14 +921,12 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                          title:@"Failed to delete"
                                       subtitle:err.localizedDescription
                                   iconResource:@"error_filled"
-                       fallbackSystemImageName:@"exclamationmark.circle.fill"
                                           tone:SCIFeedbackPillToneError];
             } else {
                 [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultDeleteFile duration:1.5
                                                  title:@"Deleted from vault"
                                               subtitle:nil
                                           iconResource:@"circle_check_filled"
-                               fallbackSystemImageName:@"checkmark.circle.fill"
                                                   tone:SCIFeedbackPillToneSuccess];
             }
         }]];
@@ -970,14 +959,14 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     return [UIContextMenuConfiguration configurationWithIdentifier:nil
                                                    previewProvider:nil
                                                     actionProvider:^UIMenu *(NSArray<UIMenuElement *> *suggested) {
-    UIImage *folderRenameImg = SCIVaultMenuActionIcon(@"edit", @"pencil");
-        UIAction *renameAction = [UIAction actionWithTitle:@"Rename folder"
+    UIImage *folderRenameImg = SCIVaultMenuActionIcon(@"edit");
+        UIAction *renameAction = [UIAction actionWithTitle:@"Rename Folder"
                                                      image:folderRenameImg
                                                 identifier:nil
                                                    handler:^(UIAction *a) { [weakSelf renameFolder:folderPath]; }];
 
-    UIImage *folderDeleteImg = SCIVaultMenuActionIcon(@"trash", @"trash");
-        UIAction *deleteAction = [UIAction actionWithTitle:@"Delete folder"
+    UIImage *folderDeleteImg = SCIVaultMenuActionIcon(@"trash");
+        UIAction *deleteAction = [UIAction actionWithTitle:@"Delete Folder"
                                                      image:folderDeleteImg
                                                 identifier:nil
                                                    handler:^(UIAction *a) { [weakSelf deleteFolder:folderPath]; }];
@@ -1193,7 +1182,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 - (void)presentMoveSheetForFiles:(NSArray<SCIVaultFile *> *)files {
     NSArray<NSString *> *allFolders = [self allFolderPaths];
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Move to folder"
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Move to Folder"
                                                                   message:nil
                                                            preferredStyle:UIAlertControllerStyleActionSheet];
 
