@@ -7,7 +7,6 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = SCInsta
 
 $(TWEAK_NAME)_FILES = $(shell find src -type f \( -iname \*.x -o -iname \*.xm -o -iname \*.m \))
-$(TWEAK_NAME)_BUNDLE_RESOURCE_DIRS = resources
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation CoreGraphics Photos CoreServices SystemConfiguration SafariServices Security QuartzCore AVFoundation AVKit CoreData LocalAuthentication ImageIO UniformTypeIdentifiers
 $(TWEAK_NAME)_PRIVATE_FRAMEWORKS = Preferences
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -Wno-unsupported-availability-guard -Wno-unused-value -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-incompatible-pointer-types
