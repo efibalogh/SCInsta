@@ -40,6 +40,12 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
 
 @implementation SCIVaultDeleteViewController
 
+- (UIView *)selectionBackgroundView {
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    return view;
+}
+
 - (instancetype)initWithMode:(SCIVaultDeletePageMode)mode {
     if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         _mode = mode;
@@ -53,6 +59,10 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = self.mode == SCIVaultDeletePageModeRoot ? @"Delete Files" : @"Delete by User";
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.tableView.tintColor = [SCIUtils SCIColor_Primary];
     [self reloadDataModel];
 }
 
@@ -199,10 +209,13 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"cell"];
     }
-    cell.textLabel.textColor = [UIColor systemRedColor];
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
+    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramDestructive];
     cell.detailTextLabel.text = nil;
+    cell.detailTextLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     cell.accessoryType = UITableViewCellAccessoryNone;
-    cell.imageView.tintColor = [UIColor systemRedColor];
+    cell.imageView.tintColor = [SCIUtils SCIColor_InstagramDestructive];
 
     if (self.mode == SCIVaultDeletePageModeUsers) {
         SCIVaultDeleteUserItem *item = self.users[indexPath.row];
@@ -253,7 +266,7 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
     req.predicate = predicate;
     NSArray<SCIVaultFile *> *files = [ctx executeFetchRequest:req error:nil] ?: @[];
     if (files.count == 0) {
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultBulkDelete duration:2.0
                                  title:@"No files to delete"
                               subtitle:nil
                           iconResource:@"info"
@@ -288,7 +301,7 @@ typedef NS_ENUM(NSInteger, SCIVaultDeleteSection) {
         if (self.onDidDelete) {
             self.onDidDelete();
         }
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultBulkDelete duration:2.0
                                  title:successTitle
                               subtitle:nil
                           iconResource:@"circle_check_filled"

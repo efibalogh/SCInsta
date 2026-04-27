@@ -134,7 +134,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramBackground];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(handleVaultPreferencesChanged:)
                                                  name:@"SCIVaultFavoritesSortPreferenceChanged"
@@ -188,22 +188,19 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
 #pragma mark - Navigation & chrome
 
-/// Blurred bar + semantic colors (`labelColor` / `separatorColor`) — materials and dynamic colors track appearance automatically.
+/// Shared neutral chrome matching the Instagram-inspired custom palette.
 - (void)applyVaultNavigationChrome {
     UINavigationController *nav = self.navigationController;
     if (!nav) {
         return;
     }
     SCIApplyMediaChromeNavigationBar(nav.navigationBar);
-
-    if ([self.navigationItem.titleView isKindOfClass:[UILabel class]]) {
-        ((UILabel *)self.navigationItem.titleView).textColor = [UIColor labelColor];
-    }
 }
 
 - (void)setupCenteredTitle {
     NSString *text = self.currentFolderPath.length > 0 ? [self.currentFolderPath lastPathComponent] : @"Media Vault";
-    self.navigationItem.titleView = SCIMediaChromeTitleLabel(text);
+    self.navigationItem.titleView = nil;
+    self.title = text;
 }
 
 - (void)setupNavigationItems {
@@ -263,7 +260,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
         UIButton *deleteBtn = [self vaultBottomBarButtonWithSymbol:@"trash" resource:@"trash" accessibility:@"Delete selected"];
         [deleteBtn addTarget:self action:@selector(deleteSelectedFiles) forControlEvents:UIControlEventTouchUpInside];
-        deleteBtn.tintColor = [UIColor systemRedColor];
+        deleteBtn.tintColor = [SCIUtils SCIColor_InstagramDestructive];
 
         self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, @[shareBtn, moveBtn, favoriteBtn, deleteBtn]);
         return;
@@ -299,7 +296,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 
     _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
     _collectionView.translatesAutoresizingMaskIntoConstraints = NO;
-    _collectionView.backgroundColor = [UIColor systemBackgroundColor];
+    _collectionView.backgroundColor = [SCIUtils SCIColor_InstagramBackground];
     _collectionView.dataSource = self;
     _collectionView.delegate = self;
     _collectionView.alwaysBounceVertical = YES;
@@ -359,13 +356,13 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     UIImageView *icon = [[UIImageView alloc] initWithImage:emptyIconImage];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
     icon.contentMode = UIViewContentModeScaleAspectFit;
-    icon.tintColor = [UIColor tertiaryLabelColor];
+    icon.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
     [_emptyStateView addSubview:icon];
 
     UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
     label.translatesAutoresizingMaskIntoConstraints = NO;
     label.text = @"No files in vault";
-    label.textColor = [UIColor secondaryLabelColor];
+    label.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     label.font = [UIFont systemFontOfSize:17 weight:UIFontWeightMedium];
     label.textAlignment = NSTextAlignmentCenter;
     [_emptyStateView addSubview:label];
@@ -374,7 +371,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
     UILabel *subtitle = [[UILabel alloc] initWithFrame:CGRectZero];
     subtitle.translatesAutoresizingMaskIntoConstraints = NO;
     subtitle.text = @"Save media from the preview screen\nto see it here.";
-    subtitle.textColor = [UIColor tertiaryLabelColor];
+    subtitle.textColor = [SCIUtils SCIColor_InstagramTertiaryText];
     subtitle.font = [UIFont systemFontOfSize:14];
     subtitle.textAlignment = NSTextAlignmentCenter;
     subtitle.numberOfLines = 0;
@@ -632,8 +629,8 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                           fromViewController:self];
 }
 
-- (void)showVaultOpenFailureMessage:(NSString *)title {
-    [SCIUtils showToastForDuration:2.0
+- (void)showVaultOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
+    [SCIUtils showToastForActionIdentifier:actionIdentifier duration:2.0
                              title:title
                           subtitle:@"The original content may no longer exist."
                       iconResource:@"error_filled"
@@ -642,14 +639,28 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
 }
 
 - (void)openOriginalPostForFile:(SCIVaultFile *)file {
-    if (![SCIVaultOriginController openOriginalPostForVaultFile:file]) {
-        [self showVaultOpenFailureMessage:@"Unable to open original post"];
+    if ([SCIVaultOriginController openOriginalPostForVaultFile:file]) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenOriginal duration:1.4
+                                         title:@"Opened original post"
+                                      subtitle:nil
+                                  iconResource:@"external_link"
+                       fallbackSystemImageName:@"arrow.up.right.square"
+                                          tone:SCIFeedbackPillToneInfo];
+    } else {
+        [self showVaultOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionVaultOpenOriginal];
     }
 }
 
 - (void)openProfileForFile:(SCIVaultFile *)file {
-    if (![SCIVaultOriginController openProfileForVaultFile:file]) {
-        [self showVaultOpenFailureMessage:@"Unable to open profile"];
+    if ([SCIVaultOriginController openProfileForVaultFile:file]) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenProfile duration:1.4
+                                         title:@"Opened profile"
+                                      subtitle:nil
+                                  iconResource:@"profile"
+                       fallbackSystemImageName:@"person.crop.circle"
+                                          tone:SCIFeedbackPillToneInfo];
+    } else {
+        [self showVaultOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionVaultOpenProfile];
     }
 }
 
@@ -809,7 +820,7 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
             }
         }
         if (firstError) {
-            [SCIUtils showToastForDuration:2.0
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultDeleteSelected duration:2.0
                                      title:@"Failed to delete"
                                   subtitle:firstError.localizedDescription
                               iconResource:@"error_filled"
@@ -817,6 +828,12 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
                                       tone:SCIFeedbackPillToneError];
             return;
         }
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultDeleteSelected duration:1.5
+                                         title:@"Deleted selected files"
+                                      subtitle:nil
+                                  iconResource:@"circle_check_filled"
+                       fallbackSystemImageName:@"checkmark.circle.fill"
+                                          tone:SCIFeedbackPillToneSuccess];
         [self exitSelectionMode];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
@@ -909,12 +926,19 @@ typedef NS_ENUM(NSInteger, SCIVaultViewMode) {
             NSError *err;
             [file removeWithError:&err];
             if (err) {
-                [SCIUtils showToastForDuration:2.0
+                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultDeleteFile duration:2.0
                                          title:@"Failed to delete"
                                       subtitle:err.localizedDescription
                                   iconResource:@"error_filled"
                        fallbackSystemImageName:@"exclamationmark.circle.fill"
                                           tone:SCIFeedbackPillToneError];
+            } else {
+                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultDeleteFile duration:1.5
+                                                 title:@"Deleted from vault"
+                                              subtitle:nil
+                                          iconResource:@"circle_check_filled"
+                               fallbackSystemImageName:@"checkmark.circle.fill"
+                                                  tone:SCIFeedbackPillToneSuccess];
             }
         }]];
         [weakSelf presentViewController:alert animated:YES completion:nil];

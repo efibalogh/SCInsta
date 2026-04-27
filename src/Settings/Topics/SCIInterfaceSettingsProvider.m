@@ -1,4 +1,5 @@
 #import "SCIInterfaceSettingsProvider.h"
+#import "../../Utils.h"
 
 #import "../SCITopicSettingsSupport.h"
 #import "SCIFeedbackPillSettingsProvider.h"
@@ -45,8 +46,8 @@
         ], nil),
         SCITopicSection(@"Appearance", @[
             [SCISetting navigationCellWithTitle:@"Feedback Pill"
-                                       subtitle:@"Style and preview the feedback pill"
-                                           icon:[SCISymbol resourceSymbolWithName:@"info" color:[UIColor labelColor] size:20.0]
+                                       subtitle:@"Style, preview, and choose which actions show the feedback pill"
+                                           icon:[SCISymbol resourceSymbolWithName:@"info" color:[SCIUtils SCIColor_InstagramPrimaryText] size:20.0]
                                     navSections:[SCIFeedbackPillSettingsProvider sections]],
             [SCISetting switchCellWithTitle:@"Enable Teen App Icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Disable App Haptics" subtitle:@"Disables haptics and vibrations within the Instagram app" defaultsKey:@"disable_haptics"]

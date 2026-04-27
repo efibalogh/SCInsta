@@ -1,9 +1,35 @@
 #import "SCIFeedbackPillSettingsProvider.h"
-
-#import "../SCITopicSettingsSupport.h"
 #import "../../Utils.h"
 
+#import "../SCITopicSettingsSupport.h"
+
 @implementation SCIFeedbackPillSettingsProvider
+
++ (NSArray<NSDictionary *> *)sci_actionSections {
+    NSMutableArray<NSDictionary *> *sections = [NSMutableArray array];
+
+    for (NSDictionary *sectionInfo in SCIFeedbackPillPreferenceSections()) {
+        NSMutableArray<SCISetting *> *rows = [NSMutableArray array];
+        for (NSDictionary *item in sectionInfo[@"items"] ?: @[]) {
+            NSString *identifier = item[@"identifier"];
+            NSString *title = item[@"title"] ?: @"Action";
+            NSString *iconName = item[@"iconName"] ?: @"info";
+            SCISymbol *icon = [SCISymbol resourceSymbolWithName:iconName
+                                                          color:[SCIUtils SCIColor_InstagramPrimaryText]
+                                                           size:20.0];
+            SCISetting *setting = [SCISetting switchCellWithTitle:title
+                                                         subtitle:@""
+                                                             icon:icon
+                                                      defaultsKey:SCIFeedbackPillDefaultsKey(identifier)];
+            setting.userInfo = @{@"defaultValue": @YES};
+            [rows addObject:setting];
+        }
+
+        [sections addObject:SCITopicSection(sectionInfo[@"title"], [rows copy], nil)];
+    }
+
+    return [sections copy];
+}
 
 + (void)sci_showNextFeedbackPillPreview {
     static NSUInteger toneIndex = 0;
@@ -20,7 +46,7 @@
             @"title": @"Something Went Wrong",
             @"subtitle": @"Feedback pill preview: error tone.",
             @"iconResource": @"error_filled",
-            @"fallback": @"xmark.octagon.fill",
+            @"fallback": @"exclamationmark.circle.fill",
             @"tone": @(SCIFeedbackPillToneError)
         },
         @{
@@ -44,16 +70,22 @@
 }
 
 + (NSArray *)sections {
-    return @[
-        SCITopicSection(@"Style", @[
-            [SCISetting menuCellWithTitle:@"Style" subtitle:@"Neutral glass vs. tone-tinted pill chrome" menu:SCIFeedbackPillStyleMenu()]
-        ], nil),
+    NSMutableArray *sections = [NSMutableArray arrayWithArray:@[
+        SCITopicSection(@"", @[
+            [SCISetting menuCellWithTitle:@"Style"
+                                 subtitle:@""
+                                     menu:SCIFeedbackPillStyleMenu()]
+        ], @"Choose between neutral or colorful pill style"),
         SCITopicSection(@"Preview", @[
-            [SCISetting buttonCellWithTitle:@"Test Feedback Pill" subtitle:@"Cycles through the success, error, and info tones" icon:[SCISymbol resourceSymbolWithName:@"info" color:[UIColor labelColor] size:20.0] action:^{
+            [SCISetting buttonCellWithTitle:@"Test Feedback Pill" subtitle:@"Cycles through the success, error, and info tones" icon:[SCISymbol resourceSymbolWithName:@"info" color:[SCIUtils SCIColor_InstagramPrimaryText] size:20.0] action:^{
                 [self sci_showNextFeedbackPillPreview];
             }]
         ], nil)
-    ];
+    ]];
+
+    NSArray *actionSections = [self sci_actionSections];
+    [sections addObjectsFromArray:actionSections];
+    return [sections copy];
 }
 
 @end

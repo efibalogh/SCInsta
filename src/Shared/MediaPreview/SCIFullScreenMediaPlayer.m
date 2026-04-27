@@ -118,7 +118,7 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName, NSString *system
     }
 
     if (items.count == 0) {
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenVault duration:2.0
                                  title:@"No files found"
                               subtitle:nil
                           iconResource:@"search"
@@ -128,6 +128,12 @@ static UIImage *SCIVaultPreviewMenuIcon(NSString *resourceName, NSString *system
     }
 
     NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenVault duration:1.4
+                                     title:@"Opened vault media"
+                                  subtitle:nil
+                              iconResource:@"photo_gallery"
+                   fallbackSystemImageName:@"photo.on.rectangle.angled"
+                                      tone:SCIFeedbackPillToneInfo];
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     player.isFromVault = YES;
@@ -673,8 +679,8 @@ fromViewController:(UIViewController *)presenter {
     _topFavoriteButton.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
 }
 
-- (void)showVaultOpenFailureMessage:(NSString *)title {
-    [SCIUtils showToastForDuration:2.0
+- (void)showVaultOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
+    [SCIUtils showToastForActionIdentifier:actionIdentifier duration:2.0
                              title:title
                           subtitle:@"The original content may no longer exist."
                       iconResource:@"error_filled"
@@ -684,15 +690,19 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)openOriginalPostForCurrentVaultItem {
     SCIVaultFile *file = self.currentItem.vaultFile;
-    if (![SCIVaultOriginController openOriginalPostForVaultFile:file]) {
-        [self showVaultOpenFailureMessage:@"Unable to open original post"];
+    if ([SCIVaultOriginController openOriginalPostForVaultFile:file]) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link" fallbackSystemImageName:@"arrow.up.right.square" tone:SCIFeedbackPillToneInfo];
+    } else {
+        [self showVaultOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionVaultOpenOriginal];
     }
 }
 
 - (void)openProfileForCurrentVaultItem {
     SCIVaultFile *file = self.currentItem.vaultFile;
-    if (![SCIVaultOriginController openProfileForVaultFile:file]) {
-        [self showVaultOpenFailureMessage:@"Unable to open profile"];
+    if ([SCIVaultOriginController openProfileForVaultFile:file]) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionVaultOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile" fallbackSystemImageName:@"person.crop.circle" tone:SCIFeedbackPillToneInfo];
+    } else {
+        [self showVaultOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionVaultOpenProfile];
     }
 }
 
@@ -870,24 +880,21 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = url.pathExtension;
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:YES];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos]];
     delegate.pendingVaultSaveMetadata = item.vaultMetadata;
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
 - (void)showSaveResult:(BOOL)success error:(NSError *)error {
-    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
     if (success) {
-        [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos duration:2.0
                                  title:@"Saved to Photos"
                               subtitle:nil
                           iconResource:@"circle_check_filled"
                fallbackSystemImageName:@"checkmark.circle.fill"
                                   tone:SCIFeedbackPillToneSuccess];
     } else {
-        [haptic notificationOccurred:UINotificationFeedbackTypeError];
-        [SCIUtils showToastForDuration:3.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos duration:3.0
                                  title:@"Failed to save"
                               subtitle:error.localizedDescription
                           iconResource:@"error_filled"
@@ -901,7 +908,7 @@ fromViewController:(UIViewController *)presenter {
     SCIMediaItem *item = [self currentItem];
 
     if (!targetURL && !item.image) {
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault duration:2.0
                                  title:@"No media to save"
                               subtitle:nil
                           iconResource:@"media"
@@ -943,7 +950,7 @@ fromViewController:(UIViewController *)presenter {
         }
     }
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:YES];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToVault showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault]];
     delegate.pendingVaultSaveMetadata = meta;
     [delegate downloadFileWithURL:targetURL fileExtension:ext hudLabel:nil];
 }
@@ -970,19 +977,16 @@ fromViewController:(UIViewController *)presenter {
                                               metadata:meta
                                                  error:&error];
 
-    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
     if (file) {
-        [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault duration:2.0
                                  title:@"Saved to Vault"
                               subtitle:nil
                           iconResource:@"circle_check_filled"
                fallbackSystemImageName:@"checkmark.circle.fill"
                                   tone:SCIFeedbackPillToneSuccess];
     } else {
-        [haptic notificationOccurred:UINotificationFeedbackTypeError];
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
-        [SCIUtils showToastForDuration:3.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveVault duration:3.0
                                  title:@"Failed to save"
                               subtitle:msg
                           iconResource:@"error_filled"
@@ -998,6 +1002,12 @@ fromViewController:(UIViewController *)presenter {
 
     if (url.isFileURL || (!url && item.image)) {
         id activityItem = url.isFileURL ? url : item.image;
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewShare duration:1.4
+                                         title:@"Opened share sheet"
+                                      subtitle:nil
+                                  iconResource:@"share"
+                       fallbackSystemImageName:@"square.and.arrow.up"
+                                          tone:SCIFeedbackPillToneInfo];
         UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[activityItem] applicationActivities:nil];
         if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && _shareButton) {
             acVC.popoverPresentationController.sourceView = _shareButton;
@@ -1010,7 +1020,7 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = url.pathExtension;
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:YES];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewShare]];
     delegate.pendingVaultSaveMetadata = item.vaultMetadata;
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
@@ -1025,9 +1035,7 @@ fromViewController:(UIViewController *)presenter {
         UIImage *image = item.image ?: [UIImage imageWithData:imageData];
         if (image) {
             [[UIPasteboard generalPasteboard] setImage:image];
-            UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-            [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-            [SCIUtils showToastForDuration:1.5
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5
                                      title:@"Copied photo to clipboard"
                                   subtitle:nil
                               iconResource:@"copy_filled"
@@ -1038,9 +1046,7 @@ fromViewController:(UIViewController *)presenter {
         NSData *data = [NSData dataWithContentsOfURL:url];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
-            UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-            [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-            [SCIUtils showToastForDuration:1.5
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5
                                      title:@"Copied video to clipboard"
                                   subtitle:nil
                               iconResource:@"copy_filled"
@@ -1073,7 +1079,7 @@ fromViewController:(UIViewController *)presenter {
     NSError *err;
     [item.vaultFile removeWithError:&err];
     if (err) {
-        [SCIUtils showToastForDuration:2.0
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteVault duration:2.0
                                  title:@"Failed to delete"
                               subtitle:err.localizedDescription
                           iconResource:@"error_filled"
@@ -1092,6 +1098,12 @@ fromViewController:(UIViewController *)presenter {
     }
 
     if (_items.count == 0) {
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteVault duration:1.5
+                                         title:@"Deleted from vault"
+                                      subtitle:nil
+                                  iconResource:@"circle_check_filled"
+                       fallbackSystemImageName:@"checkmark.circle.fill"
+                                          tone:SCIFeedbackPillToneSuccess];
         [self closeTapped];
         return;
     }
@@ -1114,6 +1126,12 @@ fromViewController:(UIViewController *)presenter {
     [self prepareViewControllerForDisplay:newVC];
     [self prepareAdjacentViewControllersAroundIndex:_currentIndex];
     [self updateUI];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteVault duration:1.5
+                                     title:@"Deleted from vault"
+                                  subtitle:nil
+                              iconResource:@"circle_check_filled"
+                   fallbackSystemImageName:@"checkmark.circle.fill"
+                                      tone:SCIFeedbackPillToneSuccess];
 }
 
 #pragma mark - Swipe to Dismiss

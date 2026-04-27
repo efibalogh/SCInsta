@@ -38,10 +38,7 @@
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
     pasteboard.string = result;
 
-    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-    [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-
-    [SCIUtils showToastForDuration:2.0
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionCopyDescription duration:2.0
                              title:@"Copied text to clipboard"
                           subtitle:nil
                       iconResource:@"copy_filled"

@@ -4,6 +4,7 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 #import "../../Networking/SCIInstagramAPI.h"
+#import "../../Shared/UI/SCIMediaChrome.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -42,8 +43,13 @@ static NSString *SCIMentionUserPK(id userObj) {
 
 static void SCIMentionStyleFollowButton(UIButton *btn, BOOL following) {
     [btn setTitle:following ? @"Following" : @"Follow" forState:UIControlStateNormal];
-    btn.backgroundColor = following ? [UIColor tertiarySystemFillColor] : [UIColor systemBlueColor];
-    [btn setTitleColor:following ? [UIColor labelColor] : [UIColor whiteColor] forState:UIControlStateNormal];
+    btn.backgroundColor = following
+        ? [SCIUtils SCIColor_InstagramPressedBackground]
+        : [SCIUtils SCIColor_Primary];
+    UIColor *titleColor = following
+        ? [UIColor greenColor]
+        : [SCIUtils SCIColor_InstagramPrimaryText];
+    [btn setTitleColor:titleColor forState:UIControlStateNormal];
 }
 
 // ============ Enhanced mention extraction ============
@@ -146,6 +152,8 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
 #define kSCIMentionAvatarSize 52.0
 #define kSCIMentionRowHeight  72.0
+#define kSCIMentionRowInset   16.0
+#define kSCIMentionRowCornerRadius 12.0
 
 @interface SCIStoryMentionsVC : UIViewController <UITableViewDataSource, UITableViewDelegate>
 @property (nonatomic, strong) NSArray<NSDictionary *> *userInfos;
@@ -159,6 +167,8 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramBackground];
+    self.title = @"Mentions";
 
     // Resolve current user to hide the Follow button for yourself
     @try {
@@ -167,31 +177,21 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
             self.currentUsername = ((IGUserSession *)[window valueForKey:@"userSession"]).user.username;
     } @catch (__unused id e) {}
 
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = @"Mentions";
-    titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    titleLabel.textColor = [UIColor labelColor];
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-
     // Table view
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     self.tableView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
-    self.tableView.separatorColor = [UIColor separatorColor];
-    self.tableView.separatorInset = UIEdgeInsetsMake(0, 16 + kSCIMentionAvatarSize + 14, 0, 0);
+    self.tableView.backgroundColor = [UIColor clearColor];
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = kSCIMentionRowHeight;
+    self.tableView.contentInset = UIEdgeInsetsMake(0, 0, 12, 0);
+    self.tableView.showsVerticalScrollIndicator = NO;
 
-    [self.view addSubview:titleLabel];
     [self.view addSubview:self.tableView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [titleLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16.0],
-        [titleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-
-        [self.tableView.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:16.0],
+        [self.tableView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:12.0],
         [self.tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [self.tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [self.tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -216,13 +216,13 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     // Empty state
     if (self.userInfos.count == 0) {
         UIImageView *emptyIcon = [[UIImageView alloc] initWithImage:[SCIUtils sci_resourceImageNamed:@"mention" template:YES]];
-        emptyIcon.tintColor = [UIColor tertiaryLabelColor];
+        emptyIcon.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
         emptyIcon.translatesAutoresizingMaskIntoConstraints = NO;
 
         UILabel *emptyLabel = [[UILabel alloc] init];
         emptyLabel.text = @"No mentions in this story";
         emptyLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-        emptyLabel.textColor = [UIColor secondaryLabelColor];
+        emptyLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
         emptyLabel.textAlignment = NSTextAlignmentCenter;
         emptyLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -237,6 +237,13 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
             [empty.centerXAnchor constraintEqualToAnchor:self.tableView.centerXAnchor],
             [empty.centerYAnchor constraintEqualToAnchor:self.tableView.centerYAnchor],
         ]];
+    }
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (self.navigationController) {
+        SCIApplyMediaChromeNavigationBar(self.navigationController.navigationBar);
     }
 }
 
@@ -271,37 +278,46 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     UILabel *nameLabel, *subLabel;
     UIButton *followBtn;
     UIActivityIndicatorView *spinner;
-    static const NSInteger kAvTag = 201, kNmTag = 202, kSbTag = 203, kFlTag = 204, kSpTag = 205;
+    UIView *cardView;
+    static const NSInteger kCdTag = 200, kAvTag = 201, kNmTag = 202, kSbTag = 203, kFlTag = 204, kSpTag = 205;
 
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:rid];
         cell.backgroundColor = [UIColor clearColor];
+        cell.contentView.backgroundColor = [UIColor clearColor];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+        cardView = [[UIView alloc] init];
+        cardView.tag = kCdTag;
+        cardView.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+        cardView.layer.cornerRadius = kSCIMentionRowCornerRadius;
+        cardView.translatesAutoresizingMaskIntoConstraints = NO;
+        [cell.contentView addSubview:cardView];
 
         avatar = [[UIImageView alloc] init];
         avatar.tag = kAvTag;
         avatar.layer.cornerRadius = kSCIMentionAvatarSize / 2.0;
         avatar.clipsToBounds = YES;
         avatar.contentMode = UIViewContentModeScaleAspectFill;
-        avatar.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        avatar.backgroundColor = [SCIUtils SCIColor_InstagramSeparator];
         avatar.translatesAutoresizingMaskIntoConstraints = NO;
 
         nameLabel = [[UILabel alloc] init];
         nameLabel.tag = kNmTag;
         nameLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-        nameLabel.textColor = [UIColor labelColor];
+        nameLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
         nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
         subLabel = [[UILabel alloc] init];
         subLabel.tag = kSbTag;
         subLabel.font = [UIFont systemFontOfSize:14];
-        subLabel.textColor = [UIColor secondaryLabelColor];
+        subLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
         subLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
         followBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         followBtn.tag = kFlTag;
         followBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-        followBtn.layer.cornerRadius = 8;
+        followBtn.layer.cornerRadius = 12;
         followBtn.clipsToBounds = YES;
         followBtn.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -315,33 +331,40 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
         text.spacing = 2;
         text.translatesAutoresizingMaskIntoConstraints = NO;
 
-        [cell.contentView addSubview:avatar];
-        [cell.contentView addSubview:text];
-        [cell.contentView addSubview:followBtn];
+        [cardView addSubview:avatar];
+        [cardView addSubview:text];
+        [cardView addSubview:followBtn];
         [followBtn addSubview:spinner];
 
         [NSLayoutConstraint activateConstraints:@[
-            [avatar.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
-            [avatar.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+            [cardView.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:4],
+            [cardView.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:kSCIMentionRowInset],
+            [cardView.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-kSCIMentionRowInset],
+            [cardView.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-4],
+            [avatar.leadingAnchor constraintEqualToAnchor:cardView.leadingAnchor constant:16],
+            [avatar.centerYAnchor constraintEqualToAnchor:cardView.centerYAnchor],
             [avatar.widthAnchor constraintEqualToConstant:kSCIMentionAvatarSize],
             [avatar.heightAnchor constraintEqualToConstant:kSCIMentionAvatarSize],
             [text.leadingAnchor constraintEqualToAnchor:avatar.trailingAnchor constant:14],
-            [text.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+            [text.centerYAnchor constraintEqualToAnchor:cardView.centerYAnchor],
             [text.trailingAnchor constraintLessThanOrEqualToAnchor:followBtn.leadingAnchor constant:-10],
-            [followBtn.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
-            [followBtn.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+            [followBtn.trailingAnchor constraintEqualToAnchor:cardView.trailingAnchor constant:-12],
+            [followBtn.centerYAnchor constraintEqualToAnchor:cardView.centerYAnchor],
             [followBtn.widthAnchor constraintGreaterThanOrEqualToConstant:90],
             [followBtn.heightAnchor constraintEqualToConstant:32],
             [spinner.centerXAnchor constraintEqualToAnchor:followBtn.centerXAnchor],
             [spinner.centerYAnchor constraintEqualToAnchor:followBtn.centerYAnchor],
         ]];
     } else {
+        cardView   = [cell.contentView viewWithTag:kCdTag];
         avatar    = [cell.contentView viewWithTag:kAvTag];
         nameLabel = [cell.contentView viewWithTag:kNmTag];
         subLabel  = [cell.contentView viewWithTag:kSbTag];
         followBtn = [cell.contentView viewWithTag:kFlTag];
         spinner   = [followBtn viewWithTag:kSpTag];
     }
+
+    cardView.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
 
     NSDictionary *info = self.userInfos[indexPath.row];
     NSString *username = info[@"username"] ?: @"Unknown";
@@ -354,7 +377,7 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
     // Default avatar
     avatar.image = [SCIUtils sci_resourceImageNamed:@"profile" template:YES];
-    avatar.tintColor = [UIColor tertiaryLabelColor];
+    avatar.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
 
     // Async avatar fetch
     if (picURL) {
@@ -400,6 +423,16 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     }
 
     return cell;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    return 4.0;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    UIView *view = [[UIView alloc] init];
+    view.backgroundColor = [UIColor clearColor];
+    return view;
 }
 
 #pragma mark - Follow/Unfollow
@@ -453,7 +486,7 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     NSDictionary *info = self.userInfos[indexPath.row];
     NSString *username = info[@"username"];
     if (!username) return;
-    [self dismissViewControllerAnimated:YES completion:^{
+    [self.navigationController dismissViewControllerAnimated:YES completion:^{
         NSString *encodedUsername = [username stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
         if (!encodedUsername.length) return;
         NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"instagram://user?username=%@", encodedUsername]];
@@ -495,10 +528,11 @@ void SCIPresentStoryMentionsSheet(UIView *overlayView) {
     SCIStoryMentionsVC *vc = [[SCIStoryMentionsVC alloc] init];
     vc.userInfos = enriched;
     vc.storyOverlayView = overlayView;
-    vc.modalPresentationStyle = UIModalPresentationPageSheet;
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
 
     // if (@available(iOS 15.0, *)) {
-        UISheetPresentationController *sheet = vc.sheetPresentationController;
+        UISheetPresentationController *sheet = nav.sheetPresentationController;
 
         // Custom compact detent: sized to fit a small number of rows (header + rows + bottom inset)
         // CGFloat headerHeight = 58.0; // title + separator
@@ -525,5 +559,5 @@ void SCIPresentStoryMentionsSheet(UIView *overlayView) {
         }
     // }
 
-    [presenter presentViewController:vc animated:YES completion:nil];
+    [presenter presentViewController:nav animated:YES completion:nil];
 }

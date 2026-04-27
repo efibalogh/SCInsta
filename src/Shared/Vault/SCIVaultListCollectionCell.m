@@ -37,19 +37,19 @@
     self.thumbnailView.contentMode = UIViewContentModeScaleAspectFill;
     self.thumbnailView.clipsToBounds = YES;
     self.thumbnailView.layer.cornerRadius = 6;
-    self.thumbnailView.backgroundColor = [UIColor secondarySystemBackgroundColor];
+    self.thumbnailView.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
     [self.contentView addSubview:self.thumbnailView];
 
     self.rowTypeIcon = [[UIImageView alloc] init];
     self.rowTypeIcon.translatesAutoresizingMaskIntoConstraints = NO;
     self.rowTypeIcon.contentMode = UIViewContentModeScaleAspectFit;
-    self.rowTypeIcon.tintColor = [UIColor secondaryLabelColor];
+    self.rowTypeIcon.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
     [self.contentView addSubview:self.rowTypeIcon];
 
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = [UIColor labelColor];
+    self.titleLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     self.titleLabel.numberOfLines = 1;
     self.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentView addSubview:self.titleLabel];
@@ -57,14 +57,14 @@
     self.technicalLabel = [[UILabel alloc] init];
     self.technicalLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.technicalLabel.font = [UIFont systemFontOfSize:12];
-    self.technicalLabel.textColor = [UIColor secondaryLabelColor];
+    self.technicalLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     self.technicalLabel.numberOfLines = 1;
     self.technicalLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentView addSubview:self.technicalLabel];
 
     self.pillBackground = [[UIView alloc] init];
     self.pillBackground.translatesAutoresizingMaskIntoConstraints = NO;
-    self.pillBackground.backgroundColor = [UIColor tertiarySystemFillColor];
+    self.pillBackground.backgroundColor = [SCIUtils SCIColor_InstagramTertiaryBackground];
     self.pillBackground.layer.cornerRadius = 5;
     self.pillBackground.clipsToBounds = YES;
     [self.contentView addSubview:self.pillBackground];
@@ -72,14 +72,14 @@
     self.pillLabel = [[UILabel alloc] init];
     self.pillLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.pillLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
-    self.pillLabel.textColor = [UIColor secondaryLabelColor];
+    self.pillLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     self.pillLabel.numberOfLines = 1;
     [self.pillBackground addSubview:self.pillLabel];
 
     self.dateLabel = [[UILabel alloc] init];
     self.dateLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.dateLabel.font = [UIFont systemFontOfSize:11];
-    self.dateLabel.textColor = [UIColor tertiaryLabelColor];
+    self.dateLabel.textColor = [SCIUtils SCIColor_InstagramTertiaryText];
     self.dateLabel.numberOfLines = 1;
     self.dateLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentView addSubview:self.dateLabel];
@@ -92,14 +92,14 @@
     self.favoriteIcon = [[UIImageView alloc] initWithImage:favImg];
     self.favoriteIcon.contentMode = UIViewContentModeScaleAspectFit;
     self.favoriteIcon.translatesAutoresizingMaskIntoConstraints = NO;
-    self.favoriteIcon.tintColor = [UIColor systemPinkColor];
+    self.favoriteIcon.tintColor = [SCIUtils SCIColor_InstagramFavorite];
     self.favoriteIcon.hidden = YES;
     [self.contentView addSubview:self.favoriteIcon];
 
     self.selectionIndicator = [[UIImageView alloc] init];
     self.selectionIndicator.translatesAutoresizingMaskIntoConstraints = NO;
     self.selectionIndicator.contentMode = UIViewContentModeScaleAspectFit;
-    self.selectionIndicator.tintColor = [UIColor secondaryLabelColor];
+    self.selectionIndicator.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
     self.selectionIndicator.hidden = YES;
     [self.contentView addSubview:self.selectionIndicator];
 
@@ -111,7 +111,7 @@
     self.moreButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.moreButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.moreButton setImage:moreImg forState:UIControlStateNormal];
-    self.moreButton.tintColor = [UIColor secondaryLabelColor];
+    self.moreButton.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
     self.moreButton.accessibilityLabel = @"More";
     self.moreButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
     self.moreButton.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;

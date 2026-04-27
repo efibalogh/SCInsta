@@ -55,13 +55,13 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
 
 - (void)updateChipAppearance {
     if (self.selectedChip) {
-        self.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.2];
-        self.tintColor = [UIColor systemBlueColor];
-        [self setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+        self.backgroundColor = [[SCIUtils SCIColor_Primary] colorWithAlphaComponent:0.18];
+        self.tintColor = [SCIUtils SCIColor_Primary];
+        [self setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
     } else {
-        self.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
-        self.tintColor = [UIColor secondaryLabelColor];
-        [self setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+        self.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+        self.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
+        [self setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
     }
 }
 
@@ -122,7 +122,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramBackground];
     [self setupNavigationBar];
     [self setupContent];
     [self updateClearRowState];
@@ -162,7 +162,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
     UILabel *l = [[UILabel alloc] init];
     l.text = title;
     l.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
-    l.textColor = [UIColor secondaryLabelColor];
+    l.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     return l;
 }
 
@@ -235,21 +235,21 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
 
 - (UIView *)createFavoritesRow {
     UIControl *row = [[UIControl alloc] init];
-    row.backgroundColor = [UIColor secondarySystemBackgroundColor];
+    row.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
     row.layer.cornerRadius = 12;
     [row.heightAnchor constraintEqualToConstant:50].active = YES;
     [row addTarget:self action:@selector(favoritesRowTapped) forControlEvents:UIControlEventTouchUpInside];
 
     UIImage *favRowIcon = [SCIUtils sci_resourceImageNamed:@"heart" template:YES maxPointSize:18] ?: [UIImage systemImageNamed:@"heart"];
     UIImageView *icon = [[UIImageView alloc] initWithImage:favRowIcon];
-    icon.tintColor = [UIColor labelColor];
+    icon.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
     [row addSubview:icon];
 
     UILabel *label = [[UILabel alloc] init];
     label.text = @"Favorites only";
     label.font = [UIFont systemFontOfSize:kSCIVaultFilterChipLabelPointSize weight:UIFontWeightMedium];
-    label.textColor = [UIColor secondaryLabelColor];
+    label.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     label.translatesAutoresizingMaskIntoConstraints = NO;
     [row addSubview:label];
 
@@ -272,7 +272,7 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
 
 - (UIView *)createClearRow {
     UIControl *row = [[UIControl alloc] init];
-    row.backgroundColor = [UIColor secondarySystemBackgroundColor];
+    row.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
     row.layer.cornerRadius = 12;
     [row.heightAnchor constraintEqualToConstant:50].active = YES;
     [row addTarget:self action:@selector(clearFilters) forControlEvents:UIControlEventTouchUpInside];
@@ -342,18 +342,18 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
     if (!self.favoritesRow || !self.favoritesLeadingIcon || !self.favoritesLabel) return;
 
     if (self.filterFavoritesOnly) {
-        UIColor *accent = [UIColor systemPinkColor];
+        UIColor *accent = [SCIUtils SCIColor_InstagramFavorite];
         self.favoritesRow.backgroundColor = [accent colorWithAlphaComponent:0.2];
-        self.favoritesLabel.textColor = [UIColor labelColor];
+        self.favoritesLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
         self.favoritesLeadingIcon.image = [SCIUtils sci_resourceImageNamed:@"heart_filled" template:YES maxPointSize:14.0]
             ?: SCIVaultFilterSymbol(nil, @"heart.fill", 14.0);
         self.favoritesLeadingIcon.tintColor = accent;
     } else {
-        self.favoritesRow.backgroundColor = [UIColor secondarySystemBackgroundColor];
-        self.favoritesLabel.textColor = [UIColor secondaryLabelColor];
+        self.favoritesRow.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+        self.favoritesLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
         self.favoritesLeadingIcon.image = [SCIUtils sci_resourceImageNamed:@"heart" template:YES maxPointSize:14.0]
             ?: SCIVaultFilterSymbol(nil, @"heart", 14.0);
-        self.favoritesLeadingIcon.tintColor = [UIColor secondaryLabelColor];
+        self.favoritesLeadingIcon.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
     }
 }
 
@@ -363,10 +363,10 @@ static NSString *SCIVaultSourceFallbackSymbol(SCIVaultSource source) {
     BOOL active = [self hasActiveFilters];
     self.clearRow.userInteractionEnabled = active;
     self.clearRow.backgroundColor = active
-        ? [[UIColor systemRedColor] colorWithAlphaComponent:0.2]
-        : [UIColor secondarySystemBackgroundColor];
-    self.clearLeadingIcon.tintColor = active ? [UIColor systemRedColor] : [UIColor tertiaryLabelColor];
-    self.clearLabel.textColor = active ? [UIColor systemRedColor] : [UIColor tertiaryLabelColor];
+        ? [[SCIUtils SCIColor_InstagramDestructive] colorWithAlphaComponent:0.16]
+        : [SCIUtils SCIColor_InstagramSecondaryBackground];
+    self.clearLeadingIcon.tintColor = active ? [SCIUtils SCIColor_InstagramDestructive] : [SCIUtils SCIColor_InstagramTertiaryText];
+    self.clearLabel.textColor = active ? [SCIUtils SCIColor_InstagramDestructive] : [SCIUtils SCIColor_InstagramTertiaryText];
 }
 
 - (BOOL)hasActiveFilters {

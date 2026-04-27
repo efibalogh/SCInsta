@@ -19,7 +19,7 @@
     if (self) {
         self.contentView.clipsToBounds = YES;
         self.contentView.layer.cornerRadius = 6.0;
-        self.contentView.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        self.contentView.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
 
         _thumbnailView = [[UIImageView alloc] initWithFrame:CGRectZero];
         _thumbnailView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -52,7 +52,7 @@
         }
         _favoriteBadge.image = favImg;
         _favoriteBadge.contentMode = UIViewContentModeScaleAspectFit;
-        _favoriteBadge.tintColor = [UIColor systemPinkColor];
+        _favoriteBadge.tintColor = [SCIUtils SCIColor_InstagramFavorite];
         _favoriteBadge.hidden = YES;
         [self.contentView addSubview:_favoriteBadge];
 

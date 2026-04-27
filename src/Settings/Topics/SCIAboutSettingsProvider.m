@@ -1,4 +1,5 @@
 #import "SCIAboutSettingsProvider.h"
+#import "../../Utils.h"
 
 #import "../SCITopicSettingsSupport.h"
 #import "../../Tweak.h"
@@ -11,7 +12,7 @@
         SCITopicSection(@"Support", @[
             [SCISetting linkCellWithTitle:@"Donate to the original developer"
                                  subtitle:@""
-                                     icon:[SCISymbol resourceSymbolWithName:@"heart_filled" color:[UIColor systemPinkColor] size:24.0]
+                                     icon:[SCISymbol resourceSymbolWithName:@"heart_filled" color:[SCIUtils SCIColor_InstagramFavorite] size:24.0]
                                       url:@"https://ko-fi.com/SoCuul"]
         ], @"Consider donating to support this tweak's development"),
         SCITopicSection(@"Credits", @[
@@ -31,13 +32,13 @@
         SCITopicSection(@"Information", @[
             [SCISetting staticCellWithTitle:@"Tweak"
                                    subtitle:SCIVersionString
-                                       icon:[SCISymbol resourceSymbolWithName:@"action" color:[UIColor labelColor] size:24.0]],
+                                       icon:[SCISymbol resourceSymbolWithName:@"action" color:[SCIUtils SCIColor_InstagramPrimaryText] size:24.0]],
             [SCISetting staticCellWithTitle:@"Instagram"
                                    subtitle:[SCIUtils IGVersionString]
-                                       icon:[SCISymbol resourceSymbolWithName:@"app" color:[UIColor labelColor] size:24.0]],
+                                       icon:[SCISymbol resourceSymbolWithName:@"app" color:[SCIUtils SCIColor_InstagramPrimaryText] size:24.0]],
             [SCISetting staticCellWithTitle:@"Bundle ID"
                                    subtitle:[[NSBundle mainBundle] bundleIdentifier]
-                                       icon:[SCISymbol resourceSymbolWithName:@"key" color:[UIColor labelColor] size:24.0]]
+                                       icon:[SCISymbol resourceSymbolWithName:@"key" color:[SCIUtils SCIColor_InstagramPrimaryText] size:24.0]]
         ], nil)
     ]);
 }

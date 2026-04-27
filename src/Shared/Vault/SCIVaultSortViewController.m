@@ -78,15 +78,15 @@ static NSString *SCIVaultSortFallbackSymbol(SCIVaultSortMode mode) {
 
 - (void)updateChipAppearance {
     if (self.selectedChip) {
-        self.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.2];
-        self.tintColor = [UIColor systemBlueColor];
-        [self setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
-        self.layer.borderColor = [UIColor systemBlueColor].CGColor;
+        self.backgroundColor = [[SCIUtils SCIColor_Primary] colorWithAlphaComponent:0.18];
+        self.tintColor = [SCIUtils SCIColor_Primary];
+        [self setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
+        self.layer.borderColor = [SCIUtils SCIColor_Primary].CGColor;
     } else {
-        self.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
-        self.tintColor = [UIColor secondaryLabelColor];
-        [self setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
-        self.layer.borderColor = [UIColor separatorColor].CGColor;
+        self.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+        self.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
+        [self setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
+        self.layer.borderColor = [SCIUtils SCIColor_InstagramSeparator].CGColor;
     }
 }
 
@@ -146,7 +146,7 @@ static NSString *SCIVaultSortFallbackSymbol(SCIVaultSortMode mode) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramBackground];
     [self setupNavigationBar];
     [self setupContent];
 }

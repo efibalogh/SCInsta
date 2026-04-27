@@ -41,6 +41,12 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 
 @implementation SCIVaultSettingsViewController
 
+- (UIView *)selectionBackgroundView {
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    return view;
+}
+
 - (instancetype)init {
     return [super initWithStyle:UITableViewStyleInsetGrouped];
 }
@@ -48,6 +54,10 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Vault Settings";
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.tableView.tintColor = [SCIUtils SCIColor_Primary];
     [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"cell"];
     [self reloadStats];
 }
@@ -127,8 +137,12 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 - (UITableViewCell *)valueCellWithTitle:(NSString *)title value:(NSString *)value {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
     cell.textLabel.text = title;
+    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.detailTextLabel.text = value;
+    cell.detailTextLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     return cell;
 }
 
@@ -184,7 +198,7 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
 
 - (void)configureDeleteCell:(UITableViewCell *)cell {
     cell.textLabel.text = @"Delete Files";
-    cell.textLabel.textColor = [UIColor systemRedColor];
+    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramDestructive];
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 }
 
@@ -194,9 +208,12 @@ typedef NS_ENUM(NSInteger, SCIVaultSettingsSection) {
     }
 
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"cell" forIndexPath:indexPath];
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
     cell.textLabel.text = nil;
-    cell.textLabel.textColor = [UIColor labelColor];
+    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.detailTextLabel.text = nil;
+    cell.detailTextLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.accessoryView = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;

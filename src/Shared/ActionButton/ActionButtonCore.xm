@@ -829,7 +829,7 @@ static NSString *SCIActionButtonMenuSignature(SCIActionButtonContext *context,
 
 static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *metadata, SCIActionButtonContext *context) {
 	if (!videoURL) {
-		[SCIUtils showToastForDuration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+		[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
 		return;
 	}
 
@@ -843,7 +843,7 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIVaultSaveMetadata *me
 		CGImageRef imageRef = [generator copyCGImageAtTime:CMTimeMakeWithSeconds(0.0, 600) actualTime:NULL error:&error];
 		if (!imageRef) {
 			dispatch_async(dispatch_get_main_queue(), ^{
-				[SCIUtils showToastForDuration:2.0 title:@"Cover unavailable" subtitle:error.localizedDescription ?: @"" iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+				[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:error.localizedDescription ?: @"" iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
 			});
 			return;
 		}
@@ -867,12 +867,15 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 								   id media) {
 	NSURL *currentURL = currentEntry.videoURL ?: currentEntry.photoURL;
 	BOOL isVideo = (currentEntry.videoURL != nil);
+	BOOL shouldShowFeedbackPill = [SCIUtils shouldShowFeedbackPillForActionIdentifier:identifier];
 
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary] ||
 		[identifier isEqualToString:kSCIActionDownloadShare] ||
 		[identifier isEqualToString:kSCIActionDownloadVault]) {
 		if (!currentURL) {
-			[SCIUtils showToastForDuration:2.0 title:@"No downloadable media" subtitle:nil iconResource:@"download" fallbackSystemImageName:@"arrow.down.to.line" tone:SCIFeedbackPillToneError];
+			if (shouldShowFeedbackPill) {
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No downloadable media" subtitle:nil iconResource:@"download" fallbackSystemImageName:@"arrow.down.to.line" tone:SCIFeedbackPillToneError];
+			}
 			return YES;
 		}
 
@@ -880,7 +883,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		if ([identifier isEqualToString:kSCIActionDownloadShare]) action = share;
 		else if ([identifier isEqualToString:kSCIActionDownloadVault]) action = saveToVault;
 
-		SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:YES];
+		SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:shouldShowFeedbackPill];
 		delegate.pendingVaultSaveMetadata = meta;
 		[delegate downloadFileWithURL:currentURL fileExtension:SCIExtensionForURL(currentURL, isVideo) hudLabel:nil];
 		return YES;
@@ -893,30 +896,41 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
             bestURL = SCIBestDownloadURLForMediaObject(mediaForCopy);
         }
 		if (!bestURL) {
-			[SCIUtils showToastForDuration:2.0 title:@"No link available" subtitle:nil iconResource:@"link" fallbackSystemImageName:@"link" tone:SCIFeedbackPillToneError];
+			if (shouldShowFeedbackPill) {
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No link available" subtitle:nil iconResource:@"link" fallbackSystemImageName:@"link" tone:SCIFeedbackPillToneError];
+			}
 			return YES;
 		}
 
 		[UIPasteboard generalPasteboard].string = bestURL.absoluteString ?: @"";
-		[SCIUtils showToastForDuration:1.5 title:@"Download link copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+		if (shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Download link copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+		}
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionExpand]) {
 		NSArray<SCIMediaItem *> *playerItems = SCIPlayerItemsFromEntries(entries, context.source, username, media);
 		if (playerItems.count == 0) {
-			[SCIUtils showToastForDuration:2.0 title:@"No media to expand" subtitle:nil iconResource:@"expand" fallbackSystemImageName:@"arrow.up.left.and.arrow.down.right" tone:SCIFeedbackPillToneError];
+			if (shouldShowFeedbackPill) {
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No media to expand" subtitle:nil iconResource:@"expand" fallbackSystemImageName:@"arrow.up.left.and.arrow.down.right" tone:SCIFeedbackPillToneError];
+			}
 			return YES;
 		}
 
 		NSInteger clampedIndex = SCIClampedIndex(resolvedIndex, (NSInteger)playerItems.count);
+		if (shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand" fallbackSystemImageName:@"arrow.up.left.and.arrow.down.right" tone:SCIFeedbackPillToneInfo];
+		}
 		[SCIFullScreenMediaPlayer showMediaItems:playerItems startingAtIndex:clampedIndex metadata:meta playbackSource:(SCIFullScreenPlaybackSource)context.source sourceView:context.view controller:context.controller];
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
 		if (!currentEntry.videoURL) {
-			[SCIUtils showToastForDuration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+			if (shouldShowFeedbackPill) {
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneError];
+			}
 			return YES;
 		}
 
@@ -940,35 +954,50 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
         } else {
 		    SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
         }
+		if (shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opening thumbnail" subtitle:nil iconResource:@"photo_filled" fallbackSystemImageName:@"photo.fill" tone:SCIFeedbackPillToneInfo];
+		}
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionCopyCaption]) {
 		NSString *caption = context.captionResolver ? context.captionResolver(context, media, entries, resolvedIndex) : nil;
 		if (caption.length == 0) {
-			[SCIUtils showToastForDuration:2.0 title:@"No caption available" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneError];
+			if (shouldShowFeedbackPill) {
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No caption available" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneError];
+			}
 			return YES;
 		}
 
 		[UIPasteboard generalPasteboard].string = caption;
-		[SCIUtils showToastForDuration:1.5 title:@"Caption copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+		if (shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Caption copied" subtitle:nil iconResource:@"copy_filled" fallbackSystemImageName:@"doc.on.doc.fill" tone:SCIFeedbackPillToneSuccess];
+		}
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionOpenTopicSettings]) {
 		if (context.settingsTitle.length == 0) {
-			[SCIUtils showToastForDuration:2.0 title:@"Settings unavailable" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneError];
+			if (shouldShowFeedbackPill) {
+				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Settings unavailable" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneError];
+			}
 			return YES;
 		}
 
+		if (shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened settings" subtitle:nil iconResource:@"settings" fallbackSystemImageName:@"gearshape" tone:SCIFeedbackPillToneInfo];
+		}
 		[SCIUtils showSettingsForTopicTitle:context.settingsTitle];
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionRepost]) {
 		BOOL handled = context.repostHandler ? context.repostHandler(context) : NO;
-		if (!handled) {
-			[SCIUtils showToastForDuration:2.0 title:@"Repost unavailable" subtitle:nil iconResource:@"repost" fallbackSystemImageName:@"arrow.triangle.2.circlepath" tone:SCIFeedbackPillToneError];
+		if (handled && shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened repost" subtitle:nil iconResource:@"repost" fallbackSystemImageName:@"arrow.triangle.2.circlepath" tone:SCIFeedbackPillToneInfo];
+		}
+		if (!handled && shouldShowFeedbackPill) {
+			[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Repost unavailable" subtitle:nil iconResource:@"repost" fallbackSystemImageName:@"arrow.triangle.2.circlepath" tone:SCIFeedbackPillToneError];
 		}
 		return YES;
 	}
@@ -982,7 +1011,7 @@ BOOL SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonContext *co
 	id media = SCIResolveMediaForContext(context);
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
 	if (entries.count == 0) {
-		[SCIUtils showToastForDuration:2.0 title:@"Media not found" subtitle:nil iconResource:@"media_filled" fallbackSystemImageName:@"photo.on.rectangle" tone:SCIFeedbackPillToneError];
+		[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Media not found" subtitle:nil iconResource:@"media_filled" fallbackSystemImageName:@"photo.on.rectangle" tone:SCIFeedbackPillToneError];
 		return NO;
 	}
 

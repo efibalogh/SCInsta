@@ -12,33 +12,7 @@ UIBlurEffect *SCIMediaChromeBlurEffect(void) {
 }
 
 void SCIApplyMediaChromeNavigationBar(UINavigationBar *bar) {
-    if (!bar) return;
-
-    UIColor *fg = [UIColor labelColor];
-    UIColor *hairline = [UIColor separatorColor];
-
-    UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
-    [appearance configureWithTransparentBackground];
-    appearance.backgroundEffect = SCIMediaChromeBlurEffect();
-    appearance.shadowColor = hairline;
-    NSDictionary *titleAttrs = @{
-        NSForegroundColorAttributeName: fg,
-        NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold],
-    };
-    appearance.titleTextAttributes = titleAttrs;
-    appearance.largeTitleTextAttributes = titleAttrs;
-
-    UIBarButtonItemAppearance *itemAppearance = [[UIBarButtonItemAppearance alloc] init];
-    itemAppearance.normal.titleTextAttributes = @{ NSForegroundColorAttributeName: fg };
-    appearance.buttonAppearance = itemAppearance;
-    appearance.doneButtonAppearance = itemAppearance;
-
-    bar.standardAppearance = appearance;
-    bar.scrollEdgeAppearance = appearance;
-    bar.compactAppearance = appearance;
-    bar.compactScrollEdgeAppearance = appearance;
-    bar.translucent = YES;
-    bar.tintColor = fg;
+    (void)bar;
 }
 
 UILabel *SCIMediaChromeTitleLabel(NSString *text) {
@@ -85,6 +59,7 @@ UIView *SCIMediaChromeInstallBottomBar(UIView *hostView) {
 
     UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:SCIMediaChromeBlurEffect()];
     blurView.translatesAutoresizingMaskIntoConstraints = NO;
+    blurView.backgroundColor = [[SCIUtils SCIColor_InstagramBackground] colorWithAlphaComponent:0.82];
     [bar addSubview:blurView];
     [NSLayoutConstraint activateConstraints:@[
         [blurView.topAnchor constraintEqualToAnchor:bar.topAnchor],
@@ -95,7 +70,7 @@ UIView *SCIMediaChromeInstallBottomBar(UIView *hostView) {
 
     UIView *topBorder = [[UIView alloc] initWithFrame:CGRectZero];
     topBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    topBorder.backgroundColor = [UIColor separatorColor];
+    topBorder.backgroundColor = [SCIUtils SCIColor_InstagramSeparator];
     [bar addSubview:topBorder];
     [NSLayoutConstraint activateConstraints:@[
         [topBorder.topAnchor constraintEqualToAnchor:bar.topAnchor],
@@ -118,7 +93,7 @@ UIButton *SCIMediaChromeBottomButton(NSString *symbolName, NSString *resourceNam
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     btn.translatesAutoresizingMaskIntoConstraints = NO;
     [btn setImage:SCIMediaChromeBottomIcon(resourceName, symbolName) forState:UIControlStateNormal];
-    btn.tintColor = [UIColor labelColor];
+    btn.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     btn.accessibilityLabel = accessibilityLabel;
     return btn;
 }

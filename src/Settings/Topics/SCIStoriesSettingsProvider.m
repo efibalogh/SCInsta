@@ -16,7 +16,7 @@ static NSString * const kSCIStoriesActionButtonDefaultActionKey = @"action_butto
             SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSourceStories, @"Stories", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceStories), SCIActionButtonDefaultSectionsForSource(SCIActionButtonSourceStories))
         ], nil),
         SCITopicSection(@"Privacy & Visibility", @[
-            [SCISetting switchCellWithTitle:@"Disable Story Seen Receipt" subtitle:@"Prevents automatic story seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
+            [SCISetting switchCellWithTitle:@"Manually Mark Stories as Seen" subtitle:@"Prevents automatic seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
             [SCISetting switchCellWithTitle:@"Stop Story Auto Advance" subtitle:@"Prevents stories from automatically moving to the next item after playback ends" defaultsKey:@"stop_story_auto_advance"],
             [SCISetting switchCellWithTitle:@"Advance When Marked as Seen" subtitle:@"After manually marking a story as seen with the eye button, advance to the next story" defaultsKey:@"advance_story_when_marking_seen"],
             [SCISetting switchCellWithTitle:@"Story Mentions Button" subtitle:@"Shows the mentions button in story overlays when a story has mentions" defaultsKey:@"story_mentions_button"],

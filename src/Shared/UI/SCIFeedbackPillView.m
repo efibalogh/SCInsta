@@ -684,33 +684,12 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     } completion:nil];
 }
 
-- (BOOL)shouldUseCompactToastWidthForTitle:(NSString *)title subtitle:(NSString *)subtitle {
-    if (subtitle.length > 0 || title.length == 0) {
-        return NO;
-    }
-
-    static NSSet<NSString *> *compactTitles;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        compactTitles = [NSSet setWithArray:@[
-            @"Marked story as seen",
-            @"Marked as seen",
-            @"Marked messages as seen",
-            @"Copied text to clipboard",
-            @"Copied photo to clipboard",
-            @"Copied video to clipboard"
-        ]];
-    });
-
-    return [compactTitles containsObject:title];
-}
-
 - (void)updateToastWidthForTitle:(NSString *)title subtitle:(NSString *)subtitle {
     if (!self.widthConstraint) {
         return;
     }
 
-    if (![self shouldUseCompactToastWidthForTitle:title subtitle:subtitle]) {
+    if (subtitle.length > 0 || title.length == 0) {
         self.widthConstraint.constant = kPillWidth;
         return;
     }
@@ -724,6 +703,27 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     CGFloat fixedWidth = kHorizontalPad + kIconBadgeSize + 10.0 + kHorizontalPad + 20.0;
     CGFloat compactWidth = ceil(textSize.width) + fixedWidth;
     self.widthConstraint.constant = MIN(kPillWidth, MAX(188.0, compactWidth));
+}
+
+- (void)triggerHapticForVisualTone:(SCIPillVisualTone)tone {
+    switch (tone) {
+        case SCIPillVisualToneSuccess: {
+            UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
+            [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
+            break;
+        }
+        case SCIPillVisualToneError: {
+            UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
+            [haptic notificationOccurred:UINotificationFeedbackTypeError];
+            break;
+        }
+        case SCIPillVisualToneInfo:
+        default: {
+            UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+            [haptic impactOccurred];
+            break;
+        }
+    }
 }
 
 - (void)configureForProgressMode {
@@ -783,6 +783,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.iconView.image = resolvedIcon;
     self.iconView.tintColor = [self iconTintForTone:visualTone];
     [self applyTone:visualTone animated:YES];
+    [self triggerHapticForVisualTone:visualTone];
 
     [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
         [self layoutIfNeeded];
@@ -866,8 +867,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.onRetry = nil;
     [self applyCancelButtonStyle];
 
-    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-    [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
+    [self triggerHapticForVisualTone:SCIPillVisualToneSuccess];
 
     UIImage *checkImage = icon ?: [self defaultIconForTone:SCIPillVisualToneSuccess];
     [self applyTone:SCIPillVisualToneSuccess animated:YES];
@@ -877,6 +877,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.titleLabel.text = title.length ? title : @"Download complete";
         self.subtitleLabel.text = subtitle;
         self.subtitleLabel.hidden = (subtitle.length == 0);
+        [self updateToastWidthForTitle:self.titleLabel.text subtitle:subtitle];
         [self setCloseButtonVisible:NO];
         [self setProgressVisible:NO];
         self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
@@ -905,8 +906,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         resolvedSubtitle = @"Tap to retry";
     }
 
-    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-    [haptic notificationOccurred:UINotificationFeedbackTypeError];
+    [self triggerHapticForVisualTone:SCIPillVisualToneError];
 
     UIImage *errorImage = icon ?: [self defaultIconForTone:SCIPillVisualToneError];
     [self applyTone:SCIPillVisualToneError animated:YES];
@@ -916,6 +916,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.titleLabel.text = title.length ? title : @"Download failed";
         self.subtitleLabel.text = resolvedSubtitle;
         self.subtitleLabel.hidden = (resolvedSubtitle.length == 0);
+        [self updateToastWidthForTitle:self.titleLabel.text subtitle:resolvedSubtitle];
         [self setCloseButtonVisible:YES];
         [self setProgressVisible:NO];
         self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
@@ -935,8 +936,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.onRetry = nil;
     [self applyCancelButtonStyle];
 
-    UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-    [haptic notificationOccurred:UINotificationFeedbackTypeWarning];
+    [self triggerHapticForVisualTone:SCIPillVisualToneInfo];
 
     UIImage *infoImage = icon ?: [self defaultIconForTone:SCIPillVisualToneInfo];
     [self applyTone:SCIPillVisualToneInfo animated:YES];
@@ -946,6 +946,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.titleLabel.text = title.length ? title : @"Info";
         self.subtitleLabel.text = subtitle;
         self.subtitleLabel.hidden = (subtitle.length == 0);
+        [self updateToastWidthForTitle:self.titleLabel.text subtitle:subtitle];
         [self setCloseButtonVisible:NO];
         [self setProgressVisible:NO];
         self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
@@ -981,6 +982,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.closeButton.transform = CGAffineTransformMakeScale(0.84, 0.84);
     } completion:^(BOOL finished) {
         [self removeFromSuperview];
+        if (self.onDidDismiss) {
+            self.onDidDismiss();
+        }
         if (completion) completion();
     }];
 }
@@ -1008,11 +1012,12 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     }
 
     if (self.isCompleted) {
-        if (self.onTapWhenCompleted) {
-            self.onTapWhenCompleted();
-        }
-
-        [self dismissWithCompletion:nil];
+        void (^onCompletedTap)(void) = [self.onTapWhenCompleted copy];
+        [self dismissWithCompletion:^{
+            if (onCompletedTap) {
+                onCompletedTap();
+            }
+        }];
     }
 
 }

@@ -5,6 +5,7 @@
 
 #import "InstagramHeaders.h"
 #import "Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "Shared/UI/SCIFeedbackPillPreferences.h"
 #import "Shared/UI/SCIFeedbackPillView.h"
 
 #import "Settings/SCISettingsViewController.h"
@@ -60,6 +61,17 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 
 // Colours
 + (UIColor *)SCIColor_Primary;
++ (UIColor *)SCIColor_InstagramBackground;
++ (UIColor *)SCIColor_InstagramSecondaryBackground;
++ (UIColor *)SCIColor_InstagramTertiaryBackground;
++ (UIColor *)SCIColor_InstagramGroupedBackground;
++ (UIColor *)SCIColor_InstagramPrimaryText;
++ (UIColor *)SCIColor_InstagramSecondaryText;
++ (UIColor *)SCIColor_InstagramTertiaryText;
++ (UIColor *)SCIColor_InstagramSeparator;
++ (UIColor *)SCIColor_InstagramFavorite;
++ (UIColor *)SCIColor_InstagramDestructive;
++ (UIColor *)SCIColor_InstagramPressedBackground;
 
 // Errors
 + (NSError *)errorWithDescription:(NSString *)errorDesc;
@@ -99,8 +111,16 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
                 iconResource:(nullable NSString *)iconResource
      fallbackSystemImageName:(nullable NSString *)fallbackSystemImageName
                         tone:(SCIFeedbackPillTone)tone;
++ (void)showToastForActionIdentifier:(NSString *)actionIdentifier
+                            duration:(double)duration
+                               title:(NSString *)title
+                            subtitle:(NSString *)subtitle
+                        iconResource:(nullable NSString *)iconResource
+             fallbackSystemImageName:(nullable NSString *)fallbackSystemImageName
+                                tone:(SCIFeedbackPillTone)tone;
 
 + (SCIFeedbackPillView *)showProgressPill;
++ (BOOL)shouldShowFeedbackPillForActionIdentifier:(NSString *)identifier;
 
 // Math
 + (NSUInteger)decimalPlacesInDouble:(double)value;

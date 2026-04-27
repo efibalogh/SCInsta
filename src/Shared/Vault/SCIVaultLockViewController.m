@@ -66,7 +66,7 @@ static NSInteger const kPasscodeLength = 4;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramBackground];
     [self setupUI];
     [self updateUIForMode];
 
@@ -80,14 +80,14 @@ static NSInteger const kPasscodeLength = 4;
 - (void)setupUI {
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = [UIColor labelColor];
+    self.titleLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     self.titleLabel.textAlignment = NSTextAlignmentCenter;
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.titleLabel];
 
     self.subtitleLabel = [[UILabel alloc] init];
     self.subtitleLabel.font = [UIFont systemFontOfSize:14];
-    self.subtitleLabel.textColor = [UIColor secondaryLabelColor];
+    self.subtitleLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     self.subtitleLabel.textAlignment = NSTextAlignmentCenter;
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.subtitleLabel];
@@ -103,7 +103,7 @@ static NSInteger const kPasscodeLength = 4;
         UIView *dot = [[UIView alloc] init];
         dot.layer.cornerRadius = 6;
         dot.layer.borderWidth = 1.5;
-        dot.layer.borderColor = [UIColor labelColor].CGColor;
+        dot.layer.borderColor = [SCIUtils SCIColor_InstagramPrimaryText].CGColor;
         dot.backgroundColor = [UIColor clearColor];
         dot.translatesAutoresizingMaskIntoConstraints = NO;
         [NSLayoutConstraint activateConstraints:@[
@@ -127,7 +127,7 @@ static NSInteger const kPasscodeLength = 4;
 
     self.cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.cancelButton setTitle:@"Cancel" forState:UIControlStateNormal];
-    [self.cancelButton setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+    [self.cancelButton setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
     self.cancelButton.titleLabel.font = [UIFont systemFontOfSize:17];
     self.cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.cancelButton addTarget:self action:@selector(cancelTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -195,7 +195,7 @@ static NSInteger const kPasscodeLength = 4;
                 }
                 [del setImage:deleteIcon forState:UIControlStateNormal];
                 [del setTitle:@"" forState:UIControlStateNormal];
-                del.tintColor = [UIColor labelColor];
+                del.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
                 [del addTarget:self action:@selector(deleteTapped) forControlEvents:UIControlEventTouchUpInside];
                 [del addTarget:self action:@selector(keyTouchDown:) forControlEvents:UIControlEventTouchDown];
                 [del addTarget:self action:@selector(keyTouchUp:) forControlEvents:UIControlEventTouchUpInside];
@@ -224,7 +224,7 @@ static NSInteger const kPasscodeLength = 4;
     btn.tag = tag;
     BOOL isDeleteButton = (tag == -2);
     btn.layer.cornerRadius = isDeleteButton ? 0.0 : 37.5;
-    btn.backgroundColor = isDeleteButton ? [UIColor clearColor] : [UIColor secondarySystemBackgroundColor];
+    btn.backgroundColor = isDeleteButton ? [UIColor clearColor] : [SCIUtils SCIColor_InstagramSecondaryBackground];
     btn.translatesAutoresizingMaskIntoConstraints = NO;
     [NSLayoutConstraint activateConstraints:@[
         [btn.widthAnchor constraintEqualToConstant:75],
@@ -235,7 +235,7 @@ static NSInteger const kPasscodeLength = 4;
         UILabel *digitLabel = [[UILabel alloc] init];
         digitLabel.text = title;
         digitLabel.font = [UIFont systemFontOfSize:32 weight:UIFontWeightLight];
-        digitLabel.textColor = [UIColor labelColor];
+        digitLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
         digitLabel.textAlignment = NSTextAlignmentCenter;
         digitLabel.translatesAutoresizingMaskIntoConstraints = NO;
         digitLabel.userInteractionEnabled = NO;
@@ -287,7 +287,7 @@ static NSInteger const kPasscodeLength = 4;
         NSString *icon = [mgr biometryType] == SCIVaultBiometryTypeFaceID ? @"faceid" : @"touchid";
         UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:28 weight:UIImageSymbolWeightRegular];
         [self.biometricButton setImage:[UIImage systemImageNamed:icon withConfiguration:cfg] forState:UIControlStateNormal];
-        self.biometricButton.tintColor = [UIColor labelColor];
+        self.biometricButton.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     }
 
     [self updateDots];
@@ -297,7 +297,7 @@ static NSInteger const kPasscodeLength = 4;
     for (NSInteger i = 0; i < self.dotViews.count; i++) {
         UIView *dot = self.dotViews[i];
         BOOL filled = i < (NSInteger)self.enteredPasscode.length;
-        dot.backgroundColor = filled ? [UIColor labelColor] : [UIColor clearColor];
+        dot.backgroundColor = filled ? [SCIUtils SCIColor_InstagramPrimaryText] : [UIColor clearColor];
     }
 }
 

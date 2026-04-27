@@ -33,7 +33,7 @@
     self.thumbnailView.contentMode = UIViewContentModeScaleAspectFill;
     self.thumbnailView.clipsToBounds = YES;
     self.thumbnailView.layer.cornerRadius = 6;
-    self.thumbnailView.backgroundColor = [UIColor secondarySystemBackgroundColor];
+    self.thumbnailView.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
     [self.contentView addSubview:self.thumbnailView];
 
     UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightBold];
@@ -50,7 +50,7 @@
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = [UIColor labelColor];
+    self.titleLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     self.titleLabel.numberOfLines = 1;
     self.titleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
     [self.contentView addSubview:self.titleLabel];
@@ -58,14 +58,14 @@
     self.subtitleLabel = [[UILabel alloc] init];
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.subtitleLabel.font = [UIFont systemFontOfSize:12];
-    self.subtitleLabel.textColor = [UIColor secondaryLabelColor];
+    self.subtitleLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
     self.subtitleLabel.numberOfLines = 1;
     [self.contentView addSubview:self.subtitleLabel];
 
     self.detailLabel = [[UILabel alloc] init];
     self.detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.detailLabel.font = [UIFont systemFontOfSize:11];
-    self.detailLabel.textColor = [UIColor tertiaryLabelColor];
+    self.detailLabel.textColor = [SCIUtils SCIColor_InstagramTertiaryText];
     self.detailLabel.numberOfLines = 1;
     [self.contentView addSubview:self.detailLabel];
 
@@ -77,7 +77,7 @@
     self.favoriteIcon = [[UIImageView alloc] initWithImage:favImg];
     self.favoriteIcon.contentMode = UIViewContentModeScaleAspectFit;
     self.favoriteIcon.translatesAutoresizingMaskIntoConstraints = NO;
-    self.favoriteIcon.tintColor = [UIColor systemPinkColor];
+    self.favoriteIcon.tintColor = [SCIUtils SCIColor_InstagramFavorite];
     self.favoriteIcon.hidden = YES;
     [self.contentView addSubview:self.favoriteIcon];
 

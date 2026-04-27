@@ -24,7 +24,7 @@
     
     if (self) {
         self.name = @"";
-        self.color = [UIColor labelColor];
+        self.color = [SCIUtils SCIColor_InstagramPrimaryText];
         self.weight = UIImageSymbolWeightRegular;
         self.size = 15.0;
     }
@@ -95,7 +95,7 @@
 + (instancetype)resourceSymbolWithName:(NSString *)resourceName color:(UIColor *)color size:(CGFloat)size {
     SCISymbol *symbol = [[self alloc] init];
     symbol.name = resourceName;
-    symbol.color = color ?: [UIColor labelColor];
+    symbol.color = color ?: [SCIUtils SCIColor_InstagramPrimaryText];
     symbol.size = size;
     symbol.usesResourceImage = YES;
     return symbol;

@@ -18,16 +18,12 @@
         SCITopicSection(@"Cache", @[
             [SCISetting buttonCellWithTitle:@"Clear Cache Now" subtitle:@"Remove temporary caches immediately" icon:nil action:^(void) {
                 [SCIUtils cleanCache];
-                [SCIUtils showToastForDuration:2.0 title:@"Cache cleared" subtitle:nil iconResource:@"circle_check_filled" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
+                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsClearCache duration:2.0 title:@"Cache cleared" subtitle:nil iconResource:@"circle_check_filled" fallbackSystemImageName:@"checkmark.circle.fill" tone:SCIFeedbackPillToneSuccess];
             }],
             [SCISetting menuCellWithTitle:@"Auto Clear Cache" subtitle:@"Choose when cache should be cleared automatically while using Instagram" menu:SCICacheAutoClearMenu()]
         ], @"Automatic clearing is checked whenever Instagram becomes active. \"Always\" clears on every foreground; the other modes clear only after enough time has elapsed."),
         SCITopicSection(@"Recommendations", @[
             [SCISetting switchCellWithTitle:@"No Suggested Users" subtitle:@"Hides all suggested users for you to follow outside your feed" defaultsKey:@"no_suggested_users"]
-        ], nil),
-        SCITopicSection(@"Confirmation", @[
-            [SCISetting switchCellWithTitle:@"Confirm Follow" subtitle:@"Shows an alert when you tap Follow to confirm the action" defaultsKey:@"follow_confirm"],
-            [SCISetting switchCellWithTitle:@"Confirm Unfollow" subtitle:@"Shows an alert when you unfollow to confirm the action" defaultsKey:@"unfollow_confirm"]
         ], nil),
         SCITopicSection(@"Liquid Glass", @[
             [SCISetting switchCellWithTitle:@"Enable Liquid Glass Buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],

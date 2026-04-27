@@ -8,11 +8,11 @@
 
 static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
 
-static NSMutableSet<SCIDownloadDelegate *> *SCIActiveDownloadDelegates(void) {
-    static NSMutableSet<SCIDownloadDelegate *> *delegates = nil;
+static NSCountedSet *SCIActiveDownloadDelegates(void) {
+    static NSCountedSet *delegates = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        delegates = [NSMutableSet set];
+        delegates = [NSCountedSet set];
     });
     return delegates;
 }
@@ -24,6 +24,9 @@ static void SCIRetainActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 }
 
 static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
+    if (!delegate) {
+        return;
+    }
     @synchronized (SCIActiveDownloadDelegates()) {
         [SCIActiveDownloadDelegates() removeObject:delegate];
     }
@@ -56,6 +59,13 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 - (void)showCompletionPillWithSubtitle:(NSString *)subtitle
                     completionImmediately:(BOOL)completionImmediately
                               completion:(void(^)(void))completion {
+    if (!self.progressView) {
+        if (completion) {
+            completion();
+        }
+        return;
+    }
+
     [self.progressView showSuccessWithTitle:@"Download complete" subtitle:subtitle icon:nil];
     self.progressView.onTapWhenCompleted = nil;
     self.progressView.onCancel = nil;
@@ -142,12 +152,22 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (error && error.code != NSURLErrorCancelled) {
             NSLog(@"[SCInsta] Download: Download failed with error: \"%@\"", error);
-            if (self.showProgress) {
+            if (self.showProgress && self.progressView) {
+                void (^existingDismissHandler)(void) = [self.progressView.onDidDismiss copy];
+                __weak typeof(self) weakSelf = self;
+                self.progressView.onDidDismiss = ^{
+                    if (existingDismissHandler) {
+                        existingDismissHandler();
+                    }
+                    SCIReleaseActiveDownloadDelegate(weakSelf);
+                };
                 [self.progressView showError:@"Download failed"];
+                return;
             }
         }
+
+        SCIReleaseActiveDownloadDelegate(self);
     });
-    SCIReleaseActiveDownloadDelegate(self);
 }
 
 - (void)downloadDidFinishWithFileURL:(NSURL *)fileURL {
@@ -207,17 +227,15 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                     [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:^{
                         SCIReleaseActiveDownloadDelegate(self);
                     }];
-                    self.progressView.onTapWhenCompleted = ^{
-                        [SCIUtils openPhotosApp];
-                    };
+                    if (self.progressView) {
+                        self.progressView.onTapWhenCompleted = ^{
+                            [SCIUtils openPhotosApp];
+                        };
+                    }
                 } else {
-                    [self.progressView showError:@"Failed to save"];
-                    [SCIUtils showToastForDuration:3.0
-                                             title:@"Failed to save"
-                                          subtitle:error.localizedDescription ?: @""
-                                      iconResource:@"error_filled"
-                           fallbackSystemImageName:@"exclamationmark.circle.fill"
-                                              tone:SCIFeedbackPillToneError];
+                    if (self.progressView) {
+                        [self.progressView showError:@"Failed to save"];
+                    }
                     SCIReleaseActiveDownloadDelegate(self);
                 }
             }];
@@ -236,11 +254,15 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                 [self showCompletionPillWithSubtitle:@"Saved to Vault successfully" completionImmediately:NO completion:^{
                     SCIReleaseActiveDownloadDelegate(self);
                 }];
-                self.progressView.onTapWhenCompleted = ^{
-                    [SCIVaultViewController presentVault];
-                };
+                if (self.progressView) {
+                    self.progressView.onTapWhenCompleted = ^{
+                        [SCIVaultViewController presentVault];
+                    };
+                }
             } else {
-                [self.progressView showError:@"Failed to save to vault"];
+                if (self.progressView) {
+                    [self.progressView showError:@"Failed to save to vault"];
+                }
                 SCIReleaseActiveDownloadDelegate(self);
             }
             return;

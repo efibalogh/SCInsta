@@ -66,6 +66,30 @@
     ];
 }
 
++ (NSArray<SCIActionDescriptor *> *)feedbackPillConfigurableDescriptors {
+    NSMutableArray<SCIActionDescriptor *> *descriptors = [NSMutableArray array];
+    NSArray<NSString *> *identifiers = @[
+        kSCIActionDownloadLibrary,
+        kSCIActionDownloadShare,
+        kSCIActionCopyDownloadLink,
+        kSCIActionDownloadVault,
+        kSCIActionExpand,
+        kSCIActionViewThumbnail,
+        kSCIActionCopyCaption,
+        kSCIActionOpenTopicSettings,
+        kSCIActionRepost
+    ];
+
+    for (NSString *identifier in identifiers) {
+        SCIActionDescriptor *descriptor = [self descriptorForIdentifier:identifier];
+        if (descriptor) {
+            [descriptors addObject:descriptor];
+        }
+    }
+
+    return [descriptors copy];
+}
+
 @end
 
 NSString *SCIActionDescriptorDisplayTitle(NSString *identifier, NSString *topicTitle) {
@@ -79,4 +103,9 @@ NSString *SCIActionDescriptorDisplayTitle(NSString *identifier, NSString *topicT
 NSString *SCIActionDescriptorIconName(NSString *identifier) {
     SCIActionDescriptor *descriptor = [SCIActionDescriptor descriptorForIdentifier:identifier];
     return descriptor.iconName ?: @"action";
+}
+
+NSString *SCIActionDescriptorFeedbackPillDefaultsKey(NSString *identifier) {
+    if (identifier.length == 0) return @"feedback_pill_action";
+    return [NSString stringWithFormat:@"feedback_pill_action_%@", identifier];
 }

@@ -86,6 +86,10 @@ static UIMenu *SCIProfileDefaultCopyInfoMenu(void) {
         ], nil),
         SCITopicSection(@"Indicators", @[
             [SCISetting switchCellWithTitle:@"Show Following Indicator" subtitle:@"Shows whether the profile user follows you" defaultsKey:@"follow_indicator"]
+        ], nil),
+        SCITopicSection(@"Confirmation", @[
+            [SCISetting switchCellWithTitle:@"Confirm Follow" subtitle:@"Shows an alert when you tap Follow to confirm the action" defaultsKey:@"follow_confirm"],
+            [SCISetting switchCellWithTitle:@"Confirm Unfollow" subtitle:@"Shows an alert when you unfollow to confirm the action" defaultsKey:@"unfollow_confirm"]
         ], nil)
     ]);
 }

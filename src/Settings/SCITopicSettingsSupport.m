@@ -21,7 +21,7 @@ NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString *footer)
 SCISetting *SCITopicNavigationSetting(NSString *title, NSString *iconName, CGFloat iconSize, NSArray *sections) {
     return [SCISetting navigationCellWithTitle:title
                                       subtitle:@""
-                                          icon:[SCISymbol resourceSymbolWithName:iconName color:[UIColor labelColor] size:iconSize]
+                                          icon:[SCISymbol resourceSymbolWithName:iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:iconSize]
                                    navSections:sections];
 }
 
@@ -37,9 +37,9 @@ static UICommand *SCIMenuCommand(NSString *title, NSString *imageName, NSString 
 
     UIImage *image = nil;
     if (imageName.length > 0) {
-        image = [[SCISymbol resourceSymbolWithName:imageName color:[UIColor labelColor] size:22.0] image];
+        image = [[SCISymbol resourceSymbolWithName:imageName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
     } else if (fallback.length > 0) {
-        image = [[SCISymbol symbolWithName:fallback color:[UIColor labelColor] size:22.0] image];
+        image = [[SCISymbol symbolWithName:fallback color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
     }
 
     return [UICommand commandWithTitle:title

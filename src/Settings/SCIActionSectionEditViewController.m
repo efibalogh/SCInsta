@@ -19,6 +19,12 @@ static char kSCISectionEditSwitchAssocKey;
 
 @implementation SCIActionSectionEditViewController
 
+- (UIView *)selectionBackgroundView {
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    return view;
+}
+
 - (NSString *)displayTitleForSectionIconName:(NSString *)iconName {
     SCIActionDescriptor *descriptor = [SCIActionDescriptor descriptorForIdentifier:iconName];
     return descriptor.title ?: iconName;
@@ -62,6 +68,7 @@ static char kSCISectionEditSwitchAssocKey;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.navigationController.navigationBar.prefersLargeTitles = NO;
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
@@ -69,6 +76,9 @@ static char kSCISectionEditSwitchAssocKey;
     self.tableView.dragInteractionEnabled = YES;
     self.tableView.dragDelegate = self;
     self.tableView.dropDelegate = self;
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.tableView.tintColor = [SCIUtils SCIColor_Primary];
     [self.view addSubview:self.tableView];
 }
 
@@ -98,6 +108,11 @@ static char kSCISectionEditSwitchAssocKey;
     SCIActionMenuSection *section = [self currentSection];
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
     UIListContentConfiguration *config = cell.defaultContentConfiguration;
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.tintColor = [SCIUtils SCIColor_Primary];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
+    config.textProperties.color = [SCIUtils SCIColor_InstagramPrimaryText];
+    config.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
 
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
@@ -114,8 +129,8 @@ static char kSCISectionEditSwitchAssocKey;
         } else if (indexPath.row == 1) {
             config.text = @"Icon";
             config.secondaryText = [self displayTitleForSectionIconName:section.iconName];
-            config.image = [[SCISymbol resourceSymbolWithName:section.iconName color:[UIColor labelColor] size:22.0] image];
-            config.imageProperties.tintColor = [UIColor labelColor];
+            config.image = [[SCISymbol resourceSymbolWithName:section.iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+            config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         } else {
@@ -131,15 +146,15 @@ static char kSCISectionEditSwitchAssocKey;
     } else if (indexPath.section == 1) {
         NSString *identifier = section.actions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[UIColor labelColor] size:22.0] image];
-        config.imageProperties.tintColor = [UIColor labelColor];
+        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
         cell.showsReorderControl = YES;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else {
         NSString *identifier = self.configuration.supportedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[UIColor labelColor] size:22.0] image];
-        config.imageProperties.tintColor = [UIColor labelColor];
+        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
         NSString *owner = [self.configuration sectionIdentifierForAction:identifier];
         if ([owner isEqualToString:section.identifier]) {

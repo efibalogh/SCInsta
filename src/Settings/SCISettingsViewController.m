@@ -14,7 +14,7 @@ static char rowStaticRef[] = "row";
 
 static UIImage *SCISettingsReorderCompositeImage(UIImage *iconImage, UIColor *tintColor) {
     UIImageSymbolConfiguration *grabberConfig = [UIImageSymbolConfiguration configurationWithPointSize:12.0 weight:UIImageSymbolWeightSemibold];
-    UIImage *grabber = [[UIImage systemImageNamed:@"line.3.horizontal" withConfiguration:grabberConfig] imageWithTintColor:[UIColor systemGray3Color] renderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage *grabber = [[UIImage systemImageNamed:@"line.3.horizontal" withConfiguration:grabberConfig] imageWithTintColor:[SCIUtils SCIColor_InstagramTertiaryText] renderingMode:UIImageRenderingModeAlwaysOriginal];
     if (!grabber || !iconImage) return iconImage ?: grabber;
 
     CGFloat spacing = 8.0;
@@ -25,7 +25,7 @@ static UIImage *SCISettingsReorderCompositeImage(UIImage *iconImage, UIColor *ti
         CGFloat grabberY = floor((size.height - grabber.size.height) / 2.0);
         [grabber drawAtPoint:CGPointMake(0.0, grabberY)];
 
-        UIImage *renderedIcon = [iconImage imageWithTintColor:tintColor ?: [UIColor labelColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
+        UIImage *renderedIcon = [iconImage imageWithTintColor:tintColor ?: [SCIUtils SCIColor_InstagramPrimaryText] renderingMode:UIImageRenderingModeAlwaysOriginal];
         CGFloat iconY = floor((size.height - renderedIcon.size.height) / 2.0);
         [renderedIcon drawAtPoint:CGPointMake(grabber.size.width + spacing, iconY)];
     }];
@@ -74,6 +74,12 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
 
 @implementation SCISettingsViewController
 
+- (UIView *)selectionBackgroundView {
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    return view;
+}
+
 - (instancetype)initWithTitle:(NSString *)title sections:(NSArray *)sections reduceMargin:(BOOL)reduceMargin {
     self = [super init];
     
@@ -86,17 +92,17 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
         
         [mutableSections enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSDictionary *section, NSUInteger index, BOOL *stop) {
         
-            // if ([section[@"header"] hasPrefix:@"_"] && [section[@"footer"] hasPrefix:@"_"]) {
-            //     if (![[SCIUtils IGVersionString] isEqualToString:@"0.0.0"]) {
-            //         [mutableSections removeObjectAtIndex:index];
-            //     }
-            // }
+            if ([section[@"header"] hasPrefix:@"_"] && [section[@"footer"] hasPrefix:@"_"]) {
+                if (![[SCIUtils IGVersionString] isEqualToString:@"0.0.0"]) {
+                    [mutableSections removeObjectAtIndex:index];
+                }
+            }
 
-            // else if ([section[@"header"] isEqualToString:@"Experimental"]) {
-            //     if (![[SCIUtils IGVersionString] hasSuffix:@"-dev"]) {
-            //         [mutableSections removeObjectAtIndex:index];
-            //     }
-            // }
+            else if ([section[@"header"] isEqualToString:@"Experimental"]) {
+                if (![[SCIUtils IGVersionString] hasSuffix:@"-dev"]) {
+                    [mutableSections removeObjectAtIndex:index];
+                }
+            }
             
         }];
         
@@ -114,17 +120,21 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.navigationController.navigationBar.prefersLargeTitles = YES;
-    // self.view.backgroundColor = UIColor.systemBackgroundColor;
+    self.navigationController.navigationBar.prefersLargeTitles = NO;
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
 
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
-    // self.tableView.contentInset = UIEdgeInsetsMake(self.reduceMargin ? -30 : -10, 0, 0, 0);
     self.tableView.delegate = self;
     self.tableView.dragInteractionEnabled = [self pageAllowsReordering];
     self.tableView.dragDelegate = self;
     self.tableView.dropDelegate = self;
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.tableView.tintColor = [SCIUtils SCIColor_Primary];
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 72.0;
 
     [self.view addSubview:self.tableView];
 }
@@ -157,6 +167,14 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
     
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     UIListContentConfiguration *cellContentConfig = cell.defaultContentConfiguration;
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.tintColor = [SCIUtils SCIColor_Primary];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
+    cellContentConfig.textProperties.color = [SCIUtils SCIColor_InstagramPrimaryText];
+    cellContentConfig.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
+    cellContentConfig.textProperties.numberOfLines = 0;
+    cellContentConfig.secondaryTextProperties.numberOfLines = 0;
+    cellContentConfig.secondaryTextProperties.lineBreakMode = NSLineBreakByWordWrapping;
     
     cellContentConfig.text = SCITitleCaseString(row.title);
     
@@ -192,14 +210,14 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
         }
             
         case SCITableCellLink: {
-            cellContentConfig.textProperties.color = [UIColor systemBlueColor];
+            cellContentConfig.textProperties.color = [SCIUtils SCIColor_Primary];
             cellContentConfig.textProperties.font = [UIFont systemFontOfSize:[UIFont preferredFontForTextStyle:UIFontTextStyleBody].pointSize
                                                                       weight:UIFontWeightMedium];
             
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
             
             UIImageView *imageView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"safari"]];
-            imageView.tintColor = [UIColor systemGray3Color];
+            imageView.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
             cell.accessoryView = imageView;
             
             break;
@@ -207,10 +225,13 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
             
         case SCITableCellSwitch: {
             UISwitch *toggle = [UISwitch new];
-            toggle.on = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            id storedValue = [defaults objectForKey:row.defaultsKey];
+            NSNumber *defaultValue = row.userInfo[@"defaultValue"];
+            toggle.on = storedValue ? [defaults boolForKey:row.defaultsKey] : defaultValue.boolValue;
             toggle.onTintColor = [SCIUtils SCIColor_Primary];
             if (row.mutuallyExclusiveDefaultsKey.length) {
-                BOOL otherOn = [[NSUserDefaults standardUserDefaults] boolForKey:row.mutuallyExclusiveDefaultsKey];
+                BOOL otherOn = [defaults boolForKey:row.mutuallyExclusiveDefaultsKey];
                 toggle.enabled = toggle.isOn || !otherOn;
             }
             
@@ -259,10 +280,14 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
             menuButton.showsMenuAsPrimaryAction = YES;
             menuButton.titleLabel.font = [UIFont systemFontOfSize:[UIFont preferredFontForTextStyle:UIFontTextStyleBody].pointSize
                                                            weight:UIFontWeightMedium];
+            menuButton.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+            [menuButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+            [menuButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
             
             UIButtonConfiguration *config = menuButton.configuration ?: [UIButtonConfiguration plainButtonConfiguration];
-            menuButton.configuration.contentInsets = NSDirectionalEdgeInsetsMake(8, 8, 8, 8);
+            config.contentInsets = NSDirectionalEdgeInsetsMake(8, 8, 8, 8);
             menuButton.configuration = config;
+            menuButton.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
             [menuButton sizeToFit];
             

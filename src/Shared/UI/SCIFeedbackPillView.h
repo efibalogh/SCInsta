@@ -60,4 +60,7 @@ typedef NS_ENUM(NSUInteger, SCIFeedbackPillStyle) {
 /// Called when user taps the pill body after success state is shown.
 @property (nonatomic, copy) void(^onTapWhenCompleted)(void);
 
+/// Called after the pill has been fully removed from its superview.
+@property (nonatomic, copy) void(^onDidDismiss)(void);
+
 @end

@@ -140,7 +140,38 @@ static NSArray *SCIArrayFromCollection(id collection) {
 static NSString * const kSCICacheAutoClearModeKey = @"cache_auto_clear_mode";
 static NSString * const kSCICacheLastClearedAtKey = @"cache_last_cleared_at";
 
-static UIWindow *SCIFeedbackPresentationWindow(void) {
+@interface SCIFeedbackOverlayRootViewController : UIViewController
+@end
+
+@implementation SCIFeedbackOverlayRootViewController
+
+- (void)loadView {
+    UIView *view = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    view.backgroundColor = UIColor.clearColor;
+    self.view = view;
+}
+
+@end
+
+@interface SCIFeedbackPassthroughWindow : UIWindow
+@end
+
+@implementation SCIFeedbackPassthroughWindow
+
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hitView = [super hitTest:point withEvent:event];
+    if (hitView == self || hitView == self.rootViewController.view) {
+        return nil;
+    }
+    return hitView;
+}
+
+@end
+
+static SCIFeedbackPassthroughWindow *sSCIFeedbackOverlayWindow = nil;
+static SCIFeedbackOverlayRootViewController *sSCIFeedbackOverlayRootViewController = nil;
+
+static UIWindow *SCIPrimaryPresentationWindow(void) {
     UIViewController *topController = topMostController();
     UIWindow *window = topController.view.window;
     if (window && !window.hidden) {
@@ -161,8 +192,65 @@ static UIWindow *SCIFeedbackPresentationWindow(void) {
     return application.windows.firstObject;
 }
 
+static UIWindowScene *SCIFeedbackPresentationWindowScene(void) {
+    UIWindow *window = SCIPrimaryPresentationWindow();
+    if ([window.windowScene isKindOfClass:[UIWindowScene class]]) {
+        return window.windowScene;
+    }
+
+    UIApplication *application = [UIApplication sharedApplication];
+    for (UIScene *scene in application.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        if (scene.activationState == UISceneActivationStateForegroundActive) {
+            return (UIWindowScene *)scene;
+        }
+    }
+
+    for (UIScene *scene in application.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            return (UIWindowScene *)scene;
+        }
+    }
+
+    return nil;
+}
+
+static void SCICleanupFeedbackOverlayWindowIfNeeded(void) {
+    if (!sSCIFeedbackOverlayWindow || !sSCIFeedbackOverlayRootViewController) {
+        return;
+    }
+
+    if (sSCIFeedbackOverlayRootViewController.view.subviews.count > 0) {
+        return;
+    }
+
+    sSCIFeedbackOverlayWindow.hidden = YES;
+    sSCIFeedbackOverlayWindow.rootViewController = nil;
+    sSCIFeedbackOverlayWindow = nil;
+    sSCIFeedbackOverlayRootViewController = nil;
+}
+
 static UIView *SCIFeedbackPresentationView(void) {
-    UIWindow *window = SCIFeedbackPresentationWindow();
+    UIWindowScene *windowScene = SCIFeedbackPresentationWindowScene();
+    if (@available(iOS 13.0, *)) {
+        if (windowScene) {
+            if (!sSCIFeedbackOverlayWindow || sSCIFeedbackOverlayWindow.windowScene != windowScene) {
+                sSCIFeedbackOverlayRootViewController = [[SCIFeedbackOverlayRootViewController alloc] init];
+                sSCIFeedbackOverlayWindow = [[SCIFeedbackPassthroughWindow alloc] initWithWindowScene:windowScene];
+                sSCIFeedbackOverlayWindow.rootViewController = sSCIFeedbackOverlayRootViewController;
+                sSCIFeedbackOverlayWindow.backgroundColor = UIColor.clearColor;
+                sSCIFeedbackOverlayWindow.opaque = NO;
+                sSCIFeedbackOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
+                sSCIFeedbackOverlayWindow.frame = windowScene.coordinateSpace.bounds;
+            }
+
+            sSCIFeedbackOverlayRootViewController.view.frame = sSCIFeedbackOverlayWindow.bounds;
+            sSCIFeedbackOverlayWindow.hidden = NO;
+            return sSCIFeedbackOverlayRootViewController.view;
+        }
+    }
+
+    UIWindow *window = SCIPrimaryPresentationWindow();
     if (window) {
         return window;
     }
@@ -172,6 +260,21 @@ static UIView *SCIFeedbackPresentationView(void) {
 }
 
 static NSTimeInterval const kSCISuccessToastDuration = 1.8;
+
+static UIColor *SCIDynamicInstagramColor(CGFloat lightRed,
+                                         CGFloat lightGreen,
+                                         CGFloat lightBlue,
+                                         CGFloat darkRed,
+                                         CGFloat darkGreen,
+                                         CGFloat darkBlue) {
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        BOOL dark = traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+        CGFloat red = dark ? darkRed : lightRed;
+        CGFloat green = dark ? darkGreen : lightGreen;
+        CGFloat blue = dark ? darkBlue : lightBlue;
+        return [UIColor colorWithRed:red / 255.0 green:green / 255.0 blue:blue / 255.0 alpha:1.0];
+    }];
+}
 
 static SCIFeedbackPillStyle SCIFeedbackPillStyleFromPreferenceString(NSString *stylePreference) {
     if ([stylePreference isEqualToString:@"colorful"]) {
@@ -726,8 +829,52 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 
 // MARK: Colours
 + (UIColor *)SCIColor_Primary {
-    return [UIColor colorWithRed:0/255.0 green:152/255.0 blue:254/255.0 alpha:1];
-};
+    return [UIColor colorWithRed:0/255.0 green:149/255.0 blue:246/255.0 alpha:1.0];
+}
+
++ (UIColor *)SCIColor_InstagramBackground {
+    return SCIDynamicInstagramColor(255.0, 255.0, 255.0, 11.0, 16.0, 20.0);
+}
+
++ (UIColor *)SCIColor_InstagramSecondaryBackground {
+    return SCIDynamicInstagramColor(240.0, 241.0, 245.0, 42.0, 48.0, 55.0);
+}
+
++ (UIColor *)SCIColor_InstagramTertiaryBackground {
+    return SCIDynamicInstagramColor(232.0, 234.0, 238.0, 58.0, 64.0, 72.0);
+}
+
++ (UIColor *)SCIColor_InstagramGroupedBackground {
+    return [self SCIColor_InstagramBackground];
+}
+
++ (UIColor *)SCIColor_InstagramPrimaryText {
+    return SCIDynamicInstagramColor(15.0, 20.0, 25.0, 244.0, 247.0, 251.0);
+}
+
++ (UIColor *)SCIColor_InstagramSecondaryText {
+    return SCIDynamicInstagramColor(99.0, 108.0, 118.0, 177.0, 185.0, 194.0);
+}
+
++ (UIColor *)SCIColor_InstagramTertiaryText {
+    return SCIDynamicInstagramColor(130.0, 138.0, 147.0, 130.0, 138.0, 147.0);
+}
+
++ (UIColor *)SCIColor_InstagramSeparator {
+    return SCIDynamicInstagramColor(220.0, 223.0, 228.0, 52.0, 59.0, 67.0);
+}
+
++ (UIColor *)SCIColor_InstagramFavorite {
+    return [UIColor colorWithRed:255.0 / 255.0 green:48.0 / 255.0 blue:64.0 / 255.0 alpha:1.0];
+}
+
++ (UIColor *)SCIColor_InstagramDestructive {
+    return [UIColor colorWithRed:237.0 / 255.0 green:73.0 / 255.0 blue:86.0 / 255.0 alpha:1.0];
+}
+
++ (UIColor *)SCIColor_InstagramPressedBackground {
+    return SCIDynamicInstagramColor(232.0, 233.0, 238.0, 51.0, 60.0, 69.0);
+}
 
 // MARK: Errors
 + (NSError *)errorWithDescription:(NSString *)errorDesc {
@@ -1017,12 +1164,34 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     }
 
     NSTimeInterval effectiveDuration = (tone != SCIFeedbackPillToneError) ? kSCISuccessToastDuration : duration;
-    [SCIFeedbackPillView showToastInView:hostView
-                                duration:effectiveDuration
-                                   title:title
-                                subtitle:subtitle
-                                    icon:icon
-                                    tone:tone];
+    SCIFeedbackPillView *pill = [SCIFeedbackPillView showToastInView:hostView
+                                                            duration:effectiveDuration
+                                                               title:title
+                                                            subtitle:subtitle
+                                                                icon:icon
+                                                                tone:tone];
+    pill.onDidDismiss = ^{
+        SCICleanupFeedbackOverlayWindowIfNeeded();
+    };
+}
+
++ (void)showToastForActionIdentifier:(NSString *)actionIdentifier
+                            duration:(double)duration
+                               title:(NSString *)title
+                            subtitle:(NSString *)subtitle
+                        iconResource:(NSString *)iconResource
+             fallbackSystemImageName:(NSString *)fallbackSystemImageName
+                                tone:(SCIFeedbackPillTone)tone {
+    if (![SCIUtils shouldShowFeedbackPillForActionIdentifier:actionIdentifier]) {
+        return;
+    }
+
+    [SCIUtils showToastForDuration:duration
+                             title:title
+                          subtitle:subtitle
+                      iconResource:iconResource
+           fallbackSystemImageName:fallbackSystemImageName
+                              tone:tone];
 }
 
 + (SCIFeedbackPillView *)showProgressPill {
@@ -1041,7 +1210,23 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     }
     SCIApplyFeedbackPillStylePreference();
 
-    return [SCIFeedbackPillView showInView:hostView];
+    SCIFeedbackPillView *pill = [SCIFeedbackPillView showInView:hostView];
+    pill.onDidDismiss = ^{
+        SCICleanupFeedbackOverlayWindowIfNeeded();
+    };
+    return pill;
+}
+
++ (BOOL)shouldShowFeedbackPillForActionIdentifier:(NSString *)identifier {
+    NSString *defaultsKey = SCIFeedbackPillDefaultsKey(identifier);
+    if (defaultsKey.length == 0) return YES;
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if ([defaults objectForKey:defaultsKey] == nil) {
+        return YES;
+    }
+
+    return [defaults boolForKey:defaultsKey];
 }
 
 // MARK: Math

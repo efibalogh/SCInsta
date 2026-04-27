@@ -431,7 +431,7 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
     id media = nil;
     BOOL resolved = SCIResolveStoryContextFromOverlay(overlayView, &markTarget, &sectionController, &media);
     if (!markTarget || !sectionController || !media) {
-        [SCIUtils showToastForDuration:1.5
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionStoryMarkSeen duration:1.5
                                  title:@"Unable to mark story as seen"
                               subtitle:nil
                           iconResource:@"error_filled"
@@ -449,7 +449,7 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
         SCIAdvanceStoryAfterManualSeenIfNeeded(overlayView);
     }
 
-    [SCIUtils showToastForDuration:1.5
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionStoryMarkSeen duration:1.5
                              title:@"Marked story as seen"
                           subtitle:nil
                       iconResource:@"circle_check_filled"
@@ -581,7 +581,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
 
     id message = SCIDirectCurrentMessageFromController(controller);
     if (!message) {
-        [SCIUtils showToastForDuration:1.5
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
                                  title:@"Message not found"
                               subtitle:nil
                           iconResource:@"error_filled"
@@ -607,7 +607,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
 
     SCIPendingDirectVisualMessageToMarkSeen = nil;
     if (!dispatched) {
-        [SCIUtils showToastForDuration:1.5
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
                                  title:@"Unable to mark as seen"
                               subtitle:nil
                           iconResource:@"error_filled"
@@ -621,7 +621,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
         ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
     }
 
-    [SCIUtils showToastForDuration:1.5
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
                              title:@"Marked as seen"
                           subtitle:nil
                       iconResource:@"circle_check_filled"
@@ -756,7 +756,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     if ([nearestVC isKindOfClass:%c(IGDirectThreadViewController)]) {
         [(IGDirectThreadViewController *)nearestVC markLastMessageAsSeen];
 
-        [SCIUtils showToastForDuration:2.5
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionThreadMessagesMarkSeen duration:2.5
                                  title:@"Marked messages as seen"
                               subtitle:nil
                           iconResource:@"circle_check_filled"

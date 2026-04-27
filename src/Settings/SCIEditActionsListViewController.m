@@ -17,6 +17,12 @@ static char kSCIActionsListSwitchAssocKey;
 
 @implementation SCIEditActionsListViewController
 
+- (UIView *)selectionBackgroundView {
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    return view;
+}
+
 - (instancetype)initWithSource:(SCIActionButtonSource)source topicTitle:(NSString *)topicTitle {
     self = [super init];
     if (self) {
@@ -32,6 +38,7 @@ static char kSCIActionsListSwitchAssocKey;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.navigationController.navigationBar.prefersLargeTitles = NO;
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
     UIBarButtonItemStyle buttonStyle;
     if (@available(iOS 26.0, *)) {
         buttonStyle = (UIBarButtonItemStyle)2; // prominent
@@ -50,6 +57,9 @@ static char kSCIActionsListSwitchAssocKey;
     self.tableView.dragInteractionEnabled = YES;
     self.tableView.dragDelegate = self;
     self.tableView.dropDelegate = self;
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.tableView.tintColor = [SCIUtils SCIColor_Primary];
     [self.view addSubview:self.tableView];
 }
 
@@ -79,25 +89,30 @@ static char kSCIActionsListSwitchAssocKey;
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
     UIListContentConfiguration *config = cell.defaultContentConfiguration;
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.tintColor = [SCIUtils SCIColor_Primary];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
+    config.textProperties.color = [SCIUtils SCIColor_InstagramPrimaryText];
+    config.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
 
     if (indexPath.section == 0) {
         SCIActionMenuSection *section = self.configuration.sections[indexPath.row];
         config.text = section.title;
         config.secondaryText = section.collapsible ? @"Collapsible" : @"Inline";
-        config.image = [[SCISymbol resourceSymbolWithName:section.iconName color:[UIColor labelColor] size:22.0] image];
-        config.imageProperties.tintColor = [UIColor labelColor];
+        config.image = [[SCISymbol resourceSymbolWithName:section.iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.showsReorderControl = YES;
     } else if (indexPath.section == 1) {
         NSString *identifier = self.configuration.unassignedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[UIColor labelColor] size:22.0] image];
-        config.imageProperties.tintColor = [UIColor labelColor];
+        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     } else {
         NSString *identifier = self.configuration.supportedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[UIColor labelColor] size:22.0] image];
-        config.imageProperties.tintColor = [UIColor labelColor];
+        config.image = [[SCISymbol resourceSymbolWithName:SCIActionDescriptorIconName(identifier) color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+        config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
         UISwitch *toggle = [[UISwitch alloc] init];
         toggle.on = ![self.configuration.disabledActions containsObject:identifier];

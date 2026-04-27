@@ -1,4 +1,5 @@
 #import "SCIVaultFolderCell.h"
+#import "../../Utils.h"
 
 @interface SCIVaultFolderCell ()
 
@@ -22,13 +23,13 @@
         UIImageSymbolConfiguration *listSym = [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightMedium];
         _listIcon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"folder.fill" withConfiguration:listSym]];
         _listIcon.translatesAutoresizingMaskIntoConstraints = NO;
-        _listIcon.tintColor = [UIColor secondaryLabelColor];
+        _listIcon.tintColor = [SCIUtils SCIColor_InstagramSecondaryText];
         _listIcon.contentMode = UIViewContentModeScaleAspectFit;
 
         _listTitle = [[UILabel alloc] init];
         _listTitle.translatesAutoresizingMaskIntoConstraints = NO;
         _listTitle.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-        _listTitle.textColor = [UIColor labelColor];
+        _listTitle.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
         _listTitle.numberOfLines = 1;
         _listTitle.lineBreakMode = NSLineBreakByTruncatingMiddle;
         [_listTitle setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
@@ -37,7 +38,7 @@
         UIImageSymbolConfiguration *chevCfg = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightSemibold];
         _listChevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right" withConfiguration:chevCfg]];
         _listChevron.translatesAutoresizingMaskIntoConstraints = NO;
-        _listChevron.tintColor = [UIColor tertiaryLabelColor];
+        _listChevron.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
 
         _listStack = [[UIStackView alloc] initWithArrangedSubviews:@[_listIcon, _listTitle, _listChevron]];
         _listStack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -51,7 +52,7 @@
 
         UIView *sep = [[UIView alloc] init];
         sep.translatesAutoresizingMaskIntoConstraints = NO;
-        sep.backgroundColor = [UIColor separatorColor];
+        sep.backgroundColor = [SCIUtils SCIColor_InstagramSeparator];
         [self.contentView addSubview:sep];
         _listSeparator = sep;
 

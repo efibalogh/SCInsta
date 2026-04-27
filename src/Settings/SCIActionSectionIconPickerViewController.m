@@ -2,6 +2,7 @@
 
 #import "SCISymbol.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
+#import "../Utils.h"
 
 @interface SCIActionSectionIconPickerViewController () <UITableViewDataSource, UITableViewDelegate>
 
@@ -12,6 +13,12 @@
 @end
 
 @implementation SCIActionSectionIconPickerViewController
+
+- (UIView *)selectionBackgroundView {
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    return view;
+}
 
 - (instancetype)initWithSelectedIconName:(NSString *)selectedIconName
                                 onSelect:(void (^)(NSString *iconName))onSelect
@@ -28,11 +35,15 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.navigationController.navigationBar.prefersLargeTitles = NO;
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
 
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.tableView.tintColor = [SCIUtils SCIColor_Primary];
     [self.view addSubview:self.tableView];
 }
 
@@ -47,11 +58,15 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     UIListContentConfiguration *config = cell.defaultContentConfiguration;
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.tintColor = [SCIUtils SCIColor_Primary];
+    cell.selectedBackgroundView = [self selectionBackgroundView];
+    config.textProperties.color = [SCIUtils SCIColor_InstagramPrimaryText];
 
     SCIActionDescriptor *descriptor = [SCIActionDescriptor availableSectionIconDescriptors][indexPath.row];
     config.text = descriptor.title;
-    config.image = [[SCISymbol resourceSymbolWithName:descriptor.iconName color:[UIColor labelColor] size:22.0] image];
-    config.imageProperties.tintColor = [UIColor labelColor];
+    config.image = [[SCISymbol resourceSymbolWithName:descriptor.iconName color:[SCIUtils SCIColor_InstagramPrimaryText] size:22.0] image];
+    config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.contentConfiguration = config;
     cell.accessoryType = [descriptor.iconName isEqualToString:self.selectedIconName] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     return cell;
