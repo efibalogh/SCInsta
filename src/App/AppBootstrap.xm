@@ -1,6 +1,7 @@
 #import "../InstagramHeaders.h"
 #import "../Tweak.h"
 #import "../Utils.h"
+#import "SCIStartupHooks.h"
 
 %hook IGInstagramAppDelegate
 - (_Bool)application:(UIApplication *)application willFinishLaunchingWithOptions:(id)arg2 {
@@ -106,6 +107,7 @@
         [defaults setBool:NO forKey:@"IGLiquidGlassOverrideEnabled"];
     }
     [SCIUtils applyLiquidGlassNavigationExperimentOverride];
+    SCIInstallEnabledFeatureHooks();
 
     return %orig;
 }

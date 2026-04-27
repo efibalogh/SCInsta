@@ -98,6 +98,8 @@ static void SCIInstallDirectActionButton(UIViewController *controller) {
 	[overlay bringSubviewToFront:button];
 }
 
+%group SCIMessagesActionButtonHooks
+
 %hook IGDirectVisualMessageViewerController
 - (void)viewDidLayoutSubviews {
 	%orig;
@@ -111,3 +113,14 @@ static void SCIInstallDirectActionButton(UIViewController *controller) {
 	});
 }
 %end
+
+%end
+
+extern "C" void SCIInstallMessagesActionButtonHooksIfEnabled(void) {
+	if (![SCIUtils getBoolPref:@"action_button_messages_enabled"]) return;
+
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+	%init(SCIMessagesActionButtonHooks);
+	});
+}

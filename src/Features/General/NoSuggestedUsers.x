@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+%group SCINoSuggestedUsersHooks
+
 // "Welcome to instagram" suggested users in feed
 %hook IGSuggestedUnitViewModel
 - (id)initWithAYMFModel:(id)arg1 headerViewModel:(id)arg2 {
@@ -13,6 +15,7 @@
     return %orig;
 }
 %end
+
 %hook IGSuggestionsUnitViewModel
 - (id)initWithAYMFModel:(id)arg1 headerViewModel:(id)arg2 {
     if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
@@ -261,3 +264,16 @@
     return %orig(arg1, rows, allActions, overflowActions, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 %end
+
+%end
+
+void SCIInstallNoSuggestedUsersHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"no_suggested_users"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCINoSuggestedUsersHooks);
+    });
+}

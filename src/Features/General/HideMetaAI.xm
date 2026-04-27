@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+%group SCIHideMetaAIHooks
+
 // Direct
 
 // Meta AI button functionality on direct search bar
@@ -615,3 +617,16 @@ sponsoredSupportConfiguration:(id)supportConfig
     return [filteredObjs copy];
 }
 %end
+
+%end
+
+extern "C" void SCIInstallHideMetaAIHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIHideMetaAIHooks);
+    });
+}

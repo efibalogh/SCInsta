@@ -16,6 +16,8 @@
 ////////////////////////////////////////////////////////
 
 // Follow button on profile page
+%group SCIFollowConfirmHooks
+
 %hook IGFollowController
 - (void)_didPressFollowButton {
     // Get user follow status (check if already following user)
@@ -99,7 +101,9 @@ static void hooked_listSectionController(id self, SEL _cmd, id arg1, id arg2) {
     orig_listSectionController(self, _cmd, arg1, arg2);
 }
 
-%ctor {
+%end
+
+static void SCIInstallFollowAllConfirmHook(void) {
     Class cls = objc_getClass("IGDirectDetailMembersKit.IGDirectThreadDetailsMembersListViewController");
     if (!cls) return;
 
@@ -109,4 +113,14 @@ static void hooked_listSectionController(id self, SEL _cmd, id arg1, id arg2) {
         (IMP)hooked_listSectionController,
         (IMP *)&orig_listSectionController
     );
+}
+
+void SCIInstallFollowConfirmHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"follow_confirm"] && ![SCIUtils getBoolPref:@"unfollow_confirm"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+    %init(SCIFollowConfirmHooks);
+    SCIInstallFollowAllConfirmHook();
+    });
 }

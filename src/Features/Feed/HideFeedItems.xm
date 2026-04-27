@@ -113,6 +113,8 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
     return [filteredObjs copy];
 }
 
+%group SCIFeedFilteringHooks
+
 // Suggested posts/reels
 %hook IGMainFeedListAdapterDataSource
 - (NSArray *)objectsForListAdapter:(id)arg1 {
@@ -132,6 +134,7 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
     return filteredObjs;
 }
 %end
+
 %hook IGSundialFeedDataSource
 - (NSArray *)objectsForListAdapter:(id)arg1 {
     NSArray *filteredList = removeItemsInList(%orig, NO);
@@ -144,6 +147,7 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
     return filteredList;
 }
 %end
+
 %hook IGContextualFeedViewController
 - (NSArray *)objectsForListAdapter:(id)arg1 {
     if ([SCIUtils getBoolPref:@"hide_ads"]) {
@@ -332,3 +336,35 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
     return;
 }
 %end
+
+%end
+
+static BOOL SCIAnyFeedFilteringPrefEnabled(void) {
+    for (NSString *key in @[
+        @"hide_ads",
+        @"no_suggested_post",
+        @"no_suggested_reels",
+        @"no_suggested_account",
+        @"no_suggested_threads",
+        @"hide_stories_tray",
+        @"hide_entire_feed",
+        @"prevent_doom_scrolling"
+    ]) {
+        if ([SCIUtils getBoolPref:key]) {
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
+extern "C" void SCIInstallFeedFilteringHooksIfEnabled(void) {
+    if (!SCIAnyFeedFilteringPrefEnabled()) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIFeedFilteringHooks);
+    });
+}

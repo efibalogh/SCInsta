@@ -576,7 +576,11 @@ static void hooked_configureProfileHeaderView(id self, SEL _cmd, id titleView, i
     orig_profileHeaderConfigure(self, _cmd, titleView, leftButtons, patchedRight, titleIsCentered);
 }
 
-%ctor {
+extern "C" void SCIInstallProfileActionButtonHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"action_button_profile_enabled"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
     Class headerClass = objc_getClass("IGProfileNavigationSwift.IGProfileNavigationHeaderView");
     if (!headerClass) headerClass = objc_getClass("IGProfileNavigationHeaderView");
     if (!headerClass) return;
@@ -584,4 +588,5 @@ static void hooked_configureProfileHeaderView(id self, SEL _cmd, id titleView, i
     SEL selector = @selector(configureWithTitleView:leftButtons:rightButtons:titleIsCentered:);
     if (![headerClass instancesRespondToSelector:selector]) return;
     MSHookMessageEx(headerClass, selector, (IMP)hooked_configureProfileHeaderView, (IMP *)&orig_profileHeaderConfigure);
+    });
 }

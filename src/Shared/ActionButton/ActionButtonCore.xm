@@ -34,6 +34,7 @@ static const void *kSCIActionButtonIconWidthConstraintAssocKey = &kSCIActionButt
 static const void *kSCIActionButtonIconHeightConstraintAssocKey = &kSCIActionButtonIconHeightConstraintAssocKey;
 static const void *kSCIActionButtonMenuSignatureAssocKey = &kSCIActionButtonMenuSignatureAssocKey;
 static const void *kSCIActionButtonLastMenuActionAssocKey = &kSCIActionButtonLastMenuActionAssocKey;
+static NSDictionary<NSString *, NSString *> *SCIPendingRepostFeedback = nil;
 
 @interface SCIResolvedMediaEntry : NSObject
 @property (nonatomic, strong, nullable) id mediaObject;
@@ -196,7 +197,7 @@ static NSString *SCIActionButtonDisplayTitleForContext(NSString *identifier, SCI
 	return SCIActionDescriptorDisplayTitle(identifier, context.settingsTitle);
 }
 
-static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButtonSource source, CGFloat size) {
+static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButtonSource source, CGFloat size, SCIActionButtonContext *context) {
 	NSString *append = (source == SCIActionButtonSourceReels) ? @"_reels" : @"";
 	NSString *iconName = SCIActionDescriptorIconName(identifier);
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) {
@@ -316,7 +317,14 @@ static SCIMediaPreviewPlaybackBlock SCIResumePlaybackBlockForContext(SCIActionBu
 }
 
 UIImage *SCIActionButtonMenuIconForIdentifier(NSString *identifier, CGFloat size) {
-	return SCIIconForActionIdentifier(identifier, SCIActionButtonSourceFeed, size);
+	return SCIIconForActionIdentifier(identifier, SCIActionButtonSourceFeed, size, nil);
+}
+
+static UIImage *SCIActionButtonMenuIconForContext(NSString *identifier, SCIActionButtonContext *context, CGFloat size) {
+	SCIActionButtonSource menuSource = (context.source == SCIActionButtonSourceReels)
+		? SCIActionButtonSourceFeed
+		: context.source;
+	return SCIIconForActionIdentifier(identifier, menuSource, size, context);
 }
 
 static NSInteger SCIClampedIndex(NSInteger index, NSInteger count) {
@@ -722,7 +730,7 @@ static void SCIResumeDirectPlaybackFromController(UIViewController *controller) 
 	}
 }
 
-static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSource source) {
+static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSource source, SCIActionButtonContext *context) {
 	CGFloat size = 24.0;
 	if (source == SCIActionButtonSourceReels) {
 		size = 44.0;
@@ -738,7 +746,7 @@ static UIImage *SCIButtonDefaultImage(NSString *identifier, SCIActionButtonSourc
 			: [SCIAssetUtils instagramIconNamed:@"action" pointSize:size];
 	}
 
-	return SCIIconForActionIdentifier(identifier, source, size);
+	return SCIIconForActionIdentifier(identifier, source, size, context);
 }
 
 static CGSize SCICustomButtonIconDisplaySize(NSString *identifier, SCIActionButtonSource source, UIImage *image, UIButton *button) {
@@ -906,6 +914,26 @@ static NSString *SCIActionButtonMenuSignature(SCIActionButtonContext *context,
 			configuration.dictionaryRepresentation.description ?: @""];
 }
 
+void SCIArmPendingRepostFeedback(SCIActionButtonContext *context) {
+	if (!context) return;
+
+	NSString *sourceValue = [NSString stringWithFormat:@"%ld", (long)context.source];
+	SCIPendingRepostFeedback = @{
+		@"title": @"Tapped repost button",
+		@"iconResource": @"ig_icon_reshare_outline_24",
+		@"source": sourceValue
+	};
+}
+
+NSDictionary<NSString *, NSString *> *SCIConsumePendingRepostFeedback(SCIActionButtonSource source) {
+	NSString *expectedSource = [NSString stringWithFormat:@"%ld", (long)source];
+	if (![SCIPendingRepostFeedback[@"source"] isEqualToString:expectedSource]) return nil;
+
+	NSDictionary<NSString *, NSString *> *feedback = SCIPendingRepostFeedback;
+	SCIPendingRepostFeedback = nil;
+	return feedback;
+}
+
 static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIGallerySaveMetadata *metadata, SCIActionButtonContext *context) {
 	if (!videoURL) {
 		[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled"];
@@ -1053,7 +1081,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		    SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
         }
 		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opening thumbnail" subtitle:nil iconResource:@"photo_gallery"];
+			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened thumbnail" subtitle:nil iconResource:@"photo_gallery"];
 		}
 		return YES;
 	}
@@ -1090,9 +1118,12 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	}
 
 	if ([identifier isEqualToString:kSCIActionRepost]) {
+		if (context.repostHandler) {
+			SCIArmPendingRepostFeedback(context);
+		}
 		BOOL handled = context.repostHandler ? context.repostHandler(context) : NO;
-		if (handled && shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened repost" subtitle:nil iconResource:@"repost"];
+		if (!handled) {
+			SCIConsumePendingRepostFeedback(context.source);
 		}
 		if (!handled && shouldShowFeedbackPill) {
 			[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Repost unavailable" subtitle:nil iconResource:@"repost"];
@@ -1210,7 +1241,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	button.hidden = NO;
 
 	NSString *defaultIdentifier = SCIResolvedDefaultActionIdentifier(visibleActions, context.source);
-	UIImage *defaultImage = SCIButtonDefaultImage(defaultIdentifier, context.source);
+	UIImage *defaultImage = SCIButtonDefaultImage(defaultIdentifier, context.source, context);
 	SCISetButtonVisualImage(button, defaultImage, context.source, defaultIdentifier);
 	BOOL shouldOpenMenuOnTap = [defaultIdentifier isEqualToString:kSCIActionNone];
 	SCIActionButtonConfiguration *configuration = [SCIActionButtonConfiguration configurationForSource:context.source
@@ -1268,7 +1299,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 			if (![visibleActions containsObject:identifier]) continue;
 
 			UIAction *menuAction = [UIAction actionWithTitle:SCIActionButtonDisplayTitleForContext(identifier, context)
-													   image:SCIActionButtonMenuIconForIdentifier(identifier, 22.0)
+													   image:SCIActionButtonMenuIconForContext(identifier, context, 22.0)
 												  identifier:nil
 													 handler:^(__unused UIAction *action) {
 				UIButton *strongButton = weakButton;
@@ -1308,7 +1339,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	if (menuElements.count == 0) {
 		for (NSString *identifier in visibleActions) {
 			[menuElements addObject:[UIAction actionWithTitle:SCIActionButtonDisplayTitleForContext(identifier, context)
-														image:SCIActionButtonMenuIconForIdentifier(identifier, 22.0)
+														image:SCIActionButtonMenuIconForContext(identifier, context, 22.0)
 												   identifier:nil
 													  handler:^(__unused UIAction *action) {
 				UIButton *strongButton = weakButton;

@@ -311,7 +311,11 @@ static void SCIApplyBottomButtonsCollapse(UIView *view) {
 
 %end
 
-%ctor {
+extern "C" void SCIInstallCreateGroupButtonControlHooksIfEnabled(void) {
+    if (!SCIShouldHideCreateGroupButton() && !SCIShouldConfirmCreateGroupButton()) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
     Class createGroupButtonClass = objc_getClass(kSCICreateGroupButtonRuntimeClassName.UTF8String);
     Class bottomButtonsViewClass = objc_getClass(kSCIBottomButtonsViewRuntimeClassName.UTF8String);
     Class bottomButtonsContainerClass = objc_getClass(kSCIBottomButtonsContainerRuntimeClassName.UTF8String);
@@ -322,4 +326,5 @@ static void SCIApplyBottomButtonsCollapse(UIView *view) {
               SCIBottomButtonsViewClass=bottomButtonsViewClass,
               SCIBottomButtonsContainerClass=bottomButtonsContainerClass);
     }
+    });
 }

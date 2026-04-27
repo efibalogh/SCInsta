@@ -52,7 +52,7 @@ static double new_peakWsBgRefresh(id self, SEL _cmd, id launcherSet, id store) {
     return override > 0.0 ? override : orig_peakWsBgRefresh(self, _cmd, launcherSet, store);
 }
 
-%ctor {
+static void SCIInstallRefreshUtilityHooks(void) {
     Class refreshUtilityClass = NSClassFromString(@"IGMainFeedViewModelUtility.IGMainFeedRefreshUtility");
     if (refreshUtilityClass) {
         Class metaClass = object_getClass(refreshUtilityClass);
@@ -80,6 +80,8 @@ static double new_peakWsBgRefresh(id self, SEL _cmd, id launcherSet, id store) {
 }
 
 // MARK: - Background refresh network source hooks
+
+%group SCIBackgroundRefreshHooks
 
 %hook IGMainFeedNetworkSource
 
@@ -220,3 +222,15 @@ useShimmerLoadingWhenNoStoriesTray:(BOOL)a25 {
 }
 
 %end
+
+%end
+
+void SCIInstallBackgroundRefreshHooksIfEnabled(void) {
+    if (!sciDisableBgRefresh() && !sciDisableHomeRefresh() && !sciDisableReelsRefresh()) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+    %init(SCIBackgroundRefreshHooks);
+    SCIInstallRefreshUtilityHooks();
+    });
+}

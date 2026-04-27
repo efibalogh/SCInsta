@@ -722,6 +722,8 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 
 // Seen buttons (in DMs)
 // - Enables no seen for messages
+%group SCISeenButtonHooks
+
 %hook IGTallNavigationBarView
 - (void)setRightBarButtonItems:(NSArray <UIBarButtonItem *> *)items {
     NSMutableArray *new_items = [[items filteredArrayUsingPredicate:
@@ -956,7 +958,9 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
 }
 %end
 
-%ctor {
+%end
+
+static void SCIInstallDirectThreadSeenStateHooks(void) {
     Class threadVCClass = NSClassFromString(@"IGDirectThreadViewController");
     if (!threadVCClass) return;
 
@@ -975,4 +979,19 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
                         (IMP)SCIHooked_setHasSentAMessage,
                         (IMP *)&orig_setHasSentAMessage);
     }
+}
+
+void SCIInstallSeenButtonHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"remove_lastseen"] &&
+        ![SCIUtils getBoolPref:@"no_seen_receipt"] &&
+        ![SCIUtils getBoolPref:@"unlimited_replay"] &&
+        ![SCIUtils getBoolPref:@"hide_reels_blend"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+    %init(SCISeenButtonHooks);
+    SCIInstallDirectThreadSeenStateHooks();
+    });
 }

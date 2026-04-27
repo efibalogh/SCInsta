@@ -1,4 +1,5 @@
 #import "SCISettingsViewController.h"
+#import "../App/SCIStartupHooks.h"
 
 static char rowStaticRef[] = "row";
 
@@ -452,6 +453,9 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
     }
     
     NSLog(@"Switch changed: %@", sender.isOn ? @"ON" : @"OFF");
+    if (sender.isOn) {
+        SCIInstallEnabledFeatureHooks();
+    }
     
     if (row.mutuallyExclusiveDefaultsKey.length) {
         [self.tableView reloadData];

@@ -53,6 +53,8 @@ static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
     return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_alert_dialog_actions" orig:(SCILiquidGlassBoolMsg)orig_alert_enableLiquidGlass selfPtr:self sel:_cmd];
 }
 
+%group SCILiquidGlassHooks
+
 %hook IGTabBar
 - (instancetype)initWithFrame:(CGRect)frame
                 defaultConfig:(id)defaultConfig
@@ -97,7 +99,35 @@ static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
 }
 %end
 
-%ctor {
+%end
+
+static BOOL SCIAnyLiquidGlassPrefEnabled(void) {
+    for (NSString *key in @[
+        @"liquid_glass_surfaces",
+        @"liquid_glass_buttons",
+        @"liquid_glass_core_class",
+        @"liquid_glass_nav_is_enabled",
+        @"liquid_glass_nav_default_value_set",
+        @"liquid_glass_nav_home_feed_header",
+        @"liquid_glass_swizzle_toggle",
+        @"liquid_glass_badged_nav_button",
+        @"liquid_glass_video_back_button",
+        @"liquid_glass_video_camera_button",
+        @"liquid_glass_alert_dialog_actions",
+        @"liquid_glass_interactive_tab_bar"
+    ]) {
+        if ([SCIUtils getBoolPref:key]) return YES;
+    }
+    return NO;
+}
+
+extern "C" void SCIInstallLiquidGlassHooksIfEnabled(void) {
+    if (!SCIAnyLiquidGlassPrefEnabled()) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+    %init(SCILiquidGlassHooks);
+
     Class c = objc_getClass("IGLiquidGlass.IGLiquidGlass");
     if (c) {
         Method m = class_getClassMethod(c, @selector(isEnabled));
@@ -166,6 +196,7 @@ static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
             MSHookMessageEx(c, @selector(enableLiquidGlass), (IMP)hook_alert_enableLiquidGlass, (IMP *)&orig_alert_enableLiquidGlass);
         }
     }
+    });
 }
 
 #pragma clang diagnostic pop

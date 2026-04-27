@@ -144,9 +144,21 @@ static NSString *SCIReelsCaptionForContext(SCIActionButtonContext *context, id m
 }
 
 static BOOL SCIReelsTriggerRepost(SCIActionButtonContext *context) {
-	if (!context.view || ![context.view respondsToSelector:@selector(_didTapRepostButton:)]) return NO;
-	((void (*)(id, SEL, id))objc_msgSend)(context.view, @selector(_didTapRepostButton:), nil);
-	return YES;
+	if (!context.view) return NO;
+
+	SEL noArgSelector = NSSelectorFromString(@"_didTapRepostButton");
+	if ([context.view respondsToSelector:noArgSelector]) {
+		((void (*)(id, SEL))objc_msgSend)(context.view, noArgSelector);
+		return YES;
+	}
+
+	SEL oneArgSelector = @selector(_didTapRepostButton:);
+	if ([context.view respondsToSelector:oneArgSelector]) {
+		((void (*)(id, SEL, id))objc_msgSend)(context.view, oneArgSelector, nil);
+		return YES;
+	}
+
+	return NO;
 }
 
 static SCIActionButtonContext *SCIReelsActionContext(UIView *verticalUFIView) {
@@ -214,9 +226,22 @@ static void SCIInstallReelsActionButton(UIView *verticalUFIView) {
 	SCIApplyButtonStyle(button, SCIActionButtonSourceReels);
 }
 
+%group SCIReelsActionButtonHooks
+
 %hook IGSundialViewerVerticalUFI
 - (void)layoutSubviews {
 	%orig;
 	SCIInstallReelsActionButton((UIView *)self);
 }
 %end
+
+%end
+
+extern "C" void SCIInstallReelsActionButtonHooksIfEnabled(void) {
+	if (![SCIUtils getBoolPref:@"action_button_reels_enabled"]) return;
+
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+	%init(SCIReelsActionButtonHooks);
+	});
+}

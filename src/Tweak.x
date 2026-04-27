@@ -2,6 +2,7 @@
 #import "InstagramHeaders.h"
 #import "Tweak.h"
 #import "Utils.h"
+#import "Shared/ActionButton/ActionButtonCore.h"
 
 ///////////////////////////////////////////////////////////
 
@@ -19,6 +20,18 @@ NSString *SCIVersionString = @"v1.2.0-dev";
 __weak id SCIPendingDirectVisualMessageToMarkSeen = nil;
 BOOL SCIForceMarkStoryAsSeen = NO;
 BOOL SCIForceStoryAutoAdvance = NO;
+
+static void SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSource source) {
+    NSDictionary<NSString *, NSString *> *feedback = SCIConsumePendingRepostFeedback(source);
+    if (!feedback) return;
+    if (![SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIActionRepost]) return;
+
+    [SCIUtils showToastForActionIdentifier:kSCIActionRepost
+                                  duration:1.4
+                                     title:feedback[@"title"] ?: @"Tapped repost button"
+                                  subtitle:nil
+                              iconResource:feedback[@"iconResource"] ?: @"ig_icon_reshare_outline_24"];
+}
 
 // MARK: Liquid glass
 
@@ -557,10 +570,17 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     if ([SCIUtils getBoolPref:@"repost_confirm_feed"]) {
         NSLog(@"[SCInsta] Confirm repost triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) {
+            %orig;
+            SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceFeed);
+        } cancelHandler:^{
+            SCIConsumePendingRepostFeedback(SCIActionButtonSourceFeed);
+        }];
     }
     else {
-        return %orig;
+        %orig;
+        SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceFeed);
+        return;
     }
 }
 
@@ -603,14 +623,39 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     }
 }
 
+- (void)_didTapRepostButton {
+    if ([SCIUtils getBoolPref:@"repost_confirm_reels"]) {
+        NSLog(@"[SCInsta] Confirm repost triggered");
+
+        [SCIUtils showConfirmation:^(void) {
+            %orig;
+            SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceReels);
+        } cancelHandler:^{
+            SCIConsumePendingRepostFeedback(SCIActionButtonSourceReels);
+        }];
+    }
+    else {
+        %orig;
+        SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceReels);
+        return;
+    }
+}
+
 - (void)_didTapRepostButton:(id)arg1 {
     if ([SCIUtils getBoolPref:@"repost_confirm_reels"]) {
         NSLog(@"[SCInsta] Confirm repost triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) {
+            %orig;
+            SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceReels);
+        } cancelHandler:^{
+            SCIConsumePendingRepostFeedback(SCIActionButtonSourceReels);
+        }];
     }
     else {
-        return %orig;
+        %orig;
+        SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceReels);
+        return;
     }
 }
 

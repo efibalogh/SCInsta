@@ -339,6 +339,8 @@ static void SCIHookSwiftModernFeedVideoLayout(id self, SEL _cmd) {
 	SCIAddFeedExpandLongPressIfNeeded((UIView *)self, @selector(sci_handleExpandLongPress:));
 }
 
+%group SCIFeedActionButtonHooks
+
 %hook IGFeedPhotoView
 - (void)didMoveToSuperview {
 	%orig;
@@ -418,7 +420,18 @@ static void SCIHookSwiftModernFeedVideoLayout(id self, SEL _cmd) {
 }
 %end
 
-%ctor {
+%end
+
+extern "C" void SCIInstallFeedActionButtonHooksIfEnabled(void) {
+	if (![SCIUtils getBoolPref:@"action_button_feed_enabled"] &&
+		![SCIUtils getBoolPref:@"enable_long_press_expand"]) {
+		return;
+	}
+
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+	%init(SCIFeedActionButtonHooks);
+
 	Class modernObjCName = objc_getClass("IGModernFeedVideoCell");
 	Class modernSwiftRuntime = objc_getClass("IGModernFeedVideoCell.IGModernFeedVideoCell");
 	if (modernSwiftRuntime && modernSwiftRuntime != modernObjCName) {
@@ -426,4 +439,5 @@ static void SCIHookSwiftModernFeedVideoLayout(id self, SEL _cmd) {
 		MSHookMessageEx(modernSwiftRuntime, @selector(didMoveToSuperview), (IMP)SCIHookSwiftModernFeedVideoDidMove, (IMP *)&orig_swiftModernFeedVideo_didMove);
 		MSHookMessageEx(modernSwiftRuntime, @selector(layoutSubviews), (IMP)SCIHookSwiftModernFeedVideoLayout, (IMP *)&orig_swiftModernFeedVideo_layout);
 	}
+	});
 }

@@ -112,9 +112,22 @@ static void SCIInstallStoriesActionButton(UIView *overlayView) {
 	SCIApplyButtonStyle(button, SCIActionButtonSourceStories);
 }
 
+%group SCIStoriesActionButtonHooks
+
 %hook IGStoryFullscreenOverlayView
 - (void)layoutSubviews {
 	%orig;
 	SCIInstallStoriesActionButton((UIView *)self);
 }
 %end
+
+%end
+
+extern "C" void SCIInstallStoriesActionButtonHooksIfEnabled(void) {
+	if (![SCIUtils getBoolPref:@"action_button_stories_enabled"]) return;
+
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+	%init(SCIStoriesActionButtonHooks);
+	});
+}

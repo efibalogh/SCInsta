@@ -37,11 +37,16 @@ static void replaced_shareToClipboardFromVC(id self, SEL _cmd, id vc) {
     SCIPollClipboardAndSanitize(countBefore, 30, 0.05);
 }
 
-__attribute__((constructor)) static void SCISharedLinkCleanupInit(void) {
+extern "C" void SCIInstallSharedLinkCleanupHooksIfEnabled(void) {
+    if (!SCIShouldSanitizeCopiedShareLinks()) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
     Class cls = NSClassFromString(@"IGExternalShareOptionsViewController");
     SEL selector = NSSelectorFromString(@"_shareToClipboardFromVC:");
     if (!cls || !class_getInstanceMethod(cls, selector)) {
         return;
     }
     MSHookMessageEx(cls, selector, (IMP)replaced_shareToClipboardFromVC, (IMP *)&orig_shareToClipboardFromVC);
+    });
 }

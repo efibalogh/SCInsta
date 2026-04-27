@@ -138,6 +138,8 @@ static void SCIHookedCoinFlipLongPress(id self, SEL _cmd, UILongPressGestureReco
 }
 
 
+%group SCIProfilePhotoZoomHooks
+
 %hook IGProfileAvatarView
 - (void)_profilePictureLongPressed:(UILongPressGestureRecognizer *)gesture {
     if (SCIShouldInterceptProfileLongPress(gesture)) {
@@ -158,7 +160,15 @@ static void SCIHookedCoinFlipLongPress(id self, SEL _cmd, UILongPressGestureReco
 }
 %end
 
-%ctor {
+%end
+
+void SCIInstallProfilePhotoZoomHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"profile_photo_zoom"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+    %init(SCIProfilePhotoZoomHooks);
+
     Class coinFlipClass = NSClassFromString(@"IGProfilePhotoCoinFlipUI.IGProfilePhotoCoinFlipView");
     SEL selector = NSSelectorFromString(@"viewLongPressedWithGesture:");
 
@@ -168,4 +178,5 @@ static void SCIHookedCoinFlipLongPress(id self, SEL _cmd, UILongPressGestureReco
                         (IMP)SCIHookedCoinFlipLongPress,
                         (IMP *)&orig_coinFlipLongPress);
     }
+    });
 }
