@@ -34,6 +34,30 @@ static UIImage *SCIAssetScaleImage(UIImage *image, CGFloat maxPointSize) {
     return scaled;
 }
 
+static UIImage *SCIAssetRotateImage(UIImage *image, CGFloat radians) {
+    if (!image) {
+        return nil;
+    }
+
+    CGRect rect = CGRectApplyAffineTransform((CGRect){.origin = CGPointZero, .size = image.size}, CGAffineTransformMakeRotation(radians));
+    CGSize rotatedSize = CGSizeMake(fabs(rect.size.width), fabs(rect.size.height));
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = image.scale;
+
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:rotatedSize format:format];
+    UIImage *rotated = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull context) {
+        CGContextRef cgContext = context.CGContext;
+        CGContextTranslateCTM(cgContext, rotatedSize.width / 2.0, rotatedSize.height / 2.0);
+        CGContextRotateCTM(cgContext, radians);
+        [image drawInRect:CGRectMake(-image.size.width / 2.0, -image.size.height / 2.0, image.size.width, image.size.height)];
+    }];
+
+    if (image.renderingMode != UIImageRenderingModeAutomatic) {
+        rotated = [rotated imageWithRenderingMode:image.renderingMode];
+    }
+    return rotated;
+}
+
 static NSArray<NSNumber *> *SCIAssetCandidateSizes(CGFloat pointSize) {
     NSInteger rounded = (NSInteger)lround(MAX(pointSize, 0.0));
     NSMutableOrderedSet<NSNumber *> *sizes = [NSMutableOrderedSet orderedSet];
@@ -94,8 +118,13 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
     dispatch_once(&onceToken, ^{
         overrides = @{
             @"app": @{@"candidates": @[@"ig_icon_app_instagram_pano_outline_24", @"ig_icon_app_instagram_outline_24"]},
-            @"action": @{@"candidates": @[@"ig_icon_flash_outline_24"]},
+            @"action": @{@"candidates": @[@"ig_icon_flash_outline_24", @"ig_icon_flash_outline_20"]},
             @"action_reels": @{@"candidates": @[@"ig_icon_flash_outline_44"]},
+            @"arrow_up": @{@"candidates": @[@"ig_icon_arrow_up_outline_24"]},
+            @"arrow_down": @{@"candidates": @[@"ig_icon_arrow_down_outline_24"]},
+            @"arrow_left": @{@"candidates": @[@"ig_icon_arrow_left_outline_24"]},
+            @"arrow_right": @{@"candidates": @[@"ig_icon_arrow_right_outline_24"]},
+            @"arrow_cw": @{@"candidates": @[@"ig_icon_arrow_cw_outline_24"]},
             @"arrow_ccw": @{@"candidates": @[@"ig_icon_arrow_ccw_outline_24"]},
             @"backspace": @{@"candidates": @[@"ig_icon_backspace_outline_24"]},
             @"calendar": @{@"candidates": @[@"ig_icon_calendar_outline_24"]},
@@ -142,7 +171,7 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
             @"photo_reels": @{@"candidates": @[@"ig_icon_photo_outline_44"]},
             @"photo_gallery": @{@"candidates": @[@"ig_icon_photo_gallery_outline_24"]},
             @"plus": @{@"candidates": @[@"ig_icon_add_pano_outline_24", @"ig_icon_add_outline_24"]},
-            @"profile": @{@"candidates": @[@"ig_icon_user_prism_outline_24"]},
+            @"profile": @{@"candidates": @[@"ig_icon_user_prism_outline_24", @"ig_icon_user_outline_24"]},
             @"reels": @{@"candidates": @[@"ig_icon_reels_prism_outline_24", @"ig_icon_reels_pano_prism_outline_24", @"ig_icon_reels_outline_24", @"ig_icon_reels_pano_outline_24"]},
             @"reels_gallery": @{@"candidates": @[@"ig_icon_reels_gallery_outline_24"]},
             @"repost": @{@"candidates": @[@"ig_icon_reshare_outline_24"]},

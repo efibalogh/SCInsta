@@ -8,7 +8,8 @@ typedef NS_ENUM(NSUInteger, SCIFeedbackPillTone) {
 
 typedef NS_ENUM(NSUInteger, SCIFeedbackPillStyle) {
     SCIFeedbackPillStyleColorful = 0,
-    SCIFeedbackPillStyleClean = 1
+    SCIFeedbackPillStyleClean = 1,
+    SCIFeedbackPillStyleDynamic = 2
 };
 
 @interface SCIFeedbackPillView : UIView

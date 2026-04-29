@@ -290,6 +290,9 @@ static SCIFeedbackPillStyle SCIFeedbackPillStyleFromPreferenceString(NSString *s
     if ([stylePreference isEqualToString:@"colorful"]) {
         return SCIFeedbackPillStyleColorful;
     }
+    if ([stylePreference isEqualToString:@"dynamic"]) {
+        return SCIFeedbackPillStyleDynamic;
+    }
 
     return SCIFeedbackPillStyleClean;
 }
@@ -813,10 +816,6 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 }
 
 + (void)showSettingsForTopicTitle:(NSString *)title {
-    SCISettingsViewController *settingsViewController = [SCISettingsViewController new];
-    UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
-    navigationController.modalPresentationStyle = UIModalPresentationFullScreen;
-
     NSArray *rootSections = [SCITweakSettings sections];
     NSArray *topicRows = rootSections.count > 0 ? rootSections[0][@"rows"] : nil;
     NSArray *targetSections = nil;
@@ -829,14 +828,25 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
         }
     }
 
+    SCISettingsViewController *settingsViewController = nil;
+    if (targetSections.count > 0) {
+        settingsViewController = [[SCISettingsViewController alloc] initWithTitle:title sections:targetSections reduceMargin:NO];
+        settingsViewController.title = title;
+    } else {
+        settingsViewController = [SCISettingsViewController new];
+    }
+
+    UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
+    navigationController.modalPresentationStyle = UIModalPresentationPageSheet;
+    UISheetPresentationController *sheet = navigationController.sheetPresentationController;
+    sheet.detents = @[
+        [UISheetPresentationControllerDetent mediumDetent],
+        [UISheetPresentationControllerDetent largeDetent]
+    ];
+    sheet.selectedDetentIdentifier = UISheetPresentationControllerDetentIdentifierLarge;
+
     UIViewController *presenter = topMostController();
-    [presenter presentViewController:navigationController animated:YES completion:^{
-        if (targetSections.count > 0) {
-            UIViewController *vc = [[SCISettingsViewController alloc] initWithTitle:title sections:targetSections reduceMargin:NO];
-            vc.title = title;
-            [navigationController pushViewController:vc animated:NO];
-        }
-    }];
+    [presenter presentViewController:navigationController animated:YES completion:nil];
 }
 
 // MARK: Colours

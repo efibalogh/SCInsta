@@ -9,13 +9,17 @@
 #import "../Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
 
 @class SCIGallerySaveMetadata;
+@class SCIGalleryFile;
+
+typedef void (^SCIDownloadCompletionBlock)(NSURL * _Nullable fileURL, NSError * _Nullable error);
 
 @interface SCIDownloadDelegate : NSObject <SCIDownloadDelegateProtocol>
 
 typedef NS_ENUM(NSUInteger, DownloadAction) {
     share,
     saveToPhotos,
-    saveToGallery
+    saveToGallery,
+    downloadOnly
 };
 @property (nonatomic, readonly) DownloadAction action;
 @property (nonatomic, readonly) BOOL showProgress;
@@ -24,9 +28,16 @@ typedef NS_ENUM(NSUInteger, DownloadAction) {
 @property (nonatomic, strong) SCIFeedbackPillView *progressView;
 /// Set immediately before `downloadFileWithURL:` when `action == saveToGallery`; consumed when the download finishes.
 @property (nonatomic, strong, nullable) SCIGallerySaveMetadata *pendingGallerySaveMetadata;
+@property (nonatomic, copy, nullable) SCIDownloadCompletionBlock completionBlock;
 
 - (instancetype)initWithAction:(DownloadAction)action showProgress:(BOOL)showProgress;
 
 - (void)downloadFileWithURL:(NSURL *)url fileExtension:(NSString *)fileExtension hudLabel:(NSString *)hudLabel;
+
++ (BOOL)isVideoFileAtURL:(NSURL *)fileURL;
++ (void)saveFileURLToPhotos:(NSURL *)fileURL completion:(void(^)(BOOL success, NSError * _Nullable error))completion;
++ (nullable SCIGalleryFile *)saveFileURLToGallery:(NSURL *)fileURL
+                                         metadata:(nullable SCIGallerySaveMetadata *)metadata
+                                            error:(NSError **)error;
 
 @end

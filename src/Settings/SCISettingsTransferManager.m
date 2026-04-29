@@ -272,7 +272,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
 
     NSURL *archiveURL = [NSURL fileURLWithPath:archivePath isDirectory:NO];
     UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[archiveURL] asCopy:YES];
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"share"];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"arrow_up"];
     [controller presentViewController:picker animated:YES completion:nil];
 }
 
@@ -289,7 +289,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     [contentTypes addObject:UTTypeData];
     picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:YES];
     picker.delegate = self;
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:1.4 title:@"Choose an export bundle" subtitle:nil iconResource:@"download"];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:1.4 title:@"Choose an export bundle" subtitle:nil iconResource:@"arrow_down"];
     [controller presentViewController:picker animated:YES completion:nil];
 }
 

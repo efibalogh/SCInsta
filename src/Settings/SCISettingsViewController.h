@@ -11,6 +11,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithTitle:(NSString *)title sections:(NSArray *)sections reduceMargin:(BOOL)reduceMargin;
 - (instancetype)init;
 
+@property (nonatomic, assign) BOOL searchesAllSettings;
+
 @end
 
 NS_ASSUME_NONNULL_END

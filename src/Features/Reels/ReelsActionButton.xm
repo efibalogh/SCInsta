@@ -102,7 +102,7 @@ static id SCIReelsMediaProvider(UIView *sourceView) {
 	UIView *carouselCell = SCIReelsFindSuperviewOfClass(sourceView, @"IGSundialViewerCarouselCell");
 	if (carouselCell) {
 		id parentMedia = SCIReelsFindMediaIvar(carouselCell);
-		if (parentMedia) return SCIReelsCurrentCarouselChildMedia(carouselCell, parentMedia);
+		if (parentMedia) return parentMedia;
 	}
 
 	id delegate = SCIObjectForSelector(sourceView, @"delegate");
@@ -170,6 +170,9 @@ static SCIActionButtonContext *SCIReelsActionContext(UIView *verticalUFIView) {
 	context.mediaResolver = ^id (SCIActionButtonContext *resolvedContext) {
 		return SCIReelsMediaProvider(resolvedContext.view);
 	};
+    context.bulkMediaResolver = ^id (SCIActionButtonContext *resolvedContext) {
+        return SCIReelsMediaProvider(resolvedContext.view);
+    };
 	context.currentIndexResolver = ^NSInteger (SCIActionButtonContext *resolvedContext) {
 		return SCIReelsCurrentIndexFromVerticalUFI(resolvedContext.view);
 	};

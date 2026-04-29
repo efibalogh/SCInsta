@@ -38,5 +38,11 @@ FOUNDATION_EXPORT NSString *SCIActionButtonTopicKeyForSource(SCIActionButtonSour
 FOUNDATION_EXPORT NSString *SCIActionButtonTopicTitleForSource(SCIActionButtonSource source);
 FOUNDATION_EXPORT NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSource source);
 FOUNDATION_EXPORT NSArray<SCIActionMenuSection *> *SCIActionButtonDefaultSectionsForSource(SCIActionButtonSource source);
+FOUNDATION_EXPORT NSArray<NSString *> *SCIActionButtonBulkDownloadSupportedActionsForSource(SCIActionButtonSource source);
+FOUNDATION_EXPORT NSArray<NSString *> *SCIActionButtonBulkCopySupportedActionsForSource(SCIActionButtonSource source);
+FOUNDATION_EXPORT NSArray<NSString *> *SCIActionButtonConfiguredBulkDownloadActionsForSource(SCIActionButtonSource source);
+FOUNDATION_EXPORT NSArray<NSString *> *SCIActionButtonConfiguredBulkCopyActionsForSource(SCIActionButtonSource source);
+FOUNDATION_EXPORT void SCIActionButtonSetConfiguredBulkDownloadActionsForSource(SCIActionButtonSource source, NSArray<NSString *> *actions);
+FOUNDATION_EXPORT void SCIActionButtonSetConfiguredBulkCopyActionsForSource(SCIActionButtonSource source, NSArray<NSString *> *actions);
 
 NS_ASSUME_NONNULL_END

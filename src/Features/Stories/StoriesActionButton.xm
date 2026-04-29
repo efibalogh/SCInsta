@@ -40,6 +40,63 @@ static UIViewController *SCIStoryControllerFromOverlay(UIView *overlayView) {
 	return [SCIUtils nearestViewControllerForView:overlayView];
 }
 
+static NSArray *SCIStoryItemsFromCandidate(id candidate) {
+    if (!candidate) return nil;
+
+    for (NSString *selectorName in @[@"items", @"storyItems", @"reelItems", @"mediaItems", @"allItems"]) {
+        id value = SCIObjectForSelector(candidate, selectorName);
+        if (!value) value = SCIKVCObject(candidate, selectorName);
+        NSArray *items = SCIArrayFromCollection(value);
+        if (items.count > 1) return items;
+    }
+
+    SEL cachedSelector = NSSelectorFromString(@"allItemsForTrayUsingCachedValue:");
+    if ([candidate respondsToSelector:cachedSelector]) {
+        @try {
+            id value = ((id (*)(id, SEL, BOOL))objc_msgSend)(candidate, cachedSelector, YES);
+            NSArray *items = SCIArrayFromCollection(value);
+            if (items.count > 1) return items;
+        } @catch (__unused NSException *exception) {
+        }
+    }
+
+    return nil;
+}
+
+static id SCIStoryMediaObjectFromCandidate(id candidate) {
+    if (!candidate) return nil;
+    for (NSString *selectorName in @[@"media", @"storyItem", @"item", @"mediaItem", @"currentStoryItem"]) {
+        id value = SCIObjectForSelector(candidate, selectorName);
+        if (!value) value = SCIKVCObject(candidate, selectorName);
+        if (value && value != candidate) return value;
+    }
+    return candidate;
+}
+
+static id SCIStoryBulkMediaFromOverlay(UIView *overlayView) {
+    id current = SCIStoryMediaFromOverlay(overlayView);
+    id sectionController = SCIStorySectionControllerFromOverlay(overlayView);
+    UIViewController *controller = SCIStoryControllerFromOverlay(overlayView);
+    id currentViewModel = SCIObjectForSelector(controller, @"currentViewModel") ?: SCIKVCObject(controller, @"currentViewModel");
+
+    for (id candidate in @[sectionController ?: (id)NSNull.null, currentViewModel ?: (id)NSNull.null, controller ?: (id)NSNull.null]) {
+        if (!candidate || candidate == (id)NSNull.null) continue;
+        NSArray *items = SCIStoryItemsFromCandidate(candidate);
+        if (items.count <= 1) continue;
+
+        NSMutableArray *resolvedMedia = [NSMutableArray array];
+        for (id item in items) {
+            id media = SCIStoryMediaObjectFromCandidate(item);
+            if (media) [resolvedMedia addObject:media];
+        }
+        if (resolvedMedia.count > 1) {
+            return [resolvedMedia copy];
+        }
+    }
+
+    return current;
+}
+
 static SCIActionButtonContext *SCIStoriesActionContext(UIView *overlayView) {
 	SCIActionButtonContext *context = [[SCIActionButtonContext alloc] init];
 	context.source = SCIActionButtonSourceStories;
@@ -50,6 +107,9 @@ static SCIActionButtonContext *SCIStoriesActionContext(UIView *overlayView) {
 	context.mediaResolver = ^id (SCIActionButtonContext *resolvedContext) {
 		return SCIStoryMediaFromOverlay(resolvedContext.view);
 	};
+    context.bulkMediaResolver = ^id (SCIActionButtonContext *resolvedContext) {
+        return SCIStoryBulkMediaFromOverlay(resolvedContext.view);
+    };
 	return context;
 }
 

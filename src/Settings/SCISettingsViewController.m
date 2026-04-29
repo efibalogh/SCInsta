@@ -2,11 +2,14 @@
 #import "../App/SCIStartupHooks.h"
 
 static char rowStaticRef[] = "row";
+static NSInteger const kSCIUINavigationItemSearchBarPlacementIntegratedButton = 4;
 
-@interface SCISettingsViewController () <UITableViewDataSource, UITableViewDelegate, UITableViewDragDelegate, UITableViewDropDelegate>
+@interface SCISettingsViewController () <UITableViewDataSource, UITableViewDelegate, UITableViewDragDelegate, UITableViewDropDelegate, UISearchResultsUpdating>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray *sections;
+@property (nonatomic, strong) NSArray *originalSections;
+@property (nonatomic, strong) UISearchController *searchController;
 @property (nonatomic) BOOL reduceMargin;
 
 @end
@@ -73,6 +76,23 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
     return mutableSections;
 }
 
+static NSString *SCISettingsNormalizedQuery(NSString *query) {
+    return [[query ?: @"" stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] lowercaseString];
+}
+
+static BOOL SCISettingsStringMatchesQuery(NSString *string, NSString *query) {
+    if (query.length == 0) return YES;
+    return [[string ?: @"" lowercaseString] containsString:query];
+}
+
+static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSString *path, NSString *sectionTitle) {
+    if (![row isKindOfClass:[SCISetting class]]) return NO;
+    return SCISettingsStringMatchesQuery(row.title, query) ||
+           SCISettingsStringMatchesQuery(row.subtitle, query) ||
+           SCISettingsStringMatchesQuery(path, query) ||
+           SCISettingsStringMatchesQuery(sectionTitle, query);
+}
+
 @implementation SCISettingsViewController
 
 - (UIView *)selectionBackgroundView {
@@ -107,6 +127,7 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
             
         }];
         
+        self.originalSections = [mutableSections copy];
         self.sections = mutableSections;
     }
     
@@ -115,7 +136,11 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
 }
 
 - (instancetype)init {
-    return [self initWithTitle:[SCITweakSettings title] sections:[SCITweakSettings sections] reduceMargin:YES];
+    self = [self initWithTitle:[SCITweakSettings title] sections:[SCITweakSettings sections] reduceMargin:YES];
+    if (self) {
+        self.searchesAllSettings = YES;
+    }
+    return self;
 }
 
 - (void)viewDidLoad {
@@ -138,6 +163,13 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
     self.tableView.estimatedRowHeight = 72.0;
 
     [self.view addSubview:self.tableView];
+    [self setupNavigationItems];
+    [self setupSearchController];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self setupNavigationItems];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -158,6 +190,34 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
         // Done with first-time setup for this version
         [[NSUserDefaults standardUserDefaults] setValue:SCIVersionString forKey:@"SCInstaFirstRun"];
     }
+}
+
+- (void)setupNavigationItems {
+    BOOL isModalRoot = self.navigationController.presentingViewController &&
+                       self.navigationController.viewControllers.firstObject == self;
+    self.navigationItem.leftBarButtonItem = isModalRoot
+        ? [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemClose
+                                                        target:self
+                                                        action:@selector(closeTapped)]
+        : nil;
+}
+
+- (void)setupSearchController {
+    self.searchController = [[UISearchController alloc] initWithSearchResultsController:nil];
+    self.searchController.searchResultsUpdater = self;
+    self.searchController.obscuresBackgroundDuringPresentation = NO;
+    self.searchController.searchBar.placeholder = self.searchesAllSettings ? @"Search settings" : [NSString stringWithFormat:@"Search %@", self.title ?: @"settings"];
+    self.navigationItem.searchController = self.searchController;
+    if (@available(iOS 26.0, *)) {
+        self.navigationItem.preferredSearchBarPlacement = (UINavigationItemSearchBarPlacement)kSCIUINavigationItemSearchBarPlacementIntegratedButton;
+    } else {
+        self.navigationItem.hidesSearchBarWhenScrolling = YES;
+    }
+    self.definesPresentationContext = YES;
+}
+
+- (void)closeTapped {
+    [self.navigationController dismissViewControllerAnimated:YES completion:nil];
 }
 
 // MARK: - UITableViewDataSource
@@ -356,6 +416,7 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
 }
 
 - (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
+    if ([self isSearching]) return NO;
     return [self.sections[indexPath.section][@"allowsReordering"] boolValue];
 }
 
@@ -385,6 +446,7 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
         }
         [[NSUserDefaults standardUserDefaults] setObject:[order copy] forKey:reorderDefaultsKey];
     }
+    self.originalSections = [self.sections copy];
 }
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -441,6 +503,101 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
     } completion:nil];
 
     [coordinator dropItem:dropItem.dragItem toRowAtIndexPath:clampedDestination];
+}
+
+// MARK: - Search
+
+- (BOOL)isSearching {
+    return self.searchController.isActive && self.searchController.searchBar.text.length > 0;
+}
+
+- (void)updateSearchResultsForSearchController:(UISearchController *)searchController {
+    NSString *query = SCISettingsNormalizedQuery(searchController.searchBar.text);
+    if (query.length == 0) {
+        self.sections = SCIMutableSectionsCopy(self.originalSections);
+    } else if (self.searchesAllSettings) {
+        self.sections = [self searchAllSettingsForQuery:query];
+    } else {
+        self.sections = [self filterCurrentSettingsForQuery:query];
+    }
+    self.tableView.dragInteractionEnabled = ![self isSearching] && [self pageAllowsReordering];
+    [self.tableView reloadData];
+}
+
+- (NSMutableArray *)filterCurrentSettingsForQuery:(NSString *)query {
+    NSMutableArray *filteredSections = [NSMutableArray array];
+    for (NSDictionary *section in self.originalSections) {
+        NSArray *rows = section[@"rows"];
+        NSMutableArray *matchedRows = [NSMutableArray array];
+        NSString *sectionTitle = section[@"header"];
+        for (SCISetting *row in rows) {
+            if (SCISettingsRowMatchesQuery(row, query, self.title, sectionTitle)) {
+                [matchedRows addObject:row];
+            }
+        }
+        if (matchedRows.count == 0) continue;
+
+        NSMutableDictionary *filteredSection = [section mutableCopy];
+        filteredSection[@"rows"] = matchedRows;
+        filteredSection[@"allowsReordering"] = @NO;
+        [filteredSections addObject:filteredSection];
+    }
+    return filteredSections;
+}
+
+- (NSMutableArray *)searchAllSettingsForQuery:(NSString *)query {
+    NSMutableDictionary<NSString *, NSMutableArray<SCISetting *> *> *rowsByPath = [NSMutableDictionary dictionary];
+    NSMutableArray<NSString *> *orderedPaths = [NSMutableArray array];
+    [self collectSearchRowsFromSections:self.originalSections
+                                   path:self.title ?: @"Settings"
+                                  query:query
+                             rowsByPath:rowsByPath
+                           orderedPaths:orderedPaths];
+
+    NSMutableArray *sections = [NSMutableArray array];
+    for (NSString *path in orderedPaths) {
+        NSArray *rows = rowsByPath[path];
+        if (rows.count == 0) continue;
+        [sections addObject:[@{
+            @"header": path,
+            @"rows": [rows mutableCopy],
+            @"allowsReordering": @NO
+        } mutableCopy]];
+    }
+    return sections;
+}
+
+- (void)collectSearchRowsFromSections:(NSArray *)sections
+                                  path:(NSString *)path
+                                 query:(NSString *)query
+                            rowsByPath:(NSMutableDictionary<NSString *, NSMutableArray<SCISetting *> *> *)rowsByPath
+                          orderedPaths:(NSMutableArray<NSString *> *)orderedPaths {
+    for (NSDictionary *section in sections) {
+        NSString *sectionTitle = section[@"header"];
+        NSString *sectionPath = sectionTitle.length > 0 ? [NSString stringWithFormat:@"%@ / %@", path, sectionTitle] : path;
+        for (SCISetting *row in section[@"rows"]) {
+            if (![row isKindOfClass:[SCISetting class]]) continue;
+
+            if (SCISettingsRowMatchesQuery(row, query, sectionPath, sectionTitle)) {
+                NSMutableArray *rows = rowsByPath[sectionPath];
+                if (!rows) {
+                    rows = [NSMutableArray array];
+                    rowsByPath[sectionPath] = rows;
+                    [orderedPaths addObject:sectionPath];
+                }
+                [rows addObject:row];
+            }
+
+            if (row.navSections.count > 0) {
+                NSString *childPath = row.title.length > 0 ? [NSString stringWithFormat:@"%@ / %@", path, row.title] : path;
+                [self collectSearchRowsFromSections:row.navSections
+                                               path:childPath
+                                              query:query
+                                         rowsByPath:rowsByPath
+                                       orderedPaths:orderedPaths];
+            }
+        }
+    }
 }
 
 // MARK: - Actions
@@ -529,6 +686,7 @@ static NSMutableArray *SCIMutableSectionsCopy(NSArray *sections) {
 }
 
 - (BOOL)pageAllowsReordering {
+    if ([self isSearching]) return NO;
     for (NSDictionary *section in self.sections) {
         if ([section[@"allowsReordering"] boolValue]) {
             return YES;

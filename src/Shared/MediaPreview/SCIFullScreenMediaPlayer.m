@@ -13,8 +13,10 @@
 #import "../Gallery/SCIGalleryOriginController.h"
 #import "../Gallery/SCIGallerySaveMetadata.h"
 #import "../Gallery/SCIGalleryCoreDataStack.h"
+#import "../ActionButton/ActionButtonCore.h"
 #import "../../AssetUtils.h"
 #import "../../Downloader/Download.h"
+#import "../../Downloader/BulkDownload.h"
 
 static CGFloat const kDismissAxisLockSlop = 20.0;
 static CGFloat const kDismissDistanceRatio = 50.0 / 667.0;
@@ -30,6 +32,24 @@ static CGFloat const kGalleryPreviewMenuIconPointSize = 22.0;
 static UIImage *SCIGalleryPreviewMenuIcon(NSString *resourceName) {
     return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
                                    pointSize:kGalleryPreviewMenuIconPointSize];
+}
+
+static SCIActionButtonSource SCIActionButtonSourceForPlaybackSource(SCIFullScreenPlaybackSource playbackSource) {
+    switch (playbackSource) {
+        case SCIFullScreenPlaybackSourceFeed:
+            return SCIActionButtonSourceFeed;
+        case SCIFullScreenPlaybackSourceReels:
+            return SCIActionButtonSourceReels;
+        case SCIFullScreenPlaybackSourceStories:
+            return SCIActionButtonSourceStories;
+        case SCIFullScreenPlaybackSourceDirect:
+            return SCIActionButtonSourceDirect;
+        case SCIFullScreenPlaybackSourceProfile:
+            return SCIActionButtonSourceProfile;
+        case SCIFullScreenPlaybackSourceUnknown:
+        default:
+            return SCIActionButtonSourceFeed;
+    }
 }
 
 static UIViewController *SCIPreviewPresenterForContext(SCIFullScreenPlaybackSource playbackSource,
@@ -66,6 +86,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 @property (nonatomic, strong) UIButton *deleteGalleryButton;
 @property (nonatomic, strong) UIButton *shareButton;
 @property (nonatomic, strong) UIButton *clipboardButton;
+@property (nonatomic, strong) UIButton *bulkActionsButton;
 @property (nonatomic, strong) UIButton *galleryOriginButton;
 
 @property (nonatomic, assign) BOOL isToolbarVisible;
@@ -482,6 +503,12 @@ fromViewController:(UIViewController *)presenter {
     [_clipboardButton addTarget:self action:@selector(copyMedia) forControlEvents:UIControlEventTouchUpInside];
     [_bottomBar addSubview:_clipboardButton];
 
+    if (!_isFromGallery && _items.count > 1) {
+        _bulkActionsButton = SCIMediaChromeBottomButton(@"more", @"Download All");
+        _bulkActionsButton.showsMenuAsPrimaryAction = YES;
+        [_bottomBar addSubview:_bulkActionsButton];
+    }
+
     if (_isFromGallery) {
         _galleryOriginButton = SCIMediaChromeBottomButton(@"more", @"More");
         [_bottomBar addSubview:_galleryOriginButton];
@@ -498,7 +525,9 @@ fromViewController:(UIViewController *)presenter {
 
     NSArray<UIView *> *row = _isFromGallery
         ? @[_savePhotosButton, _shareButton, _clipboardButton, _galleryOriginButton, _deleteGalleryButton]
-        : @[_savePhotosButton, _shareButton, _clipboardButton, _saveGalleryButton];
+        : (_bulkActionsButton
+            ? @[_savePhotosButton, _shareButton, _clipboardButton, _saveGalleryButton, _bulkActionsButton]
+            : @[_savePhotosButton, _shareButton, _clipboardButton, _saveGalleryButton]);
 
     SCIMediaChromeInstallBottomRow(_bottomBar, row);
 }
@@ -682,6 +711,10 @@ fromViewController:(UIViewController *)presenter {
     [self updateCounter];
     [self updateFavoriteButton];
     [self updateGalleryOriginButton];
+    if (self.bulkActionsButton) {
+        self.bulkActionsButton.menu = [self bulkActionsMenu];
+        self.bulkActionsButton.hidden = (self.bulkActionsButton.menu == nil);
+    }
 }
 
 - (void)updateCounter {
@@ -921,6 +954,117 @@ fromViewController:(UIViewController *)presenter {
 
     UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
     [haptic impactOccurred];
+}
+
+- (NSArray<SCIBulkDownloadItem *> *)bulkDownloadItemsForPreview {
+    NSMutableArray<SCIBulkDownloadItem *> *items = [NSMutableArray array];
+    for (SCIMediaItem *item in self.items) {
+        if (item.image) {
+            [items addObject:[SCIBulkDownloadItem itemWithImage:item.image metadata:item.galleryMetadata]];
+            continue;
+        }
+
+        NSURL *resolvedURL = [[SCIMediaCacheManager sharedManager] bestAvailableFileURLForItem:item] ?: item.fileURL;
+        if (!resolvedURL) continue;
+        NSString *extension = resolvedURL.pathExtension.length > 0
+            ? resolvedURL.pathExtension
+            : (item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg");
+        NSString *linkString = item.fileURL.absoluteString.length > 0 ? item.fileURL.absoluteString : resolvedURL.absoluteString;
+        [items addObject:[SCIBulkDownloadItem itemWithURL:resolvedURL
+                                            fileExtension:extension
+                                                  isVideo:(item.mediaType == SCIMediaItemTypeVideo)
+                                                 metadata:item.galleryMetadata
+                                               linkString:linkString]];
+    }
+    return items;
+}
+
+- (NSArray<NSString *> *)bulkDownloadLinksForPreview {
+    NSMutableOrderedSet<NSString *> *links = [NSMutableOrderedSet orderedSet];
+    for (SCIMediaItem *item in self.items) {
+        NSString *linkString = item.fileURL.absoluteString;
+        if (linkString.length == 0) {
+            NSURL *resolvedURL = [[SCIMediaCacheManager sharedManager] bestAvailableFileURLForItem:item];
+            linkString = resolvedURL.absoluteString;
+        }
+        if (linkString.length > 0) {
+            [links addObject:linkString];
+        }
+    }
+    return links.array;
+}
+
+- (void)copyAllDownloadLinks {
+    NSArray<NSString *> *links = [self bulkDownloadLinksForPreview];
+    if (links.count == 0) {
+        [SCIUtils showToastForActionIdentifier:kSCIActionCopyDownloadLink duration:2.0 title:@"No links available" subtitle:nil iconResource:@"link"];
+        return;
+    }
+
+    [UIPasteboard generalPasteboard].string = [links componentsJoinedByString:@"\n"];
+    [SCIUtils showToastForActionIdentifier:kSCIActionCopyDownloadLink
+                                  duration:1.5
+                                     title:@"Download links copied"
+                                  subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)links.count, links.count == 1 ? @"" : @"s"]
+                              iconResource:@"copy_filled"
+                                      tone:SCIFeedbackPillToneSuccess];
+}
+
+- (UIMenu *)bulkActionsMenu {
+    NSArray<SCIBulkDownloadItem *> *bulkItems = [self bulkDownloadItemsForPreview];
+    if (bulkItems.count < 2) return nil;
+
+    SCIActionButtonSource source = SCIActionButtonSourceForPlaybackSource(self.playbackSource);
+    NSArray<NSString *> *identifiers = SCIConfiguredBulkActionIdentifiersForSource(source);
+    if (identifiers.count == 0) return nil;
+
+    NSMutableArray<UIMenuElement *> *children = [NSMutableArray array];
+    for (NSString *identifier in identifiers) {
+        NSString *title = SCIActionButtonTitleForIdentifier(identifier);
+        UIImage *image = SCIActionButtonMenuIconForIdentifier(identifier, 22.0);
+        UIAction *action = [UIAction actionWithTitle:title
+                                               image:image
+                                          identifier:nil
+                                             handler:^(__unused UIAction *action) {
+            if ([identifier isEqualToString:kSCIActionDownloadAllLibrary]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationSaveToPhotos
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllLibrary
+                                               presenter:self
+                                              anchorView:self.bulkActionsButton];
+                return;
+            }
+            if ([identifier isEqualToString:kSCIActionDownloadAllShare]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationShare
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllShare
+                                               presenter:self
+                                              anchorView:self.bulkActionsButton];
+                return;
+            }
+            if ([identifier isEqualToString:kSCIActionDownloadAllGallery]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationSaveToGallery
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllGallery
+                                               presenter:self
+                                              anchorView:self.bulkActionsButton];
+                return;
+            }
+            if ([identifier isEqualToString:kSCIActionDownloadAllClipboard]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationCopyMedia
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllClipboard
+                                               presenter:self
+                                              anchorView:self.bulkActionsButton];
+                return;
+            }
+            if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) {
+                [self copyAllDownloadLinks];
+            }
+        }];
+        [children addObject:action];
+    }
+    return [UIMenu menuWithTitle:@"" children:children];
 }
 
 - (void)saveToPhotos {

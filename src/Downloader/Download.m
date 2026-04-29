@@ -32,13 +32,21 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
     }
 }
 
-- (BOOL)isVideoFileAtURL:(NSURL *)fileURL {
+static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fileURL, NSError *error) {
+    SCIDownloadCompletionBlock completion = [delegate.completionBlock copy];
+    delegate.completionBlock = nil;
+    if (completion) {
+        completion(fileURL, error);
+    }
+}
+
++ (BOOL)isVideoFileAtURL:(NSURL *)fileURL {
     NSString *ext = fileURL.pathExtension.lowercaseString;
     NSSet<NSString *> *videoExtensions = [NSSet setWithArray:@[@"mp4", @"mov", @"m4v", @"avi", @"webm", @"mkv", @"3gp"]];
     return [videoExtensions containsObject:ext];
 }
 
-- (void)saveDownloadedFileToPhotos:(NSURL *)fileURL completion:(void(^)(BOOL success, NSError *error))completion {
++ (void)saveFileURLToPhotos:(NSURL *)fileURL completion:(void(^)(BOOL success, NSError *error))completion {
     BOOL isVideo = [self isVideoFileAtURL:fileURL];
 
     [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
@@ -54,6 +62,18 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
             }
         });
     }];
+}
+
++ (SCIGalleryFile *)saveFileURLToGallery:(NSURL *)fileURL
+                                metadata:(SCIGallerySaveMetadata *)metadata
+                                   error:(NSError **)error {
+    SCIGalleryMediaType galleryType = [self isVideoFileAtURL:fileURL] ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
+    return [SCIGalleryFile saveFileToGallery:fileURL
+                                      source:SCIGallerySourceOther
+                                   mediaType:galleryType
+                                  folderPath:nil
+                                    metadata:metadata
+                                       error:error];
 }
 
 - (void)showCompletionPillWithSubtitle:(NSString *)subtitle
@@ -134,6 +154,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.progressView dismiss];
     });
+    SCIInvokeDownloadCompletion(self, nil, [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil]);
     SCIReleaseActiveDownloadDelegate(self);
 
     NSLog(@"[SCInsta] Download: Download cancelled");
@@ -162,10 +183,14 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                     SCIReleaseActiveDownloadDelegate(weakSelf);
                 };
                 [self.progressView showError:@"Download failed"];
+                SCIInvokeDownloadCompletion(self, nil, error);
                 return;
             }
         }
 
+        if (error) {
+            SCIInvokeDownloadCompletion(self, nil, error);
+        }
         SCIReleaseActiveDownloadDelegate(self);
     });
 }
@@ -174,7 +199,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
     SCIGallerySaveMetadata *galleryMeta = self.pendingGallerySaveMetadata;
     self.pendingGallerySaveMetadata = nil;
 
-    BOOL isVideo = [self isVideoFileAtURL:fileURL];
+    BOOL isVideo = [[self class] isVideoFileAtURL:fileURL];
     SCIGalleryMediaType galleryType = isVideo ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
     NSString *fileName = SCIFileNameForMedia(fileURL, galleryType, galleryMeta);
     NSString *newPath = [[fileURL.path stringByDeletingLastPathComponent] stringByAppendingPathComponent:fileName];
@@ -189,6 +214,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                 if (self.showProgress) {
                     [self.progressView showError:@"Failed to prepare file"];
                 }
+                SCIInvokeDownloadCompletion(self, nil, [NSError errorWithDomain:@"SCInsta.Download" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Failed to prepare file"}]);
             });
             SCIReleaseActiveDownloadDelegate(self);
             return;
@@ -201,6 +227,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                 if (self.showProgress) {
                     [self.progressView showError:@"Failed to finalize file"];
                 }
+                SCIInvokeDownloadCompletion(self, nil, [NSError errorWithDomain:@"SCInsta.Download" code:2 userInfo:@{NSLocalizedDescriptionKey: @"Failed to finalize file"}]);
             });
             SCIReleaseActiveDownloadDelegate(self);
             return;
@@ -213,18 +240,26 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
         NSLog(@"[SCInsta] Download: Download finished with url: \"%@\"", [newURL absoluteString]);
         NSLog(@"[SCInsta] Download: Completed with action %d", (int)self.action);
 
+        if (self.action == downloadOnly) {
+            SCIInvokeDownloadCompletion(self, newURL, nil);
+            SCIReleaseActiveDownloadDelegate(self);
+            return;
+        }
+
         if (self.action == share) {
             [self showCompletionPillWithSubtitle:@"Shared successfully" completionImmediately:YES completion:^{
                 [SCIUtils showShareVC:newURL];
+                SCIInvokeDownloadCompletion(self, newURL, nil);
                 SCIReleaseActiveDownloadDelegate(self);
             }];
             return;
         }
 
         if (self.action == saveToPhotos) {
-            [self saveDownloadedFileToPhotos:newURL completion:^(BOOL success, NSError *error) {
+            [[self class] saveFileURLToPhotos:newURL completion:^(BOOL success, NSError *error) {
                 if (success) {
                     [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:^{
+                        SCIInvokeDownloadCompletion(self, newURL, nil);
                         SCIReleaseActiveDownloadDelegate(self);
                     }];
                     if (self.progressView) {
@@ -236,6 +271,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                     if (self.progressView) {
                         [self.progressView showError:@"Failed to save"];
                     }
+                    SCIInvokeDownloadCompletion(self, nil, error ?: [NSError errorWithDomain:@"SCInsta.Download" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Failed to save"}]);
                     SCIReleaseActiveDownloadDelegate(self);
                 }
             }];
@@ -244,14 +280,10 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 
         if (self.action == saveToGallery) {
             NSError *error;
-            SCIGalleryFile *file = [SCIGalleryFile saveFileToGallery:newURL
-                                                        source:SCIGallerySourceOther
-                                                     mediaType:galleryType
-                                                    folderPath:nil
-                                                      metadata:galleryMeta
-                                                         error:&error];
+            SCIGalleryFile *file = [[self class] saveFileURLToGallery:newURL metadata:galleryMeta error:&error];
             if (file) {
                 [self showCompletionPillWithSubtitle:@"Saved to Gallery successfully" completionImmediately:NO completion:^{
+                    SCIInvokeDownloadCompletion(self, newURL, nil);
                     SCIReleaseActiveDownloadDelegate(self);
                 }];
                 if (self.progressView) {
@@ -263,6 +295,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
                 if (self.progressView) {
                     [self.progressView showError:@"Failed to save to Gallery"];
                 }
+                SCIInvokeDownloadCompletion(self, nil, error ?: [NSError errorWithDomain:@"SCInsta.Download" code:4 userInfo:@{NSLocalizedDescriptionKey: @"Failed to save to Gallery"}]);
                 SCIReleaseActiveDownloadDelegate(self);
             }
             return;
@@ -270,6 +303,7 @@ static void SCIReleaseActiveDownloadDelegate(SCIDownloadDelegate *delegate) {
 
         [self showCompletionPillWithSubtitle:@"Opened successfully" completionImmediately:YES completion:^{
             [SCIFullScreenMediaPlayer showFileURL:newURL];
+            SCIInvokeDownloadCompletion(self, newURL, nil);
         }];
         SCIReleaseActiveDownloadDelegate(self);
     });

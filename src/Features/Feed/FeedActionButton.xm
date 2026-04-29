@@ -246,6 +246,9 @@ static SCIActionButtonContext *SCIFeedActionContext(UIView *barView) {
 	context.mediaResolver = ^id (SCIActionButtonContext *resolvedContext) {
 		return SCIFeedMediaFromBarView(resolvedContext.view);
 	};
+    context.bulkMediaResolver = ^id (SCIActionButtonContext *resolvedContext) {
+        return SCIFeedMediaFromBarView(resolvedContext.view);
+    };
 	context.currentIndexResolver = ^NSInteger (SCIActionButtonContext *resolvedContext) {
 		return SCIFeedCurrentIndexFromBarView(resolvedContext.view);
 	};

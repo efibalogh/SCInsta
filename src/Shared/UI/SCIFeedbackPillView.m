@@ -12,6 +12,11 @@ static CGFloat const kPillMarginTop  = 8.0;
 static CGFloat const kPillCorner     = 28.0;
 static CGFloat const kHorizontalPad  = 16.0;
 static CGFloat const kPillWidth      = 296.0;
+static CGFloat const kDynamicMinWidth = 200.0;
+static CGFloat const kDynamicMaxWidth = 320.0;
+static CGFloat const kRingLineWidth   = 2.5;
+static CGFloat const kDynamicPillHeight = 52.0;
+static CGFloat const kDynamicTallHeight = 64.0;
 static CGFloat const kIconBadgeSize  = 28.0;
 static CGFloat const kEntranceTranslateY = -24.0;
 static CGFloat const kEntranceScale = 0.88;
@@ -63,6 +68,12 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 @property (nonatomic, strong) NSLayoutConstraint *progressRowHeightConstraint;
 @property (nonatomic, assign) BOOL isErrorState;
 
+// --- Dynamic style properties ---
+@property (nonatomic, strong) CAShapeLayer *progressRingTrackLayer;
+@property (nonatomic, strong) CAShapeLayer *progressRingLayer;
+@property (nonatomic, strong) UIPanGestureRecognizer *panGesture;
+@property (nonatomic, assign) CGPoint panOriginCenter;
+
 + (SCIFeedbackPillView *)presentPillInView:(UIView *)view
                                       mode:(SCIFeedbackPillMode)mode
                                  configure:(void(^)(SCIFeedbackPillView *pill))configure;
@@ -71,6 +82,11 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 - (CGFloat)sci_subtitleRowLayoutHeight;
 - (CGFloat)sci_progressBarHeightMatchingSubtitle;
 - (float)sanitizedProgressValue:(float)progress;
+// Dynamic style helpers
+- (void)sci_updateRingPath;
+- (UIColor *)sci_glowColorForTone:(SCIPillVisualTone)tone;
+- (void)sci_updateDynamicWidthForTitle:(NSString *)title subtitle:(NSString *)subtitle hasButton:(BOOL)hasButton;
+- (void)handlePan:(UIPanGestureRecognizer *)pan;
 @end
 
 @implementation SCIFeedbackPillView
@@ -108,11 +124,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 + (void)setDefaultStyle:(SCIFeedbackPillStyle)style {
-    if (style != SCIFeedbackPillStyleClean) {
-        sDefaultPillStyle = SCIFeedbackPillStyleColorful;
-        return;
-    }
-
     sDefaultPillStyle = style;
 }
 
@@ -342,6 +353,29 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.tone = SCIPillVisualToneInfo;
     [self applyTone:self.tone animated:NO];
 
+    // --- Dynamic style: progress ring on icon badge ---
+    _progressRingTrackLayer = [CAShapeLayer layer];
+    _progressRingTrackLayer.fillColor   = [UIColor clearColor].CGColor;
+    _progressRingTrackLayer.strokeColor = [[UIColor whiteColor] colorWithAlphaComponent:0.15].CGColor;
+    _progressRingTrackLayer.lineWidth   = kRingLineWidth;
+    _progressRingTrackLayer.hidden = YES;
+    [_iconBadgeView.layer addSublayer:_progressRingTrackLayer];
+
+    _progressRingLayer = [CAShapeLayer layer];
+    _progressRingLayer.fillColor     = [UIColor clearColor].CGColor;
+    _progressRingLayer.strokeColor   = [UIColor whiteColor].CGColor;
+    _progressRingLayer.lineWidth     = kRingLineWidth;
+    _progressRingLayer.lineCap       = kCALineCapRound;
+    _progressRingLayer.strokeStart   = 0.0;
+    _progressRingLayer.strokeEnd     = 0.0;
+    _progressRingLayer.hidden = YES;
+    [_iconBadgeView.layer addSublayer:_progressRingLayer];
+
+    // --- Dynamic style: pan gesture for swipe-to-dismiss ---
+    _panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    _panGesture.enabled = NO;
+    [self addGestureRecognizer:_panGesture];
+
     return self;
 }
 
@@ -355,9 +389,29 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
             self.progressView.layer.cornerRadius = h * 0.5;
         }
     }
+    // Update ring path when icon badge bounds change
+    [self sci_updateRingPath];
+
+    // Dynamic: keep corner radius = half-height for perfect capsule shape
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        CGFloat effectiveCorner = CGRectGetHeight(self.bounds) / 2.0;
+        self.layer.cornerRadius = effectiveCorner;
+        self.blurView.layer.cornerRadius = effectiveCorner;
+        self.chromeOverlayView.layer.cornerRadius = effectiveCorner;
+        self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.bounds
+                                                          cornerRadius:effectiveCorner].CGPath;
+    }
 }
 
 - (NSArray<UIColor *> *)chromeColorsForTone:(SCIPillVisualTone)tone {
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        (void)tone;
+        return @[
+            [UIColor colorWithWhite:0.0 alpha:0.0],
+            [UIColor colorWithWhite:0.0 alpha:0.0]
+        ];
+    }
+
     if (self.style == SCIFeedbackPillStyleClean) {
         (void)tone;
         return @[
@@ -387,6 +441,27 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (NSArray<UIColor *> *)badgeColorsForTone:(SCIPillVisualTone)tone {
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        switch (tone) {
+            case SCIPillVisualToneSuccess:
+                return @[
+                    [UIColor colorWithRed:0.22 green:0.80 blue:0.55 alpha:0.30],
+                    [UIColor colorWithRed:0.16 green:0.60 blue:0.42 alpha:0.25]
+                ];
+            case SCIPillVisualToneError:
+                return @[
+                    [UIColor colorWithRed:0.90 green:0.30 blue:0.38 alpha:0.30],
+                    [UIColor colorWithRed:0.70 green:0.18 blue:0.25 alpha:0.25]
+                ];
+            case SCIPillVisualToneInfo:
+            default:
+                return @[
+                    [UIColor colorWithRed:0.30 green:0.65 blue:0.95 alpha:0.28],
+                    [UIColor colorWithRed:0.20 green:0.50 blue:0.80 alpha:0.22]
+                ];
+        }
+    }
+
     if (self.style == SCIFeedbackPillStyleClean) {
         switch (tone) {
             case SCIPillVisualToneError:
@@ -491,12 +566,18 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (UIColor *)pillBorderColorForCurrentStyle {
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        return [UIColor colorWithWhite:1.0 alpha:0.10];
+    }
     return (self.style == SCIFeedbackPillStyleClean)
         ? [UIColor colorWithWhite:1.0 alpha:0.12]
         : [UIColor colorWithWhite:1.0 alpha:0.18];
 }
 
 - (UIColor *)iconBadgeBorderColorForCurrentStyle {
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        return [UIColor colorWithWhite:1.0 alpha:0.12];
+    }
     return (self.style == SCIFeedbackPillStyleClean)
         ? [UIColor colorWithWhite:1.0 alpha:0.18]
         : [UIColor colorWithWhite:1.0 alpha:0.24];
@@ -549,6 +630,10 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (UIColor *)iconTintForTone:(SCIPillVisualTone)tone {
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        return [UIColor colorWithWhite:1.0 alpha:0.95];
+    }
+
     if (self.style == SCIFeedbackPillStyleClean) {
         switch (tone) {
             case SCIPillVisualToneSuccess:
@@ -595,6 +680,8 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)applyCurrentVisualStyleAnimated:(BOOL)animated {
+    BOOL isDynamic = (self.style == SCIFeedbackPillStyleDynamic);
+
     void (^applyColors)(void) = ^{
         self.layer.borderColor = [self pillBorderColorForCurrentStyle].CGColor;
         self.iconBadgeView.layer.borderColor = [self iconBadgeBorderColorForCurrentStyle].CGColor;
@@ -604,6 +691,56 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self updateProgressViewColorsForTone:self.tone];
         self.titleLabel.textColor = [self titleColorForCurrentStyle];
         self.subtitleLabel.textColor = [self subtitleColorForCurrentStyle];
+
+        // Dynamic: glow shadow + ring coloring
+        if (isDynamic) {
+            self.clipsToBounds = NO;
+
+            // Subviews must self-clip since the parent no longer clips for them
+            CGFloat effectiveCorner = CGRectGetHeight(self.bounds) / 2.0;
+            if (effectiveCorner < 1.0) effectiveCorner = kPillCorner; // fallback before layout
+            self.layer.cornerRadius = effectiveCorner;
+            self.blurView.layer.cornerRadius = effectiveCorner;
+            self.blurView.layer.cornerCurve = kCACornerCurveContinuous;
+            self.blurView.clipsToBounds = YES;
+            self.chromeOverlayView.layer.cornerRadius = effectiveCorner;
+            self.chromeOverlayView.layer.cornerCurve = kCACornerCurveContinuous;
+            self.chromeOverlayView.clipsToBounds = YES;
+
+            self.chromeGradientLayer.opacity = 0.0;
+            UIColor *glowColor = [self sci_glowColorForTone:self.tone];
+            self.layer.shadowColor = glowColor.CGColor;
+            self.layer.shadowOpacity = 0.50;
+            self.layer.shadowRadius = 20.0;
+            self.layer.shadowOffset = CGSizeMake(0.0, 4.0);
+            self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.bounds
+                                                              cornerRadius:effectiveCorner].CGPath;
+
+            NSArray<UIColor *> *progressColors = [self progressColorsForTone:self.tone];
+            self.progressRingLayer.strokeColor = (progressColors.count > 0)
+                ? progressColors[0].CGColor
+                : [UIColor whiteColor].CGColor;
+
+            self.panGesture.enabled = YES;
+        } else {
+            self.clipsToBounds = YES;
+
+            // Reset per-subview clipping (parent handles it)
+            self.layer.cornerRadius = kPillCorner;
+            self.blurView.layer.cornerRadius = 0.0;
+            self.blurView.clipsToBounds = NO;
+            self.chromeOverlayView.layer.cornerRadius = 0.0;
+            self.chromeOverlayView.clipsToBounds = NO;
+
+            self.chromeGradientLayer.opacity = 0.9;
+            self.layer.shadowColor = [UIColor clearColor].CGColor;
+            self.layer.shadowOpacity = 0.0;
+            self.layer.shadowRadius = 0.0;
+            self.layer.shadowPath = nil;
+            self.panGesture.enabled = NO;
+            self.progressRingLayer.hidden = YES;
+            self.progressRingTrackLayer.hidden = YES;
+        }
     };
 
     if (!animated) {
@@ -640,15 +777,32 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)setProgressVisible:(BOOL)visible {
-    self.progressRowContainer.hidden = !visible;
-    self.progressView.hidden = !visible;
-    if (visible) {
-        self.progressRowHeightConstraint.constant = [self sci_subtitleRowLayoutHeight];
-        self.progressHeightConstraint.constant = [self sci_progressBarHeightMatchingSubtitle];
-    } else {
+    BOOL isDynamic = (self.style == SCIFeedbackPillStyleDynamic);
+
+    if (isDynamic) {
+        // Dynamic: always hide horizontal bar, show ring instead
+        self.progressRowContainer.hidden = YES;
+        self.progressView.hidden = YES;
         self.progressRowHeightConstraint.constant = 0.0;
         self.progressHeightConstraint.constant = 0.0;
-        self.progressView.layer.cornerRadius = 0.0;
+        self.progressRingTrackLayer.hidden = !visible;
+        self.progressRingLayer.hidden = !visible;
+        if (!visible) {
+            self.progressRingLayer.strokeEnd = 0.0;
+        }
+    } else {
+        self.progressRingTrackLayer.hidden = YES;
+        self.progressRingLayer.hidden = YES;
+        self.progressRowContainer.hidden = !visible;
+        self.progressView.hidden = !visible;
+        if (visible) {
+            self.progressRowHeightConstraint.constant = [self sci_subtitleRowLayoutHeight];
+            self.progressHeightConstraint.constant = [self sci_progressBarHeightMatchingSubtitle];
+        } else {
+            self.progressRowHeightConstraint.constant = 0.0;
+            self.progressHeightConstraint.constant = 0.0;
+            self.progressView.layer.cornerRadius = 0.0;
+        }
     }
 }
 
@@ -671,6 +825,11 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 
 - (void)updateToastWidthForTitle:(NSString *)title subtitle:(NSString *)subtitle {
     if (!self.widthConstraint) {
+        return;
+    }
+
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        [self sci_updateDynamicWidthForTitle:title subtitle:subtitle hasButton:!self.closeButton.hidden];
         return;
     }
 
@@ -720,9 +879,18 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.subtitleLabel.text = nil;
     self.subtitleLabel.hidden = YES;
     self.titleLabel.text = @"Downloading...";
-    self.heightConstraint.constant = kToastTallHeight;
-    self.widthConstraint.constant = kPillWidth;
     self.progressView.progress = 0.0f;
+
+    BOOL isDynamic = (self.style == SCIFeedbackPillStyleDynamic);
+    if (isDynamic) {
+        self.heightConstraint.constant = kDynamicPillHeight;
+        [self sci_updateDynamicWidthForTitle:self.titleLabel.text subtitle:nil hasButton:YES];
+        self.progressRingLayer.strokeEnd = 0.0;
+    } else {
+        self.heightConstraint.constant = kToastTallHeight;
+        self.widthConstraint.constant = kPillWidth;
+    }
+
     [self setProgressVisible:YES];
     [self setCloseButtonVisible:YES];
 
@@ -759,7 +927,12 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.subtitleLabel.text = subtitle;
     self.subtitleLabel.hidden = (subtitle.length == 0);
     [self updateToastWidthForTitle:self.titleLabel.text subtitle:subtitle];
-    self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
+
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        self.heightConstraint.constant = self.subtitleLabel.hidden ? kDynamicPillHeight : kDynamicTallHeight;
+    } else {
+        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
+    }
     [self setProgressVisible:NO];
     [self setCloseButtonVisible:NO];
 
@@ -814,7 +987,11 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.titleLabel.text = @"Downloading...";
         self.subtitleLabel.text = nil;
         self.subtitleLabel.hidden = YES;
-        self.heightConstraint.constant = kToastTallHeight;
+        if (self.style == SCIFeedbackPillStyleDynamic) {
+            self.heightConstraint.constant = kDynamicPillHeight;
+        } else {
+            self.heightConstraint.constant = kToastTallHeight;
+        }
         [self setCloseButtonVisible:YES];
         [self setProgressVisible:YES];
 
@@ -828,12 +1005,28 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self sci_applyProgressModeInfoIcon];
     }
 
-    if (animated) {
-        [UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-            self.progressView.progress = self.currentProgress;
-        } completion:nil];
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        // Drive ring strokeEnd
+        if (animated) {
+            [CATransaction begin];
+            [CATransaction setAnimationDuration:0.3];
+            [CATransaction setAnimationTimingFunction:[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut]];
+            self.progressRingLayer.strokeEnd = (CGFloat)self.currentProgress;
+            [CATransaction commit];
+        } else {
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            self.progressRingLayer.strokeEnd = (CGFloat)self.currentProgress;
+            [CATransaction commit];
+        }
     } else {
-        self.progressView.progress = self.currentProgress;
+        if (animated) {
+            [UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+                self.progressView.progress = self.currentProgress;
+            } completion:nil];
+        } else {
+            self.progressView.progress = self.currentProgress;
+        }
     }
 }
 
@@ -865,7 +1058,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self updateToastWidthForTitle:self.titleLabel.text subtitle:subtitle];
         [self setCloseButtonVisible:NO];
         [self setProgressVisible:NO];
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
+        self.heightConstraint.constant = self.subtitleLabel.hidden
+            ? (self.style == SCIFeedbackPillStyleDynamic ? kDynamicPillHeight : kPillHeight)
+            : (self.style == SCIFeedbackPillStyleDynamic ? kDynamicTallHeight : kToastTallHeight);
         [self layoutIfNeeded];
     } completion:nil];
     [self animateIconPulse];
@@ -904,7 +1099,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self updateToastWidthForTitle:self.titleLabel.text subtitle:resolvedSubtitle];
         [self setCloseButtonVisible:YES];
         [self setProgressVisible:NO];
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
+        self.heightConstraint.constant = self.subtitleLabel.hidden
+            ? (self.style == SCIFeedbackPillStyleDynamic ? kDynamicPillHeight : kPillHeight)
+            : (self.style == SCIFeedbackPillStyleDynamic ? kDynamicTallHeight : kToastTallHeight);
         [self layoutIfNeeded];
     } completion:nil];
     [self animateIconPulse];
@@ -934,7 +1131,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self updateToastWidthForTitle:self.titleLabel.text subtitle:subtitle];
         [self setCloseButtonVisible:NO];
         [self setProgressVisible:NO];
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
+        self.heightConstraint.constant = self.subtitleLabel.hidden
+            ? (self.style == SCIFeedbackPillStyleDynamic ? kDynamicPillHeight : kPillHeight)
+            : (self.style == SCIFeedbackPillStyleDynamic ? kDynamicTallHeight : kToastTallHeight);
         [self layoutIfNeeded];
     } completion:nil];
     [self animateIconPulse];
@@ -1023,6 +1222,186 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     }
 
     [self dismissWithCompletion:nil];
+}
+
+#pragma mark - Dynamic Style Helpers
+
+- (void)sci_updateRingPath {
+    CGRect bounds = self.iconBadgeView.bounds;
+    if (CGRectIsEmpty(bounds)) return;
+
+    CGFloat inset = kRingLineWidth / 2.0 + 0.5;
+    CGRect ringRect = CGRectInset(bounds, inset, inset);
+    CGPoint center = CGPointMake(CGRectGetMidX(ringRect), CGRectGetMidY(ringRect));
+    CGFloat radius = MIN(CGRectGetWidth(ringRect), CGRectGetHeight(ringRect)) / 2.0;
+
+    // Start at 12 o'clock (-π/2), draw clockwise
+    UIBezierPath *path = [UIBezierPath bezierPathWithArcCenter:center
+                                                        radius:radius
+                                                    startAngle:-M_PI_2
+                                                      endAngle:(-M_PI_2 + 2.0 * M_PI)
+                                                     clockwise:YES];
+    self.progressRingTrackLayer.path = path.CGPath;
+    self.progressRingLayer.path = path.CGPath;
+    self.progressRingTrackLayer.frame = bounds;
+    self.progressRingLayer.frame = bounds;
+}
+
+- (UIColor *)sci_glowColorForTone:(SCIPillVisualTone)tone {
+    switch (tone) {
+        case SCIPillVisualToneSuccess:
+            return [UIColor colorWithRed:0.20 green:0.85 blue:0.55 alpha:1.0];
+        case SCIPillVisualToneError:
+            return [UIColor colorWithRed:0.95 green:0.30 blue:0.40 alpha:1.0];
+        case SCIPillVisualToneInfo:
+        default:
+            return [UIColor colorWithRed:0.30 green:0.65 blue:0.98 alpha:1.0];
+    }
+}
+
+- (void)sci_updateDynamicWidthForTitle:(NSString *)title subtitle:(NSString *)subtitle hasButton:(BOOL)hasButton {
+    if (!self.widthConstraint) return;
+
+    UIFont *titleFont = self.titleLabel.font ?: [UIFont systemFontOfSize:13.5 weight:UIFontWeightSemibold];
+    UIFont *subtitleFont = self.subtitleLabel.font ?: [UIFont systemFontOfSize:11.5 weight:UIFontWeightMedium];
+
+    CGFloat titleWidth = 0.0;
+    if (title.length > 0) {
+        titleWidth = ceil([title boundingRectWithSize:CGSizeMake(CGFLOAT_MAX, titleFont.lineHeight)
+                                             options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading
+                                          attributes:@{NSFontAttributeName: titleFont}
+                                             context:nil].size.width);
+    }
+
+    CGFloat subtitleWidth = 0.0;
+    if (subtitle.length > 0) {
+        subtitleWidth = ceil([subtitle boundingRectWithSize:CGSizeMake(CGFLOAT_MAX, subtitleFont.lineHeight)
+                                                   options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading
+                                                attributes:@{NSFontAttributeName: subtitleFont}
+                                                   context:nil].size.width);
+    }
+
+    CGFloat textWidth = MAX(titleWidth, subtitleWidth);
+
+    // icon padding + icon + gap + text + trailing padding
+    CGFloat fixedWidth = kHorizontalPad + kIconBadgeSize + 10.0 + kHorizontalPad;
+    if (hasButton) {
+        fixedWidth += 24.0 + 13.0 + 10.0; // button width + trailing + gap
+    }
+
+    CGFloat targetWidth = ceil(textWidth) + fixedWidth;
+    targetWidth = MIN(kDynamicMaxWidth, MAX(kDynamicMinWidth, targetWidth));
+
+    CGFloat newWidth = targetWidth;
+    CGFloat currentWidth = self.widthConstraint.constant;
+
+    if (fabs(newWidth - currentWidth) < 1.0) return;
+
+    self.widthConstraint.constant = newWidth;
+
+    // Spring-animate the bounds change
+    [UIView animateWithDuration:0.4
+                          delay:0
+         usingSpringWithDamping:0.72
+          initialSpringVelocity:0.6
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        [self.superview layoutIfNeeded];
+    } completion:nil];
+}
+
+- (void)handlePan:(UIPanGestureRecognizer *)pan {
+    if (self.style != SCIFeedbackPillStyleDynamic) return;
+
+    CGPoint translation = [pan translationInView:self.superview];
+
+    switch (pan.state) {
+        case UIGestureRecognizerStateBegan:
+            self.panOriginCenter = self.center;
+            break;
+
+        case UIGestureRecognizerStateChanged: {
+            // Only allow upward movement, rubberband downward
+            CGFloat yDelta = translation.y;
+            if (yDelta > 0) {
+                yDelta = yDelta * 0.25; // rubberband down
+            }
+            self.center = CGPointMake(self.panOriginCenter.x, self.panOriginCenter.y + yDelta);
+
+            // Fade out as it moves up
+            CGFloat progress = MIN(1.0, MAX(0.0, -yDelta / 60.0));
+            self.alpha = 1.0 - (progress * 0.5);
+            break;
+        }
+
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled: {
+            CGFloat velocity = [pan velocityInView:self.superview].y;
+            CGFloat yOffset = self.center.y - self.panOriginCenter.y;
+
+            if (yOffset < -20.0 || velocity < -300.0) {
+                // Dismiss
+                [self dismiss];
+            } else {
+                // Snap back with spring
+                [UIView animateWithDuration:0.4
+                                      delay:0
+                     usingSpringWithDamping:0.7
+                      initialSpringVelocity:0.5
+                                    options:UIViewAnimationOptionCurveEaseOut
+                                 animations:^{
+                    self.center = self.panOriginCenter;
+                    self.alpha = 1.0;
+                } completion:nil];
+            }
+            break;
+        }
+
+        default:
+            break;
+    }
+}
+
+#pragma mark - Dynamic Touch Feedback
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesBegan:touches withEvent:event];
+    if (self.style != SCIFeedbackPillStyleDynamic) return;
+
+    [UIView animateWithDuration:0.15
+                          delay:0
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        self.transform = CGAffineTransformMakeScale(0.96, 0.96);
+    } completion:nil];
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesEnded:touches withEvent:event];
+    if (self.style != SCIFeedbackPillStyleDynamic) return;
+
+    [UIView animateWithDuration:0.3
+                          delay:0
+         usingSpringWithDamping:0.6
+          initialSpringVelocity:0.8
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        self.transform = CGAffineTransformIdentity;
+    } completion:nil];
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesCancelled:touches withEvent:event];
+    if (self.style != SCIFeedbackPillStyleDynamic) return;
+
+    [UIView animateWithDuration:0.3
+                          delay:0
+         usingSpringWithDamping:0.6
+          initialSpringVelocity:0.8
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        self.transform = CGAffineTransformIdentity;
+    } completion:nil];
 }
 
 @end

@@ -6,6 +6,7 @@
 #import "SCIActionButtonConfiguration.h"
 #import "SCIActionDescriptor.h"
 #import "../../Downloader/Download.h"
+#import "../../Downloader/BulkDownload.h"
 #import "../../InstagramHeaders.h"
 #import "../../AssetUtils.h"
 #import "../../Utils.h"
@@ -14,12 +15,20 @@
 #import "../Gallery/SCIGalleryFile.h"
 #import "../Gallery/SCIGalleryOriginController.h"
 #import "../Gallery/SCIGallerySaveMetadata.h"
+#import "../UI/SCIFeedbackPillPreferences.h"
 
 NSString * const kSCIActionNone = @"none";
 NSString * const kSCIActionDownloadLibrary = @"download_library";
 NSString * const kSCIActionDownloadShare = @"download_share";
 NSString * const kSCIActionCopyDownloadLink = @"copy_download_link";
+NSString * const kSCIActionCopyMedia = @"copy_media";
 NSString * const kSCIActionDownloadGallery = @"download_gallery";
+NSString * const kSCIActionDownloadAll = @"download_all";
+NSString * const kSCIActionDownloadAllLibrary = @"download_all_library";
+NSString * const kSCIActionDownloadAllShare = @"download_all_share";
+NSString * const kSCIActionDownloadAllGallery = @"download_all_gallery";
+NSString * const kSCIActionDownloadAllClipboard = @"download_all_clipboard";
+NSString * const kSCIActionDownloadAllLinks = @"download_all_links";
 NSString * const kSCIActionExpand = @"expand";
 NSString * const kSCIActionViewThumbnail = @"view_thumbnail";
 NSString * const kSCIActionCopyCaption = @"copy_caption";
@@ -193,13 +202,68 @@ extern "C" NSString *SCIActionButtonTitleForIdentifier(NSString *identifier) {
 	return SCIActionDescriptorDisplayTitle(identifier, nil);
 }
 
-static NSString *SCIActionButtonDisplayTitleForContext(NSString *identifier, SCIActionButtonContext *context) {
+static NSArray<NSString *> *SCIBulkActionChildIdentifiers(void) {
+    return @[
+        kSCIActionDownloadAllLibrary,
+        kSCIActionDownloadAllShare,
+        kSCIActionDownloadAllGallery,
+        kSCIActionDownloadAllClipboard,
+        kSCIActionDownloadAllLinks
+    ];
+}
+
+static BOOL SCIIsBulkChildActionIdentifier(NSString *identifier) {
+    return [SCIBulkActionChildIdentifiers() containsObject:identifier];
+}
+
+static BOOL SCIIsBulkDownloadActionIdentifier(NSString *identifier) {
+    return [@[
+        kSCIActionDownloadAllLibrary,
+        kSCIActionDownloadAllShare,
+        kSCIActionDownloadAllGallery
+    ] containsObject:identifier];
+}
+
+static BOOL SCIIsBulkCopyActionIdentifier(NSString *identifier) {
+    return [@[
+        kSCIActionDownloadAllClipboard,
+        kSCIActionDownloadAllLinks
+    ] containsObject:identifier];
+}
+
+static NSString *SCIBaseActionIdentifierForBulkChild(NSString *identifier) {
+    if ([identifier isEqualToString:kSCIActionDownloadAllLibrary]) return kSCIActionDownloadLibrary;
+    if ([identifier isEqualToString:kSCIActionDownloadAllShare]) return kSCIActionDownloadShare;
+    if ([identifier isEqualToString:kSCIActionDownloadAllGallery]) return kSCIActionDownloadGallery;
+    if ([identifier isEqualToString:kSCIActionDownloadAllClipboard]) return @"copy";
+    if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) return kSCIActionCopyDownloadLink;
+    return identifier;
+}
+
+static NSString *SCIActionButtonDisplayTitleForContext(NSString *identifier,
+                                                       SCIActionButtonContext *context,
+                                                       SCIResolvedMediaEntry *currentEntry) {
+    if ([identifier isEqualToString:kSCIActionCopyMedia]) {
+        BOOL isVideo = (currentEntry.videoURL != nil);
+        if (isVideo) {
+            return (context.source == SCIActionButtonSourceReels) ? @"Copy Reel" : @"Copy Video";
+        }
+        return @"Copy Photo";
+    }
 	return SCIActionDescriptorDisplayTitle(identifier, context.settingsTitle);
+}
+
+static NSString *SCIResolvedSettingsTitleForContext(SCIActionButtonContext *context) {
+    if (context.settingsTitle.length > 0) return context.settingsTitle;
+    return SCIActionButtonTopicTitleForSource(context.source);
 }
 
 static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButtonSource source, CGFloat size, SCIActionButtonContext *context) {
 	NSString *append = (source == SCIActionButtonSourceReels) ? @"_reels" : @"";
 	NSString *iconName = SCIActionDescriptorIconName(identifier);
+    if ([identifier isEqualToString:@"copy"]) {
+        return [SCIAssetUtils instagramIconNamed:@"copy" pointSize:size];
+    }
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary]) {
 		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"download%@", append] pointSize:size];
 	}
@@ -209,8 +273,17 @@ static UIImage *SCIIconForActionIdentifier(NSString *identifier, SCIActionButton
 	if ([identifier isEqualToString:kSCIActionCopyDownloadLink]) {
 		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"link%@", append] pointSize:size];
 	}
+	if ([identifier isEqualToString:kSCIActionCopyMedia]) {
+		return [SCIAssetUtils instagramIconNamed:@"copy" pointSize:size];
+	}
 	if ([identifier isEqualToString:kSCIActionDownloadGallery]) {
 		return [SCIAssetUtils instagramIconNamed:@"media" pointSize:size];
+	}
+	if ([identifier isEqualToString:kSCIActionDownloadAll]) {
+		return [SCIAssetUtils instagramIconNamed:@"more" pointSize:size];
+	}
+	if (SCIIsBulkChildActionIdentifier(identifier)) {
+		return SCIIconForActionIdentifier(SCIBaseActionIdentifierForBulkChild(identifier), source, size, context);
 	}
 	if ([identifier isEqualToString:kSCIActionExpand]) {
 		return [SCIAssetUtils instagramIconNamed:[NSString stringWithFormat:@"expand%@", append] pointSize:size];
@@ -626,8 +699,41 @@ static NSArray<SCIResolvedMediaEntry *> *SCIEntriesFromMedia(id media) {
 	if (!media) return @[];
 
 	NSMutableArray<SCIResolvedMediaEntry *> *entries = [NSMutableArray array];
+
+    NSArray *directCollection = SCIArrayFromCollection(media);
+    if (directCollection.count > 0) {
+        for (id item in directCollection) {
+            SCIResolvedMediaEntry *entry = SCIEntryFromMediaObject(item);
+            if (!entry) {
+                id nestedMedia = SCIObjectForSelector(item, @"media") ?: SCIKVCObject(item, @"media");
+                entry = SCIEntryFromMediaObject(nestedMedia);
+                if (entry && !entry.metadataObject) {
+                    entry.metadataObject = nestedMedia ?: item;
+                }
+            }
+            if (entry) {
+                if (!entry.mediaObject) entry.mediaObject = item;
+                if (!entry.metadataObject) entry.metadataObject = item;
+                [entries addObject:entry];
+            }
+        }
+        if (entries.count > 0) return entries;
+    }
+
 	NSArray *items = SCIArrayFromCollection(SCIObjectForSelector(media, @"items"));
 	if (items.count == 0) items = SCIArrayFromCollection(SCIKVCObject(media, @"items"));
+
+    if (items.count == 0) {
+        for (NSString *selectorName in @[@"carouselMedia", @"carouselChildren", @"children", @"carousel_media"]) {
+            items = SCIArrayFromCollection(SCIObjectForSelector(media, selectorName));
+            if (items.count == 0) {
+                items = SCIArrayFromCollection(SCIKVCObject(media, selectorName));
+            }
+            if (items.count > 0) {
+                break;
+            }
+        }
+    }
 
 	if (items.count > 0) {
 		for (id item in items) {
@@ -758,10 +864,10 @@ static CGSize SCICustomButtonIconDisplaySize(NSString *identifier, SCIActionButt
     if (source == SCIActionButtonSourceReels &&
         ([identifier isEqualToString:kSCIActionDownloadShare] ||
          [identifier isEqualToString:kSCIActionViewThumbnail] ||
-         [identifier isEqualToString:kSCIActionDownloadGallery])) {
+         [identifier isEqualToString:kSCIActionDownloadGallery] ||
+		 [identifier isEqualToString:kSCIActionCopyMedia])) {
         
-        width = height = ([identifier isEqualToString:kSCIActionDownloadGallery] ||
-                          [identifier isEqualToString:kSCIActionViewThumbnail]) ? 28.0 : 40.0;
+        width = height = (![identifier isEqualToString:kSCIActionDownloadShare]) ? 28.0 : 38.0;
     }
 
     CGFloat maxWidth = CGRectGetWidth(button.bounds) > 0.0 ? CGRectGetWidth(button.bounds) : 44.0;
@@ -829,11 +935,213 @@ static id SCIResolveMediaForContext(SCIActionButtonContext *context) {
 	return nil;
 }
 
+static id SCIResolveBulkMediaForContext(SCIActionButtonContext *context) {
+    if (!context) return nil;
+    if (context.bulkMediaResolver) return context.bulkMediaResolver(context);
+    return SCIResolveMediaForContext(context);
+}
+
 static NSInteger SCIResolveCurrentIndexForContext(SCIActionButtonContext *context) {
 	if (!context) return 0;
 	if (context.currentIndexOverride >= 0) return context.currentIndexOverride;
 	if (context.currentIndexResolver) return context.currentIndexResolver(context);
 	return 0;
+}
+
+static NSArray<SCIResolvedMediaEntry *> *SCIBulkEntriesForContext(SCIActionButtonContext *context) {
+    id bulkMedia = SCIResolveBulkMediaForContext(context);
+    return SCIEntriesFromMedia(bulkMedia);
+}
+
+static NSArray<SCIResolvedMediaEntry *> *SCIDownloadableEntries(NSArray<SCIResolvedMediaEntry *> *entries) {
+    NSMutableArray<SCIResolvedMediaEntry *> *filtered = [NSMutableArray array];
+    for (SCIResolvedMediaEntry *entry in entries) {
+        NSURL *url = entry.videoURL ?: entry.photoURL;
+        if (url) [filtered addObject:entry];
+    }
+    return filtered;
+}
+
+static UIViewController *SCIActionContextPresenter(SCIActionButtonContext *context) {
+    if (context.controller.view.window) return context.controller;
+    UIViewController *ancestor = SCIViewControllerForAncestorView(context.view);
+    if (ancestor.view.window) return ancestor;
+    return topMostController();
+}
+
+static UIView *SCIActionContextAnchorView(SCIActionButtonContext *context) {
+    if ([context.view isKindOfClass:[UIView class]] && context.view.window) return context.view;
+    return SCIActionContextPresenter(context).view;
+}
+
+static NSArray<SCIBulkDownloadItem *> *SCIBulkDownloadItemsFromEntries(NSArray<SCIResolvedMediaEntry *> *entries,
+                                                                       SCIActionButtonSource source,
+                                                                       NSString *username,
+                                                                       id media) {
+    NSMutableArray<SCIBulkDownloadItem *> *items = [NSMutableArray array];
+    for (SCIResolvedMediaEntry *entry in entries) {
+        NSURL *url = entry.videoURL ?: entry.photoURL;
+        if (!url) continue;
+        BOOL isVideo = (entry.videoURL != nil);
+        id metadataObject = entry.metadataObject ?: entry.mediaObject ?: media;
+        SCIGallerySaveMetadata *meta = SCIGalleryMetadata(source, username, metadataObject);
+        NSString *linkString = SCIBestDownloadURLForMediaObject(metadataObject).absoluteString ?: url.absoluteString;
+        [items addObject:[SCIBulkDownloadItem itemWithURL:url
+                                            fileExtension:SCIExtensionForURL(url, isVideo)
+                                                  isVideo:isVideo
+                                                 metadata:meta
+                                               linkString:linkString]];
+    }
+    return items;
+}
+
+static NSArray<NSString *> *SCIBulkDownloadLinksFromEntries(NSArray<SCIResolvedMediaEntry *> *entries, id media) {
+    NSMutableOrderedSet<NSString *> *links = [NSMutableOrderedSet orderedSet];
+    for (SCIResolvedMediaEntry *entry in entries) {
+        id metadataObject = entry.metadataObject ?: entry.mediaObject ?: media;
+        NSURL *bestURL = SCIBestDownloadURLForMediaObject(metadataObject) ?: entry.videoURL ?: entry.photoURL;
+        if (bestURL.absoluteString.length > 0) {
+            [links addObject:bestURL.absoluteString];
+        }
+    }
+    return links.array;
+}
+
+NSArray<NSString *> *SCIConfiguredBulkActionIdentifiersForSource(SCIActionButtonSource source) {
+    NSMutableOrderedSet<NSString *> *ordered = [NSMutableOrderedSet orderedSet];
+    [ordered addObjectsFromArray:SCIActionButtonConfiguredBulkDownloadActionsForSource(source)];
+    [ordered addObjectsFromArray:SCIActionButtonConfiguredBulkCopyActionsForSource(source)];
+    return ordered.array;
+}
+
+static NSArray<UIMenuElement *> *SCIBulkActionMenuElementsForIdentifiers(NSArray<NSString *> *identifiers,
+                                                                         void (^selectionHandler)(NSString *identifier)) {
+    NSMutableArray<UIMenuElement *> *elements = [NSMutableArray array];
+    for (NSString *identifier in identifiers) {
+        UIImage *image = SCIActionButtonMenuIconForIdentifier(identifier, 22.0);
+        NSString *title = SCIActionButtonTitleForIdentifier(identifier);
+        [elements addObject:[UIAction actionWithTitle:title
+                                                image:image
+                                           identifier:nil
+                                              handler:^(__unused UIAction *action) {
+            selectionHandler(identifier);
+        }]];
+    }
+    return elements;
+}
+
+static NSArray<NSString *> *SCIFilterBulkActionIdentifiers(NSArray<NSString *> *identifiers,
+                                                           BOOL (^predicate)(NSString *identifier)) {
+    NSMutableArray<NSString *> *filtered = [NSMutableArray array];
+    for (NSString *identifier in identifiers) {
+        if (predicate && predicate(identifier)) {
+            [filtered addObject:identifier];
+        }
+    }
+    return filtered;
+}
+
+static UIMenu *SCIBulkActionMenuForContext(SCIActionButtonContext *context,
+                                           NSArray<SCIResolvedMediaEntry *> *entries,
+                                           NSString *username,
+                                           id media,
+                                           NSArray<NSString *> *configuredIdentifiers) {
+    NSArray<SCIResolvedMediaEntry *> *downloadableEntries = SCIDownloadableEntries(entries);
+    if (downloadableEntries.count < 2) {
+        return nil;
+    }
+
+    NSArray<SCIBulkDownloadItem *> *bulkItems = SCIBulkDownloadItemsFromEntries(downloadableEntries, context.source, username, media);
+    NSArray<NSString *> *bulkLinks = SCIBulkDownloadLinksFromEntries(downloadableEntries, media);
+    UIViewController *presenter = SCIActionContextPresenter(context);
+    UIView *anchorView = SCIActionContextAnchorView(context);
+
+    NSArray<UIMenuElement *> *children = SCIBulkActionMenuElementsForIdentifiers(configuredIdentifiers, ^(NSString *identifier) {
+        if ([identifier isEqualToString:kSCIActionDownloadAllLibrary]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationSaveToPhotos
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllLibrary
+                                               presenter:presenter
+                                              anchorView:anchorView];
+            return;
+        }
+        if ([identifier isEqualToString:kSCIActionDownloadAllShare]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationShare
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllShare
+                                               presenter:presenter
+                                              anchorView:anchorView];
+            return;
+        }
+        if ([identifier isEqualToString:kSCIActionDownloadAllGallery]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationSaveToGallery
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllGallery
+                                               presenter:presenter
+                                              anchorView:anchorView];
+            return;
+        }
+        if ([identifier isEqualToString:kSCIActionDownloadAllClipboard]) {
+            [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationCopyMedia
+                                                   items:bulkItems
+                                        actionIdentifier:kSCIActionDownloadAllClipboard
+                                               presenter:presenter
+                                              anchorView:anchorView];
+            return;
+        }
+        if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) {
+            if (bulkLinks.count == 0) {
+                [SCIUtils showToastForActionIdentifier:kSCIActionDownloadAllLinks duration:2.0 title:@"No links available" subtitle:nil iconResource:@"link"];
+                return;
+            }
+            [UIPasteboard generalPasteboard].string = [bulkLinks componentsJoinedByString:@"\n"];
+            [SCIUtils showToastForActionIdentifier:kSCIActionDownloadAllLinks
+                                          duration:1.5
+                                             title:@"Download links copied"
+                                          subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)bulkLinks.count, bulkLinks.count == 1 ? @"" : @"s"]
+                                      iconResource:@"copy_filled"];
+        }
+    });
+    if (children.count == 0) return nil;
+    return [UIMenu menuWithTitle:@"" children:children];
+}
+
+static void SCIPresentBulkActionChooser(SCIActionButtonContext *context,
+                                        NSArray<SCIResolvedMediaEntry *> *entries,
+                                        NSString *username,
+                                        id media) {
+    UIMenu *menu = SCIBulkActionMenuForContext(context, entries, username, media, SCIConfiguredBulkActionIdentifiersForSource(context.source));
+    if (!menu) {
+        [SCIUtils showToastForActionIdentifier:kSCIActionDownloadAllLibrary duration:2.0 title:@"No bulk media available" subtitle:nil iconResource:@"download"];
+    }
+}
+
+static UIMenuElement *SCIBulkActionMenuElementForContext(SCIActionButtonContext *context,
+                                                         NSArray<SCIResolvedMediaEntry *> *entries,
+                                                         NSString *username,
+                                                         id media,
+                                                         NSArray<NSString *> *configuredIdentifiers,
+                                                         NSString *title,
+                                                         NSString *iconIdentifier) {
+    UIMenu *menu = SCIBulkActionMenuForContext(context, entries, username, media, configuredIdentifiers);
+    if (!menu) return nil;
+    return [UIMenu menuWithTitle:title ?: @""
+                           image:SCIActionButtonMenuIconForContext(iconIdentifier ?: kSCIActionDownloadAll, context, 22.0)
+                      identifier:nil
+                         options:0
+                        children:menu.children];
+}
+
+static NSString *SCIResolvedBulkUsernameForContext(SCIActionButtonContext *context, NSArray<SCIResolvedMediaEntry *> *entries, id media) {
+    NSString *username = (context.source == SCIActionButtonSourceDirect)
+        ? SCIDirectUsernameFromController(context.controller)
+        : SCIUsernameFromMediaObject(media);
+    if (username.length > 0) return username;
+    for (SCIResolvedMediaEntry *entry in entries) {
+        username = SCIUsernameFromMediaObject(entry.metadataObject ?: entry.mediaObject);
+        if (username.length > 0) return username;
+    }
+    return nil;
 }
 
 static BOOL SCIIsActionVisible(SCIActionButtonContext *context,
@@ -842,10 +1150,12 @@ static BOOL SCIIsActionVisible(SCIActionButtonContext *context,
 							   id media,
 							   NSArray<SCIResolvedMediaEntry *> *entries,
 							   NSInteger currentIndex) {
-	if (entries.count == 0 || identifier.length == 0) return NO;
+	if (identifier.length == 0) return NO;
 	if ([configuration.disabledActions containsObject:identifier] || [configuration.unassignedActions containsObject:identifier]) {
 		return NO;
 	}
+
+    if (entries.count == 0) return NO;
 
 	NSInteger idx = SCIClampedIndex(currentIndex, (NSInteger)entries.count);
 	SCIResolvedMediaEntry *currentEntry = entries[idx];
@@ -857,6 +1167,7 @@ static BOOL SCIIsActionVisible(SCIActionButtonContext *context,
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary] ||
 		[identifier isEqualToString:kSCIActionDownloadShare] ||
 		[identifier isEqualToString:kSCIActionCopyDownloadLink] ||
+        [identifier isEqualToString:kSCIActionCopyMedia] ||
 		[identifier isEqualToString:kSCIActionDownloadGallery]) {
 		return currentURL != nil;
 	}
@@ -864,7 +1175,7 @@ static BOOL SCIIsActionVisible(SCIActionButtonContext *context,
 		return context.captionResolver != nil && [context.captionResolver(context, media, entries, idx) length] > 0;
 	}
 	if ([identifier isEqualToString:kSCIActionOpenTopicSettings]) {
-		return context.settingsTitle.length > 0;
+		return SCIResolvedSettingsTitleForContext(context).length > 0;
 	}
 	if ([identifier isEqualToString:kSCIActionRepost]) {
 		return context.repostHandler != nil;
@@ -897,6 +1208,9 @@ static NSString *SCIResolvedDefaultActionIdentifier(NSArray<NSString *> *visible
 
 	NSString *saved = [SCIUtils getStringPref:SCIDefaultActionPrefKeyForSource(source)];
 	if ([saved isEqualToString:kSCIActionNone]) return kSCIActionNone;
+	if ([saved isEqualToString:kSCIActionDownloadAll] && [visibleIdentifiers containsObject:kSCIActionDownloadAllLibrary]) {
+        return kSCIActionDownloadAllLibrary;
+    }
 	if (saved.length > 0 && [visibleIdentifiers containsObject:saved]) return saved;
 	if (saved.length > 0) return kSCIActionNone;
 	if ([visibleIdentifiers containsObject:kSCIActionDownloadLibrary]) return kSCIActionDownloadLibrary;
@@ -970,6 +1284,71 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIGallerySaveMetadata *
 	});
 }
 
+static BOOL SCIExecuteBulkChildAction(NSString *identifier,
+                                      SCIActionButtonContext *context,
+                                      NSArray<SCIResolvedMediaEntry *> *entries,
+                                      NSString *username,
+                                      id media) {
+    NSArray<SCIResolvedMediaEntry *> *downloadableEntries = SCIDownloadableEntries(entries);
+    if (downloadableEntries.count < 2) {
+        [SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No bulk media available" subtitle:nil iconResource:@"download"];
+        return YES;
+    }
+
+    NSArray<SCIBulkDownloadItem *> *bulkItems = SCIBulkDownloadItemsFromEntries(downloadableEntries, context.source, username, media);
+    UIViewController *presenter = SCIActionContextPresenter(context);
+    UIView *anchorView = SCIActionContextAnchorView(context);
+
+    if ([identifier isEqualToString:kSCIActionDownloadAllLibrary]) {
+        [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationSaveToPhotos
+                                               items:bulkItems
+                                    actionIdentifier:identifier
+                                           presenter:presenter
+                                          anchorView:anchorView];
+        return YES;
+    }
+    if ([identifier isEqualToString:kSCIActionDownloadAllShare]) {
+        [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationShare
+                                               items:bulkItems
+                                    actionIdentifier:identifier
+                                           presenter:presenter
+                                          anchorView:anchorView];
+        return YES;
+    }
+    if ([identifier isEqualToString:kSCIActionDownloadAllGallery]) {
+        [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationSaveToGallery
+                                               items:bulkItems
+                                    actionIdentifier:identifier
+                                           presenter:presenter
+                                          anchorView:anchorView];
+        return YES;
+    }
+    if ([identifier isEqualToString:kSCIActionDownloadAllClipboard]) {
+        [SCIBulkDownloadCoordinator performOperation:SCIBulkDownloadOperationCopyMedia
+                                               items:bulkItems
+                                    actionIdentifier:identifier
+                                           presenter:presenter
+                                          anchorView:anchorView];
+        return YES;
+    }
+    if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) {
+        NSArray<NSString *> *bulkLinks = SCIBulkDownloadLinksFromEntries(downloadableEntries, media);
+        if (bulkLinks.count == 0) {
+            [SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No links available" subtitle:nil iconResource:@"link"];
+            return YES;
+        }
+        [UIPasteboard generalPasteboard].string = [bulkLinks componentsJoinedByString:@"\n"];
+        [SCIUtils showToastForActionIdentifier:identifier
+                                      duration:1.5
+                                         title:@"Download links copied"
+                                      subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)bulkLinks.count, bulkLinks.count == 1 ? @"" : @"s"]
+                                  iconResource:@"copy_filled"];
+        return YES;
+    }
+
+    return NO;
+}
+
 static BOOL SCIExecuteCommonAction(NSString *identifier,
 								   SCIActionButtonContext *context,
 								   SCIResolvedMediaEntry *currentEntry,
@@ -981,6 +1360,13 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	NSURL *currentURL = currentEntry.videoURL ?: currentEntry.photoURL;
 	BOOL isVideo = (currentEntry.videoURL != nil);
 	BOOL shouldShowFeedbackPill = [SCIUtils shouldShowFeedbackPillForActionIdentifier:identifier];
+
+	if ([identifier isEqualToString:kSCIActionDownloadAll]) {
+		return YES;
+	}
+    if (SCIIsBulkChildActionIdentifier(identifier)) {
+        return SCIExecuteBulkChildAction(identifier, context, entries, username, media);
+    }
 
 	if ([identifier isEqualToString:kSCIActionDownloadLibrary] ||
 		[identifier isEqualToString:kSCIActionDownloadShare] ||
@@ -1022,8 +1408,45 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		return YES;
 	}
 
+    if ([identifier isEqualToString:kSCIActionCopyMedia]) {
+        if (!currentURL && !currentEntry.photoURL) {
+            if (shouldShowFeedbackPill) {
+                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];
+            }
+            return YES;
+        }
+
+        if (!isVideo) {
+            NSData *imageData = currentURL ? [NSData dataWithContentsOfURL:currentURL] : nil;
+            UIImage *image = imageData ? [UIImage imageWithData:imageData] : nil;
+            if (image) {
+                [[UIPasteboard generalPasteboard] setImage:image];
+                if (shouldShowFeedbackPill) {
+                    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5 title:@"Copied photo to clipboard" subtitle:nil iconResource:@"copy_filled"];
+                }
+            }
+            return YES;
+        }
+
+        NSData *data = [NSData dataWithContentsOfURL:currentURL];
+        if (data) {
+            [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
+            if (shouldShowFeedbackPill) {
+                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5 title:@"Copied video to clipboard" subtitle:nil iconResource:@"copy_filled"];
+            }
+        } else if (shouldShowFeedbackPill) {
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];
+        }
+        return YES;
+    }
+
 	if ([identifier isEqualToString:kSCIActionExpand]) {
-		NSArray<SCIMediaItem *> *playerItems = SCIPlayerItemsFromEntries(entries, context.source, username, media);
+        NSArray<SCIResolvedMediaEntry *> *previewEntries = entries;
+        NSArray<SCIResolvedMediaEntry *> *bulkEntries = SCIDownloadableEntries(SCIBulkEntriesForContext(context));
+        if (bulkEntries.count > previewEntries.count) {
+            previewEntries = bulkEntries;
+        }
+		NSArray<SCIMediaItem *> *playerItems = SCIPlayerItemsFromEntries(previewEntries, context.source, username, media);
 		if (playerItems.count == 0) {
 			if (shouldShowFeedbackPill) {
 				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No media to expand" subtitle:nil iconResource:@"expand"];
@@ -1103,7 +1526,8 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	}
 
 	if ([identifier isEqualToString:kSCIActionOpenTopicSettings]) {
-		if (context.settingsTitle.length == 0) {
+		NSString *settingsTitle = SCIResolvedSettingsTitleForContext(context);
+		if (settingsTitle.length == 0) {
 			if (shouldShowFeedbackPill) {
 				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Settings unavailable" subtitle:nil iconResource:@"settings"];
 			}
@@ -1113,7 +1537,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		if (shouldShowFeedbackPill) {
 			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened settings" subtitle:nil iconResource:@"settings"];
 		}
-		[SCIUtils showSettingsForTopicTitle:context.settingsTitle];
+		[SCIUtils showSettingsForTopicTitle:settingsTitle];
 		return YES;
 	}
 
@@ -1139,6 +1563,14 @@ BOOL SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonContext *co
 
 	id media = SCIResolveMediaForContext(context);
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
+    if (SCIIsBulkChildActionIdentifier(identifier)) {
+        id bulkMedia = SCIResolveBulkMediaForContext(context);
+        NSArray<SCIResolvedMediaEntry *> *bulkEntries = SCIDownloadableEntries(SCIEntriesFromMedia(bulkMedia));
+        if (bulkEntries.count > 0) {
+            media = bulkMedia ?: media;
+            entries = bulkEntries;
+        }
+    }
 	if (entries.count == 0) {
 		[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Media not found" subtitle:nil iconResource:@"media"];
 		return NO;
@@ -1230,6 +1662,10 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 	id media = SCIResolveMediaForContext(context);
 	NSArray<SCIResolvedMediaEntry *> *entries = SCIEntriesFromMedia(media);
 	NSInteger currentIndex = SCIResolveCurrentIndexForContext(context);
+    SCIResolvedMediaEntry *currentEntry = nil;
+    if (entries.count > 0) {
+        currentEntry = entries[SCIClampedIndex(currentIndex, (NSInteger)entries.count)];
+    }
 	NSArray<NSString *> *visibleActions = SCIVisibleActionsForContext(context, media, entries, currentIndex);
 
 	if (visibleActions.count == 0) {
@@ -1286,6 +1722,11 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 		objc_setAssociatedObject(button, kSCIActionButtonTapActionAssocKey, newTapAction, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 	}
 
+    NSArray<SCIResolvedMediaEntry *> *bulkEntries = SCIBulkEntriesForContext(context);
+    NSString *bulkUsername = SCIResolvedBulkUsernameForContext(context, bulkEntries, media);
+    NSArray<NSString *> *configuredBulkDownloadIdentifiers = SCIActionButtonConfiguredBulkDownloadActionsForSource(context.source);
+    NSArray<NSString *> *configuredBulkCopyIdentifiers = SCIActionButtonConfiguredBulkCopyActionsForSource(context.source);
+    BOOL hasBulkMedia = (SCIDownloadableEntries(bulkEntries).count > 1);
 	NSMutableArray<UIMenuElement *> *menuElements = [NSMutableArray array];
 	NSArray<SCIActionMenuSection *> *menuSections = [configuration visibleSections];
 	BOOL firstGroup = YES;
@@ -1298,7 +1739,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 		for (NSString *identifier in identifiers) {
 			if (![visibleActions containsObject:identifier]) continue;
 
-			UIAction *menuAction = [UIAction actionWithTitle:SCIActionButtonDisplayTitleForContext(identifier, context)
+			UIAction *menuAction = [UIAction actionWithTitle:SCIActionButtonDisplayTitleForContext(identifier, context, currentEntry)
 													   image:SCIActionButtonMenuIconForContext(identifier, context, 22.0)
 												  identifier:nil
 													 handler:^(__unused UIAction *action) {
@@ -1310,6 +1751,14 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 			}];
 			[groupElements addObject:menuAction];
 		}
+
+        if (hasBulkMedia && [group.identifier isEqualToString:@"download"]) {
+            UIMenuElement *bulkElement = SCIBulkActionMenuElementForContext(context, bulkEntries, bulkUsername, media, configuredBulkDownloadIdentifiers, @"Download All", kSCIActionDownloadAll);
+            if (bulkElement) [groupElements addObject:bulkElement];
+        } else if (hasBulkMedia && [group.identifier isEqualToString:@"copy"]) {
+            UIMenuElement *bulkElement = SCIBulkActionMenuElementForContext(context, bulkEntries, bulkUsername, media, configuredBulkCopyIdentifiers, @"Copy All", kSCIActionDownloadAll);
+            if (bulkElement) [groupElements addObject:bulkElement];
+        }
 
 		if (groupElements.count == 0) continue;
 		if (!firstGroup) {
@@ -1338,7 +1787,7 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 
 	if (menuElements.count == 0) {
 		for (NSString *identifier in visibleActions) {
-			[menuElements addObject:[UIAction actionWithTitle:SCIActionButtonDisplayTitleForContext(identifier, context)
+			[menuElements addObject:[UIAction actionWithTitle:SCIActionButtonDisplayTitleForContext(identifier, context, currentEntry)
 														image:SCIActionButtonMenuIconForContext(identifier, context, 22.0)
 												   identifier:nil
 													  handler:^(__unused UIAction *action) {
@@ -1349,9 +1798,16 @@ void SCIConfigureActionButton(UIButton *button, SCIActionButtonContext *context)
 				SCIExecuteActionIdentifier(identifier, context, NO);
 			}]];
 		}
+        if (hasBulkMedia) {
+            UIMenuElement *downloadBulkElement = SCIBulkActionMenuElementForContext(context, bulkEntries, bulkUsername, media, configuredBulkDownloadIdentifiers, @"Download All", kSCIActionDownloadAll);
+            if (downloadBulkElement) [menuElements addObject:downloadBulkElement];
+            UIMenuElement *copyBulkElement = SCIBulkActionMenuElementForContext(context, bulkEntries, bulkUsername, media, configuredBulkCopyIdentifiers, @"Copy All", kSCIActionDownloadAll);
+            if (copyBulkElement) [menuElements addObject:copyBulkElement];
+        }
 	}
 
-	button.menu = [UIMenu menuWithTitle:@"" children:menuElements];
+    UIMenu *fullMenu = [UIMenu menuWithTitle:@"" children:menuElements];
+    button.menu = fullMenu;
 	button.showsMenuAsPrimaryAction = shouldOpenMenuOnTap;
 	objc_setAssociatedObject(button, kSCIActionButtonContextAssocKey, context, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 	objc_setAssociatedObject(button, kSCIActionButtonMenuSignatureAssocKey, menuSignature, OBJC_ASSOCIATION_COPY_NONATOMIC);

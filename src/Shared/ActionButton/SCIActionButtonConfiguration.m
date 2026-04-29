@@ -1,6 +1,39 @@
 #import "SCIActionButtonConfiguration.h"
 #import "SCIActionDescriptor.h"
 
+static NSArray<NSString *> *SCIBulkActionIdentifiers(void) {
+    return @[
+        kSCIActionDownloadAllLibrary,
+        kSCIActionDownloadAllShare,
+        kSCIActionDownloadAllGallery,
+        kSCIActionDownloadAllClipboard,
+        kSCIActionDownloadAllLinks
+    ];
+}
+
+static BOOL SCIIsBulkDownloadSectionAction(NSString *identifier) {
+    return [@[
+        kSCIActionDownloadAllLibrary,
+        kSCIActionDownloadAllShare,
+        kSCIActionDownloadAllGallery
+    ] containsObject:identifier];
+}
+
+static BOOL SCIIsBulkCopySectionAction(NSString *identifier) {
+    return [@[
+        kSCIActionDownloadAllClipboard,
+        kSCIActionDownloadAllLinks
+    ] containsObject:identifier];
+}
+
+static NSString *SCIBulkDownloadDefaultsKeyForSource(SCIActionButtonSource source) {
+    return [NSString stringWithFormat:@"action_button_%@_bulk_download_actions", SCIActionButtonTopicKeyForSource(source)];
+}
+
+static NSString *SCIBulkCopyDefaultsKeyForSource(SCIActionButtonSource source) {
+    return [NSString stringWithFormat:@"action_button_%@_bulk_copy_actions", SCIActionButtonTopicKeyForSource(source)];
+}
+
 static NSArray<NSString *> *SCIFilteredActionArray(NSArray *values, NSArray<NSString *> *supported) {
     NSMutableOrderedSet<NSString *> *filtered = [NSMutableOrderedSet orderedSet];
     for (id value in values) {
@@ -9,6 +42,10 @@ static NSArray<NSString *> *SCIFilteredActionArray(NSArray *values, NSArray<NSSt
         }
     }
     return filtered.array;
+}
+
+static NSArray<NSString *> *SCIFilteredUniqueActionArray(NSArray *values, NSArray<NSString *> *supported) {
+    return SCIFilteredActionArray(values, supported);
 }
 
 NSString *SCIActionButtonTopicKeyForSource(SCIActionButtonSource source) {
@@ -39,6 +76,7 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionDownloadLibrary,
                 kSCIActionDownloadShare,
                 kSCIActionCopyDownloadLink,
+                kSCIActionCopyMedia,
                 kSCIActionDownloadGallery,
                 kSCIActionExpand,
                 kSCIActionViewThumbnail,
@@ -47,11 +85,22 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionRepost
             ];
         case SCIActionButtonSourceStories:
+            return @[
+                kSCIActionDownloadLibrary,
+                kSCIActionDownloadShare,
+                kSCIActionCopyDownloadLink,
+                kSCIActionCopyMedia,
+                kSCIActionDownloadGallery,
+                kSCIActionExpand,
+                kSCIActionViewThumbnail,
+                kSCIActionOpenTopicSettings
+            ];
         case SCIActionButtonSourceDirect:
             return @[
                 kSCIActionDownloadLibrary,
                 kSCIActionDownloadShare,
                 kSCIActionCopyDownloadLink,
+                kSCIActionCopyMedia,
                 kSCIActionDownloadGallery,
                 kSCIActionExpand,
                 kSCIActionViewThumbnail,
@@ -62,11 +111,67 @@ NSArray<NSString *> *SCIActionButtonSupportedActionsForSource(SCIActionButtonSou
                 kSCIActionDownloadLibrary,
                 kSCIActionDownloadShare,
                 kSCIActionCopyDownloadLink,
+                kSCIActionCopyMedia,
                 kSCIActionDownloadGallery,
                 kSCIActionExpand,
                 kSCIActionOpenTopicSettings
             ];
     }
+}
+
+NSArray<NSString *> *SCIActionButtonBulkDownloadSupportedActionsForSource(SCIActionButtonSource source) {
+    switch (source) {
+        case SCIActionButtonSourceFeed:
+        case SCIActionButtonSourceReels:
+        case SCIActionButtonSourceStories:
+            return @[
+                kSCIActionDownloadAllLibrary,
+                kSCIActionDownloadAllShare,
+                kSCIActionDownloadAllGallery
+            ];
+        case SCIActionButtonSourceDirect:
+        case SCIActionButtonSourceProfile:
+            return @[];
+    }
+}
+
+NSArray<NSString *> *SCIActionButtonBulkCopySupportedActionsForSource(SCIActionButtonSource source) {
+    switch (source) {
+        case SCIActionButtonSourceFeed:
+        case SCIActionButtonSourceReels:
+        case SCIActionButtonSourceStories:
+            return @[
+                kSCIActionDownloadAllClipboard,
+                kSCIActionDownloadAllLinks
+            ];
+        case SCIActionButtonSourceDirect:
+        case SCIActionButtonSourceProfile:
+            return @[];
+    }
+}
+
+NSArray<NSString *> *SCIActionButtonConfiguredBulkDownloadActionsForSource(SCIActionButtonSource source) {
+    NSArray<NSString *> *supported = SCIActionButtonBulkDownloadSupportedActionsForSource(source);
+    NSArray *stored = [[NSUserDefaults standardUserDefaults] arrayForKey:SCIBulkDownloadDefaultsKeyForSource(source)];
+    NSArray<NSString *> *filtered = SCIFilteredUniqueActionArray(stored, supported);
+    return filtered.count > 0 ? filtered : supported;
+}
+
+NSArray<NSString *> *SCIActionButtonConfiguredBulkCopyActionsForSource(SCIActionButtonSource source) {
+    NSArray<NSString *> *supported = SCIActionButtonBulkCopySupportedActionsForSource(source);
+    NSArray *stored = [[NSUserDefaults standardUserDefaults] arrayForKey:SCIBulkCopyDefaultsKeyForSource(source)];
+    NSArray<NSString *> *filtered = SCIFilteredUniqueActionArray(stored, supported);
+    return filtered.count > 0 ? filtered : supported;
+}
+
+void SCIActionButtonSetConfiguredBulkDownloadActionsForSource(SCIActionButtonSource source, NSArray<NSString *> *actions) {
+    [[NSUserDefaults standardUserDefaults] setObject:SCIFilteredUniqueActionArray(actions, SCIActionButtonBulkDownloadSupportedActionsForSource(source))
+                                              forKey:SCIBulkDownloadDefaultsKeyForSource(source)];
+}
+
+void SCIActionButtonSetConfiguredBulkCopyActionsForSource(SCIActionButtonSource source, NSArray<NSString *> *actions) {
+    [[NSUserDefaults standardUserDefaults] setObject:SCIFilteredUniqueActionArray(actions, SCIActionButtonBulkCopySupportedActionsForSource(source))
+                                              forKey:SCIBulkCopyDefaultsKeyForSource(source)];
 }
 
 NSArray<SCIActionMenuSection *> *SCIActionButtonDefaultSectionsForSource(SCIActionButtonSource source) {
@@ -78,8 +183,8 @@ NSArray<SCIActionMenuSection *> *SCIActionButtonDefaultSectionsForSource(SCIActi
         kSCIActionViewThumbnail
     ];
     NSArray<NSString *> *copyActions = (source == SCIActionButtonSourceFeed || source == SCIActionButtonSourceReels)
-        ? @[kSCIActionCopyDownloadLink, kSCIActionCopyCaption]
-        : @[kSCIActionCopyDownloadLink];
+        ? @[kSCIActionCopyDownloadLink, kSCIActionCopyMedia, kSCIActionCopyCaption]
+        : @[kSCIActionCopyDownloadLink, kSCIActionCopyMedia];
     NSArray<NSString *> *moreActions = (source == SCIActionButtonSourceFeed || source == SCIActionButtonSourceReels)
         ? @[kSCIActionExpand, kSCIActionRepost, kSCIActionOpenTopicSettings]
         : @[kSCIActionExpand, kSCIActionOpenTopicSettings];

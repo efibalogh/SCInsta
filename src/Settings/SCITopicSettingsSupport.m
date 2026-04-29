@@ -1,5 +1,6 @@
 #import "SCITopicSettingsSupport.h"
 #import "SCIEditActionsListViewController.h"
+#import "SCIBulkActionMenuEditViewController.h"
 
 #import "../AssetUtils.h"
 #import "../Utils.h"
@@ -73,15 +74,48 @@ static NSString *SCIActionButtonDisplayTitle(NSString *identifier, NSString *top
 
 UIMenu *SCIActionButtonDefaultActionMenu(NSString *defaultsKey, NSString *topicTitle, NSArray<NSString *> *supportedActions) {
     NSMutableArray<UIMenuElement *> *commands = [NSMutableArray array];
-    [commands addObject:SCIMenuCommand(@"None", @"action", nil, defaultsKey, kSCIActionNone, NO)];
-    for (NSString *identifier in supportedActions) {
-        [commands addObject:SCIMenuCommand(SCIActionButtonDisplayTitle(identifier, topicTitle),
-                                           SCIActionDescriptorIconName(identifier),
-                                           nil,
-                                           defaultsKey,
-                                           identifier,
-                                           NO)];
+
+    NSMutableOrderedSet<NSString *> *supportedSet = [NSMutableOrderedSet orderedSet];
+    for (NSString *identifier in supportedActions ?: @[]) {
+        if ([identifier isKindOfClass:[NSString class]] && identifier.length > 0) {
+            [supportedSet addObject:identifier];
+        }
     }
+
+    NSArray<NSArray<NSString *> *> *groups = @[
+        @[kSCIActionDownloadLibrary, kSCIActionDownloadShare, kSCIActionDownloadGallery],
+        @[kSCIActionExpand, kSCIActionViewThumbnail],
+        @[kSCIActionCopyMedia, kSCIActionCopyDownloadLink, kSCIActionCopyCaption],
+        @[kSCIActionOpenTopicSettings, kSCIActionRepost]
+    ];
+
+    for (NSInteger groupIndex = 0; groupIndex < (NSInteger)groups.count; groupIndex++) {
+        NSArray<NSString *> *group = groups[groupIndex];
+        NSMutableArray<UIMenuElement *> *groupCommands = [NSMutableArray array];
+        for (NSString *identifier in group) {
+            if (![supportedSet containsObject:identifier]) continue;
+            [groupCommands addObject:SCIMenuCommand(SCIActionButtonDisplayTitle(identifier, topicTitle),
+                                                    SCIActionDescriptorIconName(identifier),
+                                                    nil,
+                                                    defaultsKey,
+                                                    identifier,
+                                                    NO)];
+        }
+        if (groupIndex == (NSInteger)groups.count - 1) {
+            [groupCommands addObject:SCIMenuCommand(@"None", @"action", nil, defaultsKey, kSCIActionNone, NO)];
+        }
+        if (groupCommands.count == 0) continue;
+        [commands addObject:[UIMenu menuWithTitle:@""
+                                            image:nil
+                                       identifier:nil
+                                          options:UIMenuOptionsDisplayInline
+                                         children:groupCommands]];
+    }
+
+    if (commands.count == 0) {
+        [commands addObject:SCIMenuCommand(@"None", @"action", nil, defaultsKey, kSCIActionNone, NO)];
+    }
+
     return [UIMenu menuWithChildren:commands];
 }
 
@@ -89,10 +123,46 @@ SCISetting *SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSource 
     SCIEditActionsListViewController *controller = [[SCIEditActionsListViewController alloc] initWithSource:source topicTitle:topicTitle];
     (void)supportedActions;
     (void)defaultSections;
-    return [SCISetting navigationCellWithTitle:@"Configure Actions"
-                                      subtitle:@"Edit sections, ordering, and disabled actions"
+
+    NSMutableArray *rows = [NSMutableArray arrayWithObject:[SCISetting navigationCellWithTitle:@"Configure Actions"
+                                                                                      subtitle:@"Edit sections, ordering, and disabled actions"
+                                                                                          icon:nil
+                                                                                viewController:controller]];
+
+    NSArray<NSString *> *bulkDownloadSupported = SCIActionButtonBulkDownloadSupportedActionsForSource(source);
+    if (bulkDownloadSupported.count > 0) {
+        SCIBulkActionMenuEditViewController *bulkDownloadController = [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Download All Menu"
+                                                                                                                            source:source
+                                                                                                                  supportedActions:bulkDownloadSupported
+                                                                                                                 configuredActions:SCIActionButtonConfiguredBulkDownloadActionsForSource(source)
+                                                                                                                            onSave:^(NSArray<NSString *> *actions) {
+            SCIActionButtonSetConfiguredBulkDownloadActionsForSource(source, actions);
+        }];
+        [rows addObject:[SCISetting navigationCellWithTitle:@"Configure Download All Menu"
+                                                   subtitle:@"Choose which bulk download actions appear and in what order"
+                                                       icon:nil
+                                             viewController:bulkDownloadController]];
+    }
+
+    NSArray<NSString *> *bulkCopySupported = SCIActionButtonBulkCopySupportedActionsForSource(source);
+    if (bulkCopySupported.count > 0) {
+        SCIBulkActionMenuEditViewController *bulkCopyController = [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Copy All Menu"
+                                                                                                                        source:source
+                                                                                                              supportedActions:bulkCopySupported
+                                                                                                             configuredActions:SCIActionButtonConfiguredBulkCopyActionsForSource(source)
+                                                                                                                        onSave:^(NSArray<NSString *> *actions) {
+            SCIActionButtonSetConfiguredBulkCopyActionsForSource(source, actions);
+        }];
+        [rows addObject:[SCISetting navigationCellWithTitle:@"Configure Copy All Menu"
+                                                   subtitle:@"Choose which bulk copy actions appear and in what order"
+                                                       icon:nil
+                                             viewController:bulkCopyController]];
+    }
+
+    return [SCISetting navigationCellWithTitle:@"Configure Menus"
+                                      subtitle:@"Edit primary sections and bulk submenus"
                                           icon:nil
-                                viewController:controller];
+                                    navSections:@[SCITopicSection(@"", rows, nil)]];
 }
 
 UIMenu *SCIReelsTapControlMenu(void) {
@@ -141,7 +211,8 @@ UIMenu *SCISwipeBetweenTabsMenu(void) {
 UIMenu *SCIFeedbackPillStyleMenu(void) {
     return [UIMenu menuWithChildren:@[
         SCIMenuCommand(@"Clean", nil, nil, @"feedback_pill_style", @"clean", NO),
-        SCIMenuCommand(@"Colorful", nil, nil, @"feedback_pill_style", @"colorful", NO)
+        SCIMenuCommand(@"Colorful", nil, nil, @"feedback_pill_style", @"colorful", NO),
+        SCIMenuCommand(@"Dynamic", nil, nil, @"feedback_pill_style", @"dynamic", NO)
     ]];
 }
 
