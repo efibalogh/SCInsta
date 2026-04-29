@@ -23,6 +23,8 @@ static CGFloat const kDismissReturnVelocityAnimationRatio = 0.00007;
 static CGFloat const kDismissMinimumVelocity = 1.0;
 static CGFloat const kDismissMinimumDuration = 0.12;
 static CGFloat const kDismissFinalBackdropAlpha = 0.1;
+static NSTimeInterval const kPresentationFadeDuration = 0.22;
+static NSTimeInterval const kDismissFadeDuration = 0.18;
 static CGFloat const kGalleryPreviewMenuIconPointSize = 22.0;
 
 static UIImage *SCIGalleryPreviewMenuIcon(NSString *resourceName) {
@@ -75,6 +77,7 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 @property (nonatomic, assign) BOOL interactiveDismissalInProgress;
 @property (nonatomic, assign) CGPoint interactiveDismissAnchorPoint;
 @property (nonatomic, strong, nullable) id<UIViewControllerContextTransitioning> interactiveDismissTransitionContext;
+@property (nonatomic, assign) BOOL presentingTransition;
 
 @property (nonatomic, assign) SCIFullScreenPlaybackSource playbackSource;
 @property (nonatomic, weak, nullable) UIView *playbackSourceView;
@@ -332,7 +335,6 @@ fromViewController:(UIViewController *)presenter {
     self.modalPresentationStyle = [self shouldUseLifecycleSuppressingPresentation]
         ? UIModalPresentationFullScreen
         : UIModalPresentationOverFullScreen;
-    self.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
     self.transitioningDelegate = self;
     [presenter presentViewController:self animated:YES completion:nil];
 }
@@ -850,6 +852,10 @@ fromViewController:(UIViewController *)presenter {
 #pragma mark - Playback Suppression
 
 - (BOOL)shouldUseLifecycleSuppressingPresentation {
+    if (self.isFromGallery) {
+        return YES;
+    }
+
     switch (self.playbackSource) {
         case SCIFullScreenPlaybackSourceFeed:
         case SCIFullScreenPlaybackSourceReels:
@@ -894,8 +900,8 @@ fromViewController:(UIViewController *)presenter {
 #pragma mark - Actions
 
 - (void)closeTapped {
-    [self cleanupAll];
     [self dismissViewControllerAnimated:YES completion:^{
+        [self cleanupAll];
         dispatch_async(dispatch_get_main_queue(), ^{
             [self restorePreviewPlaybackIfNeeded];
         });
@@ -1406,8 +1412,16 @@ fromViewController:(UIViewController *)presenter {
     self.pageViewController.view.center = SCICenterForBounds(self.view.bounds);
 }
 
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented
+                                                                  presentingController:(UIViewController *)presenting
+                                                                      sourceController:(UIViewController *)source {
+    self.presentingTransition = YES;
+    return self;
+}
+
 - (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
-    return self.interactiveDismissalInProgress ? self : nil;
+    self.presentingTransition = NO;
+    return self;
 }
 
 - (id<UIViewControllerInteractiveTransitioning>)interactionControllerForDismissal:(id<UIViewControllerAnimatedTransitioning>)animator {
@@ -1415,11 +1429,35 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (NSTimeInterval)transitionDuration:(id<UIViewControllerContextTransitioning>)transitionContext {
-    return kDismissMaximumDuration;
+    return self.presentingTransition ? kPresentationFadeDuration : kDismissFadeDuration;
 }
 
 - (void)animateTransition:(id<UIViewControllerContextTransitioning>)transitionContext {
-    [transitionContext completeTransition:!transitionContext.transitionWasCancelled];
+    if (self.presentingTransition) {
+        UIView *toView = [transitionContext viewForKey:UITransitionContextToViewKey];
+        UIViewController *toViewController = [transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
+        toView.frame = [transitionContext finalFrameForViewController:toViewController];
+        toView.alpha = 0.0;
+        [transitionContext.containerView addSubview:toView];
+
+        [UIView animateWithDuration:kPresentationFadeDuration delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+            toView.alpha = 1.0;
+        } completion:^(__unused BOOL finished) {
+            [transitionContext completeTransition:!transitionContext.transitionWasCancelled];
+        }];
+        return;
+    }
+
+    UIView *fromView = [transitionContext viewForKey:UITransitionContextFromViewKey];
+    [UIView animateWithDuration:kDismissFadeDuration delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+        fromView.alpha = 0.0;
+    } completion:^(__unused BOOL finished) {
+        BOOL completed = !transitionContext.transitionWasCancelled;
+        if (!completed) {
+            fromView.alpha = 1.0;
+        }
+        [transitionContext completeTransition:completed];
+    }];
 }
 
 - (void)startInteractiveTransition:(id<UIViewControllerContextTransitioning>)transitionContext {
@@ -1435,10 +1473,6 @@ fromViewController:(UIViewController *)presenter {
         }
     }
     [self.controllerCache removeAllObjects];
-
-    [[AVAudioSession sharedInstance] setActive:NO
-                                   withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
-                                         error:nil];
 }
 
 @end

@@ -12,7 +12,7 @@ static NSString *sciUserAgent(void) {
     static NSString *ua = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        NSString *version = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"] ?: @"424.0.0";
+        NSString *version = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"] ?: @"426.0.0";
         char machine[64] = {0};
         size_t size = sizeof(machine);
         sysctlbyname("hw.machine", machine, &size, NULL, 0);

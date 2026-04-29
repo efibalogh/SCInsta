@@ -807,6 +807,7 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     UIViewController *rootController = [window rootViewController];
     SCISettingsViewController *settingsViewController = [SCISettingsViewController new];
     UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
+    navigationController.modalPresentationStyle = UIModalPresentationFullScreen;
     
     [rootController presentViewController:navigationController animated:YES completion:nil];
 }
@@ -814,6 +815,7 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 + (void)showSettingsForTopicTitle:(NSString *)title {
     SCISettingsViewController *settingsViewController = [SCISettingsViewController new];
     UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
+    navigationController.modalPresentationStyle = UIModalPresentationFullScreen;
 
     NSArray *rootSections = [SCITweakSettings sections];
     NSArray *topicRows = rootSections.count > 0 ? rootSections[0][@"rows"] : nil;

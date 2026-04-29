@@ -381,6 +381,10 @@ static UIImage *SCIAssetLookupInstagramIcon(NSString *name, CGFloat pointSize, S
                          weight:(UIImageSymbolWeight)weight
                          source:(SCIResolvedImageSource)source
                   renderingMode:(UIImageRenderingMode)renderingMode {
+    if (name.length == 0 && fallbackSystemName.length == 0) {
+        return nil;
+    }
+
     UIImage *image = nil;
 
     switch (source) {
@@ -415,7 +419,13 @@ static UIImage *SCIAssetLookupInstagramIcon(NSString *name, CGFloat pointSize, S
         }
     }
 
-    return image ?: SCIAssetFallbackImage(pointSize, renderingMode);
+    if (image) {
+        return image;
+    }
+    if (fallbackSystemName.length > 0) {
+        return SCIAssetFallbackImage(pointSize, renderingMode);
+    }
+    return nil;
 }
 
 @end
