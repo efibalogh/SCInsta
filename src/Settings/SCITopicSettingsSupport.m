@@ -124,12 +124,22 @@ SCISetting *SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSource 
     (void)supportedActions;
     (void)defaultSections;
 
+    NSArray<NSString *> *bulkDownloadSupported = SCIActionButtonBulkDownloadSupportedActionsForSource(source);
+    NSArray<NSString *> *bulkCopySupported = SCIActionButtonBulkCopySupportedActionsForSource(source);
+    BOOL hasBulkMenuEditors = (bulkDownloadSupported.count > 0 || bulkCopySupported.count > 0);
+
+    if (!hasBulkMenuEditors) {
+        return [SCISetting navigationCellWithTitle:@"Configure Actions"
+                                          subtitle:@"Edit sections, ordering, and disabled actions"
+                                              icon:nil
+                                    viewController:controller];
+    }
+
     NSMutableArray *rows = [NSMutableArray arrayWithObject:[SCISetting navigationCellWithTitle:@"Configure Actions"
                                                                                       subtitle:@"Edit sections, ordering, and disabled actions"
                                                                                           icon:nil
                                                                                 viewController:controller]];
 
-    NSArray<NSString *> *bulkDownloadSupported = SCIActionButtonBulkDownloadSupportedActionsForSource(source);
     if (bulkDownloadSupported.count > 0) {
         SCIBulkActionMenuEditViewController *bulkDownloadController = [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Download All Menu"
                                                                                                                             source:source
@@ -144,7 +154,6 @@ SCISetting *SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSource 
                                              viewController:bulkDownloadController]];
     }
 
-    NSArray<NSString *> *bulkCopySupported = SCIActionButtonBulkCopySupportedActionsForSource(source);
     if (bulkCopySupported.count > 0) {
         SCIBulkActionMenuEditViewController *bulkCopyController = [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Copy All Menu"
                                                                                                                         source:source
