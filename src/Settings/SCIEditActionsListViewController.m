@@ -2,6 +2,7 @@
 #include <UIKit/UIKit.h>
 
 #import "SCIActionSectionEditViewController.h"
+#import "SCIBulkActionMenuEditViewController.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../AssetUtils.h"
 #import "../Utils.h"
@@ -12,6 +13,7 @@ static char kSCIActionsListSwitchAssocKey;
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) SCIActionButtonConfiguration *configuration;
+@property (nonatomic, assign) SCIActionButtonSource source;
 
 @end
 
@@ -26,6 +28,7 @@ static char kSCIActionsListSwitchAssocKey;
 - (instancetype)initWithSource:(SCIActionButtonSource)source topicTitle:(NSString *)topicTitle {
     self = [super init];
     if (self) {
+        _source = source;
         _configuration = [SCIActionButtonConfiguration configurationForSource:source
                                                                    topicTitle:topicTitle
                                                              supportedActions:SCIActionButtonSupportedActionsForSource(source)
@@ -63,12 +66,75 @@ static char kSCIActionsListSwitchAssocKey;
     [self.view addSubview:self.tableView];
 }
 
+- (NSArray<NSString *> *)bulkEditorKinds {
+    NSMutableArray<NSString *> *kinds = [NSMutableArray array];
+    if (SCIActionButtonBulkDownloadSupportedActionsForSource(self.source).count > 0) {
+        [kinds addObject:@"download"];
+    }
+    if (SCIActionButtonBulkCopySupportedActionsForSource(self.source).count > 0) {
+        [kinds addObject:@"copy"];
+    }
+    return kinds;
+}
+
+- (BOOL)isBulkEditorRowInMenuSection:(NSInteger)row {
+    return row >= (NSInteger)self.configuration.sections.count;
+}
+
+- (NSString *)bulkEditorKindForMenuSectionRow:(NSInteger)row {
+    NSInteger index = row - (NSInteger)self.configuration.sections.count;
+    NSArray<NSString *> *kinds = [self bulkEditorKinds];
+    if (index < 0 || index >= (NSInteger)kinds.count) {
+        return nil;
+    }
+    return kinds[index];
+}
+
+- (NSString *)bulkEditorTitleForKind:(NSString *)kind {
+    if ([kind isEqualToString:@"download"]) {
+        return @"Configure Download All Menu";
+    }
+    if ([kind isEqualToString:@"copy"]) {
+        return @"Configure Copy All Menu";
+    }
+    return @"Configure Menu";
+}
+
+- (NSString *)bulkEditorSubtitleForKind:(NSString *)kind {
+    (void)kind;
+    return nil;
+}
+
+- (SCIBulkActionMenuEditViewController *)bulkEditorControllerForKind:(NSString *)kind {
+    if ([kind isEqualToString:@"download"]) {
+        return [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Download All Menu"
+                                                                   source:self.source
+                                                         supportedActions:SCIActionButtonBulkDownloadSupportedActionsForSource(self.source)
+                                                        configuredActions:SCIActionButtonConfiguredBulkDownloadActionsForSource(self.source)
+                                                                   onSave:^(NSArray<NSString *> *actions) {
+            SCIActionButtonSetConfiguredBulkDownloadActionsForSource(self.source, actions);
+        }];
+    }
+
+    if ([kind isEqualToString:@"copy"]) {
+        return [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Copy All Menu"
+                                                                   source:self.source
+                                                         supportedActions:SCIActionButtonBulkCopySupportedActionsForSource(self.source)
+                                                        configuredActions:SCIActionButtonConfiguredBulkCopyActionsForSource(self.source)
+                                                                   onSave:^(NSArray<NSString *> *actions) {
+            SCIActionButtonSetConfiguredBulkCopyActionsForSource(self.source, actions);
+        }];
+    }
+
+    return nil;
+}
+
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
     return 3;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return self.configuration.sections.count;
+    if (section == 0) return self.configuration.sections.count + self.bulkEditorKinds.count;
     if (section == 1) return self.configuration.unassignedActions.count;
     return self.configuration.supportedActions.count;
 }
@@ -80,7 +146,7 @@ static char kSCIActionsListSwitchAssocKey;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) return @"Drag to reorder sections. Tap a section to edit its title, icon, collapsible state, and actions.";
+    if (section == 0) return @"Drag to reorder sections. Tap a section to edit its title, icon, collapsible state, and actions. Bulk submenu editors stay pinned below your sections.";
     if (section == 1) return @"Actions here are supported but do not appear in the runtime menu.";
     if (section == 2) return @"Disabled actions are hidden even if they remain assigned to a section.";
     return nil;
@@ -96,6 +162,17 @@ static char kSCIActionsListSwitchAssocKey;
     config.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
 
     if (indexPath.section == 0) {
+        if ([self isBulkEditorRowInMenuSection:indexPath.row]) {
+            NSString *kind = [self bulkEditorKindForMenuSectionRow:indexPath.row];
+            config.text = [self bulkEditorTitleForKind:kind];
+            config.image = [SCIAssetUtils instagramIconNamed:([kind isEqualToString:@"copy"] ? @"copy" : @"download") pointSize:22.0];
+            config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            cell.contentConfiguration = config;
+            return cell;
+        }
+
         SCIActionMenuSection *section = self.configuration.sections[indexPath.row];
         config.text = section.title;
         config.secondaryText = section.collapsible ? @"Collapsible" : @"Inline";
@@ -128,11 +205,11 @@ static char kSCIActionsListSwitchAssocKey;
 }
 
 - (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {
-    return indexPath.section == 0;
+    return indexPath.section == 0 && ![self isBulkEditorRowInMenuSection:indexPath.row];
 }
 
 - (NSArray<UIDragItem *> *)tableView:(UITableView *)tableView itemsForBeginningDragSession:(id<UIDragSession>)session atIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section != 0) return @[];
+    if (indexPath.section != 0 || [self isBulkEditorRowInMenuSection:indexPath.row]) return @[];
     SCIActionMenuSection *section = self.configuration.sections[indexPath.row];
     UIDragItem *item = [[UIDragItem alloc] initWithItemProvider:[[NSItemProvider alloc] initWithObject:section.identifier]];
     item.localObject = section.identifier;
@@ -148,7 +225,9 @@ static char kSCIActionsListSwitchAssocKey;
 }
 
 - (UITableViewDropProposal *)tableView:(UITableView *)tableView dropSessionDidUpdate:(id<UIDropSession>)session withDestinationIndexPath:(NSIndexPath *)destinationIndexPath {
-    if (session.localDragSession == nil || destinationIndexPath.section != 0) {
+    if (session.localDragSession == nil ||
+        destinationIndexPath.section != 0 ||
+        [self isBulkEditorRowInMenuSection:destinationIndexPath.row]) {
         return [[UITableViewDropProposal alloc] initWithDropOperation:UIDropOperationCancel];
     }
     return [[UITableViewDropProposal alloc] initWithDropOperation:UIDropOperationMove intent:UITableViewDropIntentInsertAtDestinationIndexPath];
@@ -158,7 +237,12 @@ static char kSCIActionsListSwitchAssocKey;
     NSIndexPath *destinationIndexPath = coordinator.destinationIndexPath;
     id<UITableViewDropItem> dropItem = coordinator.items.firstObject;
     NSIndexPath *sourceIndexPath = dropItem.sourceIndexPath;
-    if (!destinationIndexPath || !sourceIndexPath || sourceIndexPath.section != 0 || destinationIndexPath.section != 0) return;
+    if (!destinationIndexPath ||
+        !sourceIndexPath ||
+        sourceIndexPath.section != 0 ||
+        destinationIndexPath.section != 0 ||
+        [self isBulkEditorRowInMenuSection:sourceIndexPath.row] ||
+        [self isBulkEditorRowInMenuSection:destinationIndexPath.row]) return;
 
     NSInteger rowCount = self.configuration.sections.count;
     NSInteger destinationRow = MIN(MAX(0, destinationIndexPath.row), MAX(0, rowCount - 1));
@@ -174,6 +258,16 @@ static char kSCIActionsListSwitchAssocKey;
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.section == 0) {
+        if ([self isBulkEditorRowInMenuSection:indexPath.row]) {
+            NSString *kind = [self bulkEditorKindForMenuSectionRow:indexPath.row];
+            SCIBulkActionMenuEditViewController *controller = [self bulkEditorControllerForKind:kind];
+            if (controller) {
+                [self.navigationController pushViewController:controller animated:YES];
+            }
+            [tableView deselectRowAtIndexPath:indexPath animated:YES];
+            return;
+        }
+
         SCIActionMenuSection *section = self.configuration.sections[indexPath.row];
         __weak typeof(self) weakSelf = self;
         SCIActionSectionEditViewController *controller = [[SCIActionSectionEditViewController alloc] initWithConfiguration:self.configuration sectionIdentifier:section.identifier onChange:^{
@@ -186,7 +280,7 @@ static char kSCIActionsListSwitchAssocKey;
 }
 
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
-    return indexPath.section == 0;
+    return indexPath.section == 0 && ![self isBulkEditorRowInMenuSection:indexPath.row];
 }
 
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {

@@ -123,55 +123,10 @@ SCISetting *SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSource 
     SCIEditActionsListViewController *controller = [[SCIEditActionsListViewController alloc] initWithSource:source topicTitle:topicTitle];
     (void)supportedActions;
     (void)defaultSections;
-
-    NSArray<NSString *> *bulkDownloadSupported = SCIActionButtonBulkDownloadSupportedActionsForSource(source);
-    NSArray<NSString *> *bulkCopySupported = SCIActionButtonBulkCopySupportedActionsForSource(source);
-    BOOL hasBulkMenuEditors = (bulkDownloadSupported.count > 0 || bulkCopySupported.count > 0);
-
-    if (!hasBulkMenuEditors) {
-        return [SCISetting navigationCellWithTitle:@"Configure Actions"
-                                          subtitle:@"Edit sections, ordering, and disabled actions"
-                                              icon:nil
-                                    viewController:controller];
-    }
-
-    NSMutableArray *rows = [NSMutableArray arrayWithObject:[SCISetting navigationCellWithTitle:@"Configure Actions"
-                                                                                      subtitle:@"Edit sections, ordering, and disabled actions"
-                                                                                          icon:nil
-                                                                                viewController:controller]];
-
-    if (bulkDownloadSupported.count > 0) {
-        SCIBulkActionMenuEditViewController *bulkDownloadController = [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Download All Menu"
-                                                                                                                            source:source
-                                                                                                                  supportedActions:bulkDownloadSupported
-                                                                                                                 configuredActions:SCIActionButtonConfiguredBulkDownloadActionsForSource(source)
-                                                                                                                            onSave:^(NSArray<NSString *> *actions) {
-            SCIActionButtonSetConfiguredBulkDownloadActionsForSource(source, actions);
-        }];
-        [rows addObject:[SCISetting navigationCellWithTitle:@"Configure Download All Menu"
-                                                   subtitle:@"Choose which bulk download actions appear and in what order"
-                                                       icon:nil
-                                             viewController:bulkDownloadController]];
-    }
-
-    if (bulkCopySupported.count > 0) {
-        SCIBulkActionMenuEditViewController *bulkCopyController = [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Copy All Menu"
-                                                                                                                        source:source
-                                                                                                              supportedActions:bulkCopySupported
-                                                                                                             configuredActions:SCIActionButtonConfiguredBulkCopyActionsForSource(source)
-                                                                                                                        onSave:^(NSArray<NSString *> *actions) {
-            SCIActionButtonSetConfiguredBulkCopyActionsForSource(source, actions);
-        }];
-        [rows addObject:[SCISetting navigationCellWithTitle:@"Configure Copy All Menu"
-                                                   subtitle:@"Choose which bulk copy actions appear and in what order"
-                                                       icon:nil
-                                             viewController:bulkCopyController]];
-    }
-
-    return [SCISetting navigationCellWithTitle:@"Configure Menus"
+    return [SCISetting navigationCellWithTitle:@"Configure Actions"
                                       subtitle:@"Edit primary sections and bulk submenus"
                                           icon:nil
-                                    navSections:@[SCITopicSection(@"", rows, nil)]];
+                                 viewController:controller];
 }
 
 UIMenu *SCIReelsTapControlMenu(void) {
