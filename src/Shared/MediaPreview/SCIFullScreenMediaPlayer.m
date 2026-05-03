@@ -10,6 +10,7 @@
 #import "../../Utils.h"
 #import "../UI/SCIMediaChrome.h"
 #import "../Gallery/SCIGalleryFile.h"
+#import "../Gallery/SCIGalleryManager.h"
 #import "../Gallery/SCIGalleryOriginController.h"
 #import "../Gallery/SCIGallerySaveMetadata.h"
 #import "../Gallery/SCIGalleryCoreDataStack.h"
@@ -756,10 +757,49 @@ fromViewController:(UIViewController *)presenter {
                               tone:SCIFeedbackPillToneError];
 }
 
+- (void)dismissGalleryFlowForOriginOpenWithCompletion:(void (^)(void))completion {
+    UIViewController *galleryPresenter = self.presentingViewController;
+    UIViewController *galleryContainer = galleryPresenter.navigationController ?: galleryPresenter;
+
+    if (self.isFromGallery && galleryContainer) {
+        [self cleanupAll];
+        [self restorePreviewPlaybackIfNeeded];
+        if ([SCIGalleryManager sharedManager].isLockEnabled) {
+            [[SCIGalleryManager sharedManager] lockGallery];
+        }
+        [self dismissViewControllerAnimated:NO completion:^{
+            [galleryContainer dismissViewControllerAnimated:YES completion:^{
+                if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
+                    [self.delegate fullScreenMediaPlayerDidDismiss];
+                }
+                if (completion) {
+                    completion();
+                }
+            }];
+        }];
+        return;
+    }
+
+    [self dismissViewControllerAnimated:YES completion:^{
+        [self cleanupAll];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self restorePreviewPlaybackIfNeeded];
+        });
+        if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
+            [self.delegate fullScreenMediaPlayerDidDismiss];
+        }
+        if (completion) {
+            completion();
+        }
+    }];
+}
+
 - (void)openOriginalPostForCurrentGalleryItem {
     SCIGalleryFile *file = self.currentItem.galleryFile;
     if ([SCIGalleryOriginController openOriginalPostForGalleryFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link"];
+        [self dismissGalleryFlowForOriginOpenWithCompletion:^{
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link"];
+        }];
     } else {
         [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionGalleryOpenOriginal];
     }
@@ -768,7 +808,9 @@ fromViewController:(UIViewController *)presenter {
 - (void)openProfileForCurrentGalleryItem {
     SCIGalleryFile *file = self.currentItem.galleryFile;
     if ([SCIGalleryOriginController openProfileForGalleryFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile"];
+        [self dismissGalleryFlowForOriginOpenWithCompletion:^{
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile"];
+        }];
     } else {
         [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionGalleryOpenProfile];
     }

@@ -95,6 +95,8 @@ static NSString *SCIFileKeyForURL(NSURL *url) {
 - (nullable NSURL *)bestAvailableFileURLForItem:(SCIMediaItem *)item {
     if (!item) return nil;
 
+    [self ensureDirectoriesExist];
+
     NSURL *resolvedURL = item.resolvedFileURL;
     if (resolvedURL.isFileURL && [[NSFileManager defaultManager] fileExistsAtPath:resolvedURL.path]) {
         return resolvedURL;
@@ -210,6 +212,8 @@ static NSString *SCIFileKeyForURL(NSURL *url) {
             NSError *finalError = error;
 
             if (!finalError && tempURL) {
+                [strongSelf ensureDirectoriesExist];
+
                 NSString *hash = SCISHA256String(key);
                 NSString *ext = remoteURL.pathExtension.lowercaseString;
                 if (ext.length == 0) {

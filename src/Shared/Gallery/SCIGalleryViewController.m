@@ -715,13 +715,27 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
                               tone:SCIFeedbackPillToneError];
 }
 
+- (void)dismissGalleryForOriginOpenWithCompletion:(void (^)(void))completion {
+    if ([SCIGalleryManager sharedManager].isLockEnabled) {
+        [[SCIGalleryManager sharedManager] lockGallery];
+    }
+
+    [self.navigationController dismissViewControllerAnimated:YES completion:^{
+        if (completion) {
+            completion();
+        }
+    }];
+}
+
 - (void)openOriginalPostForFile:(SCIGalleryFile *)file {
     if ([SCIGalleryOriginController openOriginalPostForGalleryFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4
-                                         title:@"Opened original post"
-                                      subtitle:nil
-                                  iconResource:@"external_link"
-                                          tone:SCIFeedbackPillToneInfo];
+        [self dismissGalleryForOriginOpenWithCompletion:^{
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4
+                                             title:@"Opened original post"
+                                          subtitle:nil
+                                      iconResource:@"external_link"
+                                              tone:SCIFeedbackPillToneInfo];
+        }];
     } else {
         [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionGalleryOpenOriginal];
     }
@@ -729,11 +743,13 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 
 - (void)openProfileForFile:(SCIGalleryFile *)file {
     if ([SCIGalleryOriginController openProfileForGalleryFile:file]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4
-                                         title:@"Opened profile"
-                                      subtitle:nil
-                                  iconResource:@"profile"
-                                          tone:SCIFeedbackPillToneInfo];
+        [self dismissGalleryForOriginOpenWithCompletion:^{
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4
+                                             title:@"Opened profile"
+                                          subtitle:nil
+                                      iconResource:@"profile"
+                                              tone:SCIFeedbackPillToneInfo];
+        }];
     } else {
         [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionGalleryOpenProfile];
     }

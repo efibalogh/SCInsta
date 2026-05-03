@@ -5,9 +5,16 @@
 #import "../../Utils.h"
 #import "../../Shared/ActionButton/ActionButtonCore.h"
 #import "../../Shared/ActionButton/SCIActionButtonConfiguration.h"
+#import "../../Shared/Gallery/SCIGalleryFile.h"
+#import "../../Shared/Gallery/SCIGalleryOriginController.h"
+#import "../../Shared/Gallery/SCIGallerySaveMetadata.h"
+#import "../../Shared/MediaPreview/SCIMediaItem.h"
 
 static NSInteger const kSCIFeedActionButtonTag = 921341;
 static const void *kSCIFeedExpandLongPressMarkerAssocKey = &kSCIFeedExpandLongPressMarkerAssocKey;
+
+@interface IGFeedItemPageVideoCell : UICollectionViewCell
+@end
 
 static BOOL SCIFeedLongPressExpandEnabled(void) {
 	return [SCIUtils getBoolPref:@"enable_long_press_expand"];
@@ -134,6 +141,182 @@ static UIView *SCIFeedCellAncestorForView(UIView *view) {
 		depth++;
 	}
 	return nil;
+}
+
+static UICollectionView *SCIFeedOuterCollectionView(UIView *view) {
+	UIView *walker = view;
+	NSInteger depth = 0;
+	while (walker && depth < 16) {
+		if ([walker isKindOfClass:[UICollectionView class]]) {
+			NSString *className = NSStringFromClass([walker class]);
+			if (![className containsString:@"Carousel"] && ![className containsString:@"Page"]) {
+				return (UICollectionView *)walker;
+			}
+		}
+		walker = walker.superview;
+		depth++;
+	}
+	return nil;
+}
+
+static NSInteger SCIFeedSectionForViewInCollection(UIView *view, UICollectionView *collectionView) {
+	if (!view || !collectionView) return -1;
+	UIView *walker = view;
+	NSInteger depth = 0;
+	while (walker && depth < 16) {
+		if ([walker isKindOfClass:[UICollectionViewCell class]]) {
+			NSIndexPath *indexPath = [collectionView indexPathForCell:(UICollectionViewCell *)walker];
+			if (indexPath) return indexPath.section;
+		}
+		walker = walker.superview;
+		depth++;
+	}
+	return -1;
+}
+
+static id SCIFeedMediaFromCellByIntrospection(UICollectionViewCell *cell, Class mediaClass) {
+	if (!cell || !mediaClass) return nil;
+
+	unsigned int count = 0;
+	Class currentClass = object_getClass(cell);
+	while (currentClass && currentClass != [UICollectionViewCell class]) {
+		Ivar *ivars = class_copyIvarList(currentClass, &count);
+		for (unsigned int i = 0; i < count; i++) {
+			const char *type = ivar_getTypeEncoding(ivars[i]);
+			if (!type || type[0] != '@') continue;
+			@try {
+				id value = object_getIvar(cell, ivars[i]);
+				if (value && [value isKindOfClass:mediaClass]) {
+					if (ivars) free(ivars);
+					return value;
+				}
+			} @catch (__unused NSException *exception) {
+			}
+		}
+		if (ivars) free(ivars);
+		currentClass = class_getSuperclass(currentClass);
+	}
+
+	if ([cell respondsToSelector:@selector(mediaCellFeedItem)]) {
+		id media = ((id (*)(id, SEL))objc_msgSend)(cell, @selector(mediaCellFeedItem));
+		if (media && [media isKindOfClass:mediaClass]) return media;
+	}
+
+	for (NSString *selectorName in @[@"post", @"pagePhotoPost", @"pageVideoPost", @"media"]) {
+		id media = SCIObjectForSelector(cell, selectorName);
+		if (media && [media isKindOfClass:mediaClass]) return media;
+	}
+
+	return nil;
+}
+
+static id SCIFeedMediaForZoomFromView(UIView *view) {
+	Class mediaClass = NSClassFromString(@"IGMedia");
+	if (!view || !mediaClass) return nil;
+
+	UICollectionView *collectionView = SCIFeedOuterCollectionView(view);
+	if (!collectionView) return nil;
+
+	NSInteger section = SCIFeedSectionForViewInCollection(view, collectionView);
+	if (section < 0) return nil;
+
+	for (UICollectionViewCell *cell in collectionView.visibleCells) {
+		NSIndexPath *indexPath = [collectionView indexPathForCell:cell];
+		if (!indexPath || indexPath.section != section) continue;
+
+		NSString *className = NSStringFromClass([cell class]);
+		if (![className containsString:@"Photo"] &&
+			![className containsString:@"Video"] &&
+			![className containsString:@"Media"] &&
+			![className containsString:@"Page"]) {
+			continue;
+		}
+
+		id media = SCIFeedMediaFromCellByIntrospection(cell, mediaClass);
+		if (media) return media;
+	}
+
+	return nil;
+}
+
+static NSInteger SCIFeedCarouselPageIndexFromView(UIView *view) {
+	UICollectionView *collectionView = SCIFeedOuterCollectionView(view);
+	if (!collectionView) return 0;
+
+	NSInteger section = SCIFeedSectionForViewInCollection(view, collectionView);
+	if (section < 0) return 0;
+
+	for (UICollectionViewCell *cell in collectionView.visibleCells) {
+		NSIndexPath *indexPath = [collectionView indexPathForCell:cell];
+		if (!indexPath || indexPath.section != section) continue;
+		if (![NSStringFromClass([cell class]) containsString:@"Page"]) continue;
+
+		NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:cell];
+		NSInteger scanned = 0;
+		while (queue.count > 0 && scanned < 100) {
+			UIView *current = queue.firstObject;
+			[queue removeObjectAtIndex:0];
+			scanned++;
+
+			if ([current isKindOfClass:[UIScrollView class]] && current != collectionView) {
+				UIScrollView *scrollView = (UIScrollView *)current;
+				CGFloat pageWidth = scrollView.bounds.size.width;
+				if (pageWidth > 100.0 && scrollView.contentSize.width > pageWidth * 1.5) {
+					return (NSInteger)llround(scrollView.contentOffset.x / pageWidth);
+				}
+			}
+
+			for (UIView *subview in current.subviews) {
+				[queue addObject:subview];
+			}
+		}
+	}
+
+	return 0;
+}
+
+static NSArray *SCIFeedCarouselChildren(id media) {
+	if (!media) return @[];
+
+	for (NSString *selectorName in @[@"carouselMedia", @"carouselChildren", @"children", @"carousel_media"]) {
+		id value = SCIObjectForSelector(media, selectorName);
+		if (!value) value = SCIKVCObject(media, selectorName);
+		NSArray *items = SCIArrayFromCollection(value);
+		if (items.count > 0) return items;
+	}
+
+	return @[];
+}
+
+static BOOL SCIFeedIsCarouselMedia(id media) {
+	if (!media) return NO;
+
+	if ([media respondsToSelector:@selector(isCarousel)]) {
+		@try {
+			if (((BOOL (*)(id, SEL))objc_msgSend)(media, @selector(isCarousel))) {
+				return YES;
+			}
+		} @catch (__unused NSException *exception) {
+		}
+	}
+
+	if ([media respondsToSelector:@selector(mediaType)]) {
+		@try {
+			if (((NSInteger (*)(id, SEL))objc_msgSend)(media, @selector(mediaType)) == 8) {
+				return YES;
+			}
+		} @catch (__unused NSException *exception) {
+		}
+	}
+
+	return SCIFeedCarouselChildren(media).count > 0;
+}
+
+static SCIGallerySaveMetadata *SCIFeedMetadataForMedia(id media) {
+	SCIGallerySaveMetadata *metadata = [[SCIGallerySaveMetadata alloc] init];
+	metadata.source = (int16_t)SCIGallerySourceFeed;
+	[SCIGalleryOriginController populateMetadata:metadata fromMedia:media];
+	return metadata;
 }
 
 static id SCIFeedPostObjectFromFeedCell(UIView *feedCell) {
@@ -309,20 +492,63 @@ static void SCIAddFeedExpandLongPressIfNeeded(UIView *view, SEL action) {
 static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecognizer *sender) {
 	if (!SCIFeedLongPressExpandEnabled() || !view || !sender || sender.state != UIGestureRecognizerStateBegan || !view.window) return;
 
-	id postObject = nil;
-	UIView *feedCell = nil;
-	if (!SCIFeedPostAndCellFromScrollContainers(view, sender, &postObject, &feedCell)) {
-		feedCell = SCIFeedCellAncestorForView(view);
-		postObject = SCIFeedPostObjectFromFeedCell(feedCell);
+	id media = SCIFeedMediaForZoomFromView(view);
+	if (!media) return;
+
+	NSString *username = SCIUsernameFromMediaObject(media);
+	SCIGallerySaveMetadata *metadata = SCIFeedMetadataForMedia(media);
+
+	if (SCIFeedIsCarouselMedia(media)) {
+		NSArray *children = SCIFeedCarouselChildren(media);
+		NSMutableArray<SCIMediaItem *> *items = [NSMutableArray array];
+		for (id child in children) {
+			NSURL *videoURL = [SCIUtils getVideoUrlForMedia:(IGMedia *)child];
+			NSURL *photoURL = [SCIUtils getPhotoUrlForMedia:(IGMedia *)child];
+			if (!videoURL && !photoURL) continue;
+
+			SCIMediaItem *item = [SCIMediaItem itemWithFileURL:(videoURL ?: photoURL)];
+			item.mediaType = videoURL ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
+			item.gallerySaveSource = SCIGallerySourceFeed;
+			item.galleryMetadata = SCIFeedMetadataForMedia(child);
+			if (username.length > 0) item.title = username;
+			[items addObject:item];
+		}
+
+		if (items.count > 0) {
+			NSInteger index = SCIFeedCarouselPageIndexFromView(view);
+			if (index < 0 || index >= (NSInteger)items.count) index = 0;
+			[SCIUtils showToastForActionIdentifier:kSCIActionExpand duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
+			[SCIFullScreenMediaPlayer showMediaItems:items
+								startingAtIndex:index
+									   metadata:metadata
+								 playbackSource:SCIFullScreenPlaybackSourceFeed
+									 sourceView:view
+									 controller:[SCIUtils viewControllerForAncestralView:view]
+								  pausePlayback:nil
+								 resumePlayback:nil];
+			return;
+		}
 	}
-	if (!feedCell) return;
 
-	UIView *contextView = SCIFeedActionContextViewFromMediaView(feedCell);
-	if (!contextView) return;
+	NSURL *videoURL = [SCIUtils getVideoUrlForMedia:(IGMedia *)media];
+	NSURL *photoURL = [SCIUtils getPhotoUrlForMedia:(IGMedia *)media];
+	if (!videoURL && !photoURL) return;
 
-	SCIActionButtonContext *context = SCIFeedActionContext(contextView);
-	context.mediaOverride = postObject;
-	SCIExecuteActionIdentifier(kSCIActionExpand, context, YES);
+	SCIMediaItem *item = [SCIMediaItem itemWithFileURL:(videoURL ?: photoURL)];
+	item.mediaType = videoURL ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
+	item.gallerySaveSource = SCIGallerySourceFeed;
+	item.galleryMetadata = metadata;
+	if (username.length > 0) item.title = username;
+
+	[SCIUtils showToastForActionIdentifier:kSCIActionExpand duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
+	[SCIFullScreenMediaPlayer showMediaItems:@[item]
+						startingAtIndex:0
+							   metadata:metadata
+						 playbackSource:SCIFullScreenPlaybackSourceFeed
+							 sourceView:view
+							 controller:[SCIUtils viewControllerForAncestralView:view]
+						  pausePlayback:nil
+						 resumePlayback:nil];
 }
 
 static void SCIExpandFeedLongPressAction(id self, SEL _cmd, UILongPressGestureRecognizer *sender) {
@@ -399,6 +625,28 @@ static void SCIHookSwiftModernFeedVideoLayout(id self, SEL _cmd) {
 %end
 
 %hook IGPageMediaView
+- (void)didMoveToSuperview {
+	%orig;
+	SCIAddFeedExpandLongPressIfNeeded((UIView *)self, @selector(sci_handleExpandLongPress:));
+}
+
+%new - (void)sci_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+	SCIHandleFeedExpandLongPress((UIView *)self, sender);
+}
+%end
+
+%hook IGFeedItemPagePhotoCell
+- (void)didMoveToSuperview {
+	%orig;
+	SCIAddFeedExpandLongPressIfNeeded((UIView *)self, @selector(sci_handleExpandLongPress:));
+}
+
+%new - (void)sci_handleExpandLongPress:(UILongPressGestureRecognizer *)sender {
+	SCIHandleFeedExpandLongPress((UIView *)self, sender);
+}
+%end
+
+%hook IGFeedItemPageVideoCell
 - (void)didMoveToSuperview {
 	%orig;
 	SCIAddFeedExpandLongPressIfNeeded((UIView *)self, @selector(sci_handleExpandLongPress:));
