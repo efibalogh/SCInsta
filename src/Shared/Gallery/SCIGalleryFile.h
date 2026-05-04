@@ -12,7 +12,6 @@ typedef NS_ENUM(int16_t, SCIGalleryMediaType) {
 
 FOUNDATION_EXPORT NSString *SCIFileNameForMedia(NSURL *originalURL, SCIGalleryMediaType mediaType, SCIGallerySaveMetadata * _Nullable metadata);
 
-
 typedef NS_ENUM(int16_t, SCIGallerySource) {
     SCIGallerySourceOther   = 0,
     SCIGallerySourceFeed    = 1,
@@ -43,6 +42,9 @@ typedef NS_ENUM(int16_t, SCIGallerySource) {
 @property (nonatomic) int32_t pixelWidth;
 @property (nonatomic) int32_t pixelHeight;
 @property (nonatomic) double durationSeconds;
+
+/// Classifies by path extension; unknown extensions default to image.
++ (SCIGalleryMediaType)inferMediaTypeFromFileURL:(NSURL *)fileURL;
 
 + (nullable SCIGalleryFile *)saveFileToGallery:(NSURL *)fileURL
                                         source:(SCIGallerySource)source

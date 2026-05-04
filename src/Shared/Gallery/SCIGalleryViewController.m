@@ -17,6 +17,7 @@
 #import "../../AssetUtils.h"
 #import "../../Utils.h"
 #import <CoreData/CoreData.h>
+#import <CoreServices/CoreServices.h>
 
 static NSString * const kGridCellID = @"SCIGalleryGridCell";
 static NSString * const kListCellID = @"SCIGalleryListCell";
@@ -56,7 +57,8 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
                                        SCIGallerySortViewControllerDelegate,
                                        SCIGalleryFilterViewControllerDelegate,
                                        UIAdaptivePresentationControllerDelegate,
-                                       UISearchResultsUpdating>
+                                       UISearchResultsUpdating,
+                                       UIDocumentPickerDelegate>
 
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, strong) NSFetchedResultsController *fetchedResultsController;
@@ -334,7 +336,10 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     UIButton *folderBtn = [self galleryBottomBarButtonWithResource:@"folder" accessibility:@"New folder"];
     [folderBtn addTarget:self action:@selector(presentCreateFolder) forControlEvents:UIControlEventTouchUpInside];
 
-    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn, searchBtn];
+    UIButton *importBtn = [self galleryBottomBarButtonWithResource:@"plus" accessibility:@"Import"];
+    [importBtn addTarget:self action:@selector(presentImportPicker:) forControlEvents:UIControlEventTouchUpInside];
+
+    NSArray<UIView *> *row = @[toggleBtn, sortBtn, filterBtn, folderBtn, importBtn, searchBtn];
 
     self.bottomBarStack = SCIMediaChromeInstallBottomRow(self.bottomBar, row);
 }
@@ -1471,6 +1476,143 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 - (void)pushSettings {
     SCIGallerySettingsViewController *vc = [[SCIGallerySettingsViewController alloc] init];
     [self.navigationController pushViewController:vc animated:YES];
+}
+
+#pragma mark - Import
+
+- (void)presentImportPicker:(UIButton *)sender {
+    NSArray<NSString *> *utiStrings = @[
+        (__bridge NSString *)kUTTypeImage,
+        (__bridge NSString *)kUTTypeMovie,
+        (__bridge NSString *)kUTTypeVideo,
+        (__bridge NSString *)kUTTypeMPEG4,
+        (__bridge NSString *)kUTTypeQuickTimeMovie,
+        (__bridge NSString *)kUTTypeGIF,
+        @"org.webmproject.webp",
+    ];
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:utiStrings inMode:UIDocumentPickerModeImport];
+    picker.delegate = self;
+    picker.allowsMultipleSelection = YES;
+    UIPopoverPresentationController *ppc = picker.popoverPresentationController;
+    if (ppc && sender) {
+        ppc.sourceView = sender;
+        ppc.sourceRect = sender.bounds;
+    }
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    (void)controller;
+    if (urls.count == 0) {
+        return;
+    }
+    if (urls.count == 1) {
+        [self presentSingleImportOptionsForURL:urls.firstObject];
+        return;
+    }
+    [self importGalleryFromURLs:urls firstFileMetadata:nil];
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    (void)controller;
+}
+
+- (void)presentSingleImportOptionsForURL:(NSURL *)srcURL {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Import to Gallery"
+                                                                   message:@"Optional: file name stem is used on disk when the picked file’s name should not drive naming (UUID exports, generic names). Display name is shown in the gallery list."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
+        tf.placeholder = @"File name stem (optional)";
+        tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        tf.autocorrectionType = UITextAutocorrectionTypeNo;
+        tf.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
+        tf.placeholder = @"Display name (optional)";
+        tf.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:@"Import" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        SCIGallerySaveMetadata *m = [[SCIGallerySaveMetadata alloc] init];
+        m.source = (int16_t)SCIGallerySourceOther;
+        NSString *stem = [alert.textFields[0].text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *disp = [alert.textFields[1].text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (stem.length > 0) {
+            m.importFileNameStem = stem;
+        }
+        if (disp.length > 0) {
+            m.customName = disp;
+        }
+        [weakSelf importGalleryFromURLs:@[srcURL] firstFileMetadata:m];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)importGalleryFromURLs:(NSArray<NSURL *> *)urls firstFileMetadata:(SCIGallerySaveMetadata *)firstFileMetadata {
+    NSUInteger failures = 0;
+    NSString *lastError = nil;
+    for (NSURL *src in urls) {
+        SCIGallerySaveMetadata *meta = (urls.count == 1) ? firstFileMetadata : nil;
+        NSError *err = nil;
+        if (![self importSingleGalleryFileFromSecurityScopedURL:src metadata:meta error:&err]) {
+            failures++;
+            lastError = err.localizedDescription ?: @"Unknown error";
+        }
+    }
+    if (failures > 0) {
+        NSString *msg = urls.count == 1
+            ? (lastError ?: @"Could not import the file.")
+            : [NSString stringWithFormat:@"%lu file(s) could not be imported.%@", (unsigned long)failures, lastError.length ? [NSString stringWithFormat:@" Last error: %@", lastError] : @""];
+        UIAlertController *errAlert = [UIAlertController alertControllerWithTitle:@"Import failed"
+                                                                           message:msg
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+        [errAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:errAlert animated:YES completion:nil];
+    }
+}
+
+- (BOOL)importSingleGalleryFileFromSecurityScopedURL:(NSURL *)srcURL metadata:(SCIGallerySaveMetadata *)metadata error:(NSError **)outError {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL scoped = [srcURL startAccessingSecurityScopedResource];
+    NSString *tempPath = nil;
+    NSError *copyErr = nil;
+
+    NSString *tmpName = [NSString stringWithFormat:@"scinsta-gallery-import-%@.%@", [NSUUID UUID].UUIDString, srcURL.pathExtension];
+    tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
+    [fm removeItemAtPath:tempPath error:nil];
+    NSURL *tempURL = [NSURL fileURLWithPath:tempPath];
+
+    if (![fm copyItemAtURL:srcURL toURL:tempURL error:&copyErr]) {
+        if (scoped) {
+            [srcURL stopAccessingSecurityScopedResource];
+        }
+        if (outError) {
+            *outError = copyErr ?: [NSError errorWithDomain:@"SCIGallery" code:2 userInfo:@{NSLocalizedDescriptionKey: @"Copy failed"}];
+        }
+        return NO;
+    }
+    if (scoped) {
+        [srcURL stopAccessingSecurityScopedResource];
+    }
+
+    SCIGalleryMediaType mediaType = [SCIGalleryFile inferMediaTypeFromFileURL:tempURL];
+    NSError *saveErr = nil;
+    SCIGalleryFile *saved = [SCIGalleryFile saveFileToGallery:tempURL
+                                                       source:SCIGallerySourceOther
+                                                    mediaType:mediaType
+                                                   folderPath:self.currentFolderPath
+                                                     metadata:metadata
+                                                        error:&saveErr];
+    [fm removeItemAtPath:tempPath error:nil];
+
+    if (!saved) {
+        if (outError) {
+            *outError = saveErr ?: [NSError errorWithDomain:@"SCIGallery" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Save to gallery failed"}];
+        }
+        return NO;
+    }
+    return YES;
 }
 
 @end

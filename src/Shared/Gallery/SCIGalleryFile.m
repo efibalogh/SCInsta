@@ -105,6 +105,45 @@ static BOOL SCIStringLooksLikeUUIDFilename(NSString *baseName) {
     return u != nil;
 }
 
+/// Single path segment for imported files: no slashes, trimmed, limited length.
+static NSString *SCISanitizedImportFileStem(NSString *raw) {
+    if (!raw.length) {
+        return @"";
+    }
+    NSString *s = [[raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lastPathComponent];
+    NSMutableString *out = [NSMutableString stringWithCapacity:MIN((NSUInteger)80, s.length)];
+    NSUInteger maxLen = 80;
+    [s enumerateSubstringsInRange:NSMakeRange(0, s.length)
+                          options:NSStringEnumerationByComposedCharacterSequences
+                       usingBlock:^(NSString * _Nullable substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
+        if (out.length >= maxLen) {
+            *stop = YES;
+            return;
+        }
+        if (substring.length != 1) {
+            [out appendString:@"_"];
+            return;
+        }
+        unichar c = [substring characterAtIndex:0];
+        if (c == '/' || c == '\\' || c == ':' || c == 0) {
+            return;
+        }
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.') {
+            [out appendString:substring];
+        } else if (c == ' ') {
+            [out appendString:@"_"];
+        } else {
+            [out appendString:@"_"];
+        }
+    }];
+    NSString *collapsed = [out stringByReplacingOccurrencesOfString:@"__" withString:@"_"];
+    while ([collapsed containsString:@"__"]) {
+        collapsed = [collapsed stringByReplacingOccurrencesOfString:@"__" withString:@"_"];
+    }
+    collapsed = [collapsed stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"._-"]];
+    return collapsed.length ? collapsed : @"";
+}
+
 NSString *SCIFileNameForMedia(NSURL *fileURL,
                               SCIGalleryMediaType mediaType,
                               SCIGallerySaveMetadata * _Nullable metadata) {
@@ -130,12 +169,21 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         return [NSString stringWithFormat:@"%@_%@_%@.%@", user, slug, dateCompact, ext];
     }
 
-    NSString *base = [orig stringByDeletingPathExtension];
+    NSString *base = nil;
+    if (metadata.importFileNameStem.length > 0) {
+        NSString *stem = SCISanitizedImportFileStem(metadata.importFileNameStem);
+        if (stem.length > 0) {
+            base = stem;
+        }
+    }
+    if (base.length == 0) {
+        base = [orig stringByDeletingPathExtension];
+    }
     if (SCIStringLooksLikeUUIDFilename(base) || base.length == 0) {
         return [NSString stringWithFormat:@"media_%@_%@.%@", slug, dateCompact, ext];
     }
 
-    return [NSString stringWithFormat:@"%@_%@.%@", orig, dateCompact, ext];
+    return [NSString stringWithFormat:@"%@_%@.%@", base, dateCompact, ext];
 }
 
 @implementation SCIGalleryFile
@@ -188,6 +236,7 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         file.pixelWidth = metadata.pixelWidth;
         file.pixelHeight = metadata.pixelHeight;
         file.durationSeconds = metadata.durationSeconds;
+        file.customName = metadata.customName.length ? metadata.customName : nil;
     } else {
         file.source = fallbackSource;
         file.sourceUsername = nil;
@@ -199,7 +248,21 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         file.pixelWidth = 0;
         file.pixelHeight = 0;
         file.durationSeconds = 0;
+        file.customName = nil;
     }
+}
+
++ (SCIGalleryMediaType)inferMediaTypeFromFileURL:(NSURL *)fileURL {
+    NSString *e = fileURL.pathExtension.lowercaseString;
+    static NSSet<NSString *> *videoExts;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        videoExts = [NSSet setWithArray:@[ @"mp4", @"mov", @"m4v", @"webm" ]];
+    });
+    if ([videoExts containsObject:e]) {
+        return SCIGalleryMediaTypeVideo;
+    }
+    return SCIGalleryMediaTypeImage;
 }
 
 + (void)probeMediaAtPath:(NSString *)path mediaType:(SCIGalleryMediaType)mediaType file:(SCIGalleryFile *)file {

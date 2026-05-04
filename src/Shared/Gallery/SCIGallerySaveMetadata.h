@@ -21,6 +21,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// If > 0 for video, overrides probed duration (seconds).
 @property (nonatomic, assign) double durationSeconds;
 
+/// When set (and `sourceUsername` is empty), used as the basename segment for `SCIFileNameForMedia` instead of the picked file’s name — useful for imports whose URL name does not match the usual save pattern.
+@property (nonatomic, copy, nullable) NSString *importFileNameStem;
+
+/// Stored on `SCIGalleryFile.customName` for list/grid display.
+@property (nonatomic, copy, nullable) NSString *customName;
+
 @end
 
 NS_ASSUME_NONNULL_END
