@@ -2,6 +2,7 @@
 #import "SCIGalleryDeleteViewController.h"
 #import "SCIGalleryManager.h"
 #import "SCIGalleryLockViewController.h"
+#import "SCIGalleryImportViewController.h"
 #import "SCIGalleryFile.h"
 #import "SCIGalleryCoreDataStack.h"
 #import "../UI/SCISwitch.h"
@@ -22,6 +23,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     SCIGallerySettingsSectionBrowsing,
     SCIGallerySettingsSectionLock,
     SCIGallerySettingsSectionShortcuts,
+    SCIGallerySettingsSectionImport,
     SCIGallerySettingsSectionDelete,
     SCIGallerySettingsSectionCount
 };
@@ -101,6 +103,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionBrowsing: return @"Browsing";
         case SCIGallerySettingsSectionLock: return @"Lock";
         case SCIGallerySettingsSectionShortcuts: return @"Shortcuts";
+        case SCIGallerySettingsSectionImport: return @"Import";
         case SCIGallerySettingsSectionDelete: return @"Delete";
     }
     return nil;
@@ -114,6 +117,8 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
             return @"When enabled, the Gallery requires a passcode or biometrics to open.";
         case SCIGallerySettingsSectionShortcuts:
             return @"Long press Messages tab to open. Requires app restart to take effect.";
+        case SCIGallerySettingsSectionImport:
+            return @"Import from the Files app with full metadata (username, shortcode, URLs) so Open profile / Open original behave like saves from Instagram. Batch: set shared fields, Add files, then edit or merge per row.";
         default:
             return nil;
     }
@@ -128,6 +133,8 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionLock:
             return [SCIGalleryManager sharedManager].isLockEnabled ? 2 : 1;
         case SCIGallerySettingsSectionShortcuts:
+            return 1;
+        case SCIGallerySettingsSectionImport:
             return 1;
         case SCIGallerySettingsSectionDelete:
             return 1;
@@ -197,6 +204,12 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     cell.accessoryView = sw;
 }
 
+- (void)configureImportCell:(UITableViewCell *)cell {
+    cell.textLabel.text = @"Import from Files…";
+    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+}
+
 - (void)configureDeleteCell:(UITableViewCell *)cell {
     cell.textLabel.text = @"Delete Files";
     cell.textLabel.textColor = [SCIUtils SCIColor_InstagramDestructive];
@@ -228,6 +241,9 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
             break;
         case SCIGallerySettingsSectionShortcuts:
             [self configureShortcutsCell:cell];
+            break;
+        case SCIGallerySettingsSectionImport:
+            [self configureImportCell:cell];
             break;
         case SCIGallerySettingsSectionDelete:
             [self configureDeleteCell:cell];
@@ -283,6 +299,12 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         [SCIGalleryLockViewController presentMode:SCIGalleryLockModeChangePasscode
                              fromViewController:self
                                      completion:^(BOOL success) {}];
+        return;
+    }
+
+    if (indexPath.section == SCIGallerySettingsSectionImport) {
+        SCIGalleryImportViewController *vc = [[SCIGalleryImportViewController alloc] initWithDestinationFolderPath:self.importDestinationFolderPath];
+        [self.navigationController pushViewController:vc animated:YES];
         return;
     }
 

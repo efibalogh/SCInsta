@@ -1,6 +1,7 @@
 #import "SCIMediaFFmpeg.h"
 
 #import "../../AssetUtils.h"
+#import "../UI/SCIMediaChrome.h"
 #import "../../Utils.h"
 #import <AVFoundation/AVFoundation.h>
 #import <dlfcn.h>
@@ -936,15 +937,11 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
         [_textView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12.0]
     ]];
 
-    UIBarButtonItem *copyItem = [[UIBarButtonItem alloc] initWithTitle:@"Copy"
-                                                                 style:UIBarButtonItemStylePlain
-                                                                target:self
-                                                                action:@selector(copyTapped)];
-    UIBarButtonItem *shareItem = [[UIBarButtonItem alloc] initWithTitle:@"Share"
-                                                                  style:UIBarButtonItemStylePlain
-                                                                 target:self
-                                                                 action:@selector(shareTapped)];
-    self.navigationItem.rightBarButtonItems = @[shareItem, copyItem];
+    UIBarButtonItem *shareItem = SCIMediaChromeTopBarButtonItem(@"share", self, @selector(shareTapped));
+    shareItem.accessibilityLabel = @"Share";
+    UIBarButtonItem *copyItem = SCIMediaChromeTopBarButtonItem(@"copy", self, @selector(copyTapped));
+    copyItem.accessibilityLabel = @"Copy";
+    self.navigationItem.rightBarButtonItems = @[ shareItem, copyItem ];
 
     [self reloadContent];
 }
@@ -987,10 +984,11 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
     self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
     self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
     self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
-    self.navigationItem.rightBarButtonItems = @[
-        [[UIBarButtonItem alloc] initWithTitle:@"Share All" style:UIBarButtonItemStylePlain target:self action:@selector(shareAllTapped)],
-        [[UIBarButtonItem alloc] initWithTitle:@"Clear" style:UIBarButtonItemStylePlain target:self action:@selector(clearTapped)]
-    ];
+    UIBarButtonItem *shareAllItem = SCIMediaChromeTopBarButtonItem(@"share", self, @selector(shareAllTapped));
+    shareAllItem.accessibilityLabel = @"Share all";
+    UIBarButtonItem *clearItem = SCIMediaChromeTopBarButtonItem(@"trash", self, @selector(clearTapped));
+    clearItem.accessibilityLabel = @"Clear";
+    self.navigationItem.rightBarButtonItems = @[ shareAllItem, clearItem ];
 }
 
 - (void)viewWillAppear:(BOOL)animated {

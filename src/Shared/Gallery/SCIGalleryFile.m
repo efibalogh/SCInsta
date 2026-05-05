@@ -1,8 +1,10 @@
 #import "SCIGalleryFile.h"
 #import "SCIGalleryPaths.h"
 #import "SCIGalleryCoreDataStack.h"
+#import "SCIGalleryOriginController.h"
 #import <AVFoundation/AVFoundation.h>
 #import <ImageIO/ImageIO.h>
+#import <ctype.h>
 
 static CGFloat const kThumbnailSize = 300.0;
 
@@ -144,6 +146,172 @@ static NSString *SCISanitizedImportFileStem(NSString *raw) {
     return collapsed.length ? collapsed : @"";
 }
 
+static BOOL SCIDigitsOnlyString(NSString *s) {
+    if (s.length == 0) {
+        return NO;
+    }
+    for (NSUInteger i = 0; i < s.length; i++) {
+        if (!isdigit((unsigned char)[s characterAtIndex:i])) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
+static NSDate * _Nullable SCIParseCompactDigitDateFromString(NSString *s) {
+    if (!SCIDigitsOnlyString(s)) {
+        return nil;
+    }
+    NSUInteger n = s.length;
+    if (n != 8 && n != 12 && n != 14) {
+        return nil;
+    }
+    static NSDateFormatter *fmt8;
+    static NSDateFormatter *fmt12;
+    static NSDateFormatter *fmt14;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        fmt8 = [[NSDateFormatter alloc] init];
+        fmt8.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        fmt8.timeZone = [NSTimeZone localTimeZone];
+        fmt8.dateFormat = @"yyyyMMdd";
+
+        fmt12 = [[NSDateFormatter alloc] init];
+        fmt12.locale = fmt8.locale;
+        fmt12.timeZone = fmt8.timeZone;
+        fmt12.dateFormat = @"yyyyMMddHHmm";
+
+        fmt14 = [[NSDateFormatter alloc] init];
+        fmt14.locale = fmt8.locale;
+        fmt14.timeZone = fmt8.timeZone;
+        fmt14.dateFormat = @"yyyyMMddHHmmss";
+    });
+    if (n == 14) {
+        return [fmt14 dateFromString:s];
+    }
+    if (n == 12) {
+        return [fmt12 dateFromString:s];
+    }
+    return [fmt8 dateFromString:s];
+}
+
+/// Recognizes slug segments matching `SCIGallerySourceSlug` output (feed, story, reel, …).
+static BOOL SCISourceFromBasenameSlug(NSString *low, SCIGallerySource *out) {
+    if ([low isEqualToString:@"feed"]) {
+        *out = SCIGallerySourceFeed;
+        return YES;
+    }
+    if ([low isEqualToString:@"story"] || [low isEqualToString:@"stories"]) {
+        *out = SCIGallerySourceStories;
+        return YES;
+    }
+    if ([low isEqualToString:@"reel"] || [low isEqualToString:@"reels"]) {
+        *out = SCIGallerySourceReels;
+        return YES;
+    }
+    if ([low isEqualToString:@"profile"] || [low isEqualToString:@"profile-photo"] || [low isEqualToString:@"profilephoto"]) {
+        *out = SCIGallerySourceProfile;
+        return YES;
+    }
+    if ([low isEqualToString:@"dm"] || [low isEqualToString:@"dms"]) {
+        *out = SCIGallerySourceDMs;
+        return YES;
+    }
+    if ([low isEqualToString:@"thumbnail"] || [low isEqualToString:@"thumb"]) {
+        *out = SCIGallerySourceThumbnail;
+        return YES;
+    }
+    if ([low isEqualToString:@"other"]) {
+        *out = SCIGallerySourceOther;
+        return YES;
+    }
+    return NO;
+}
+
+void SCIGalleryApplyImportHeuristicsFromFilename(NSString *fileName, SCIGallerySaveMetadata *m) {
+    if (!fileName.length || !m) {
+        return;
+    }
+    NSString *stem = [fileName lastPathComponent].stringByDeletingPathExtension;
+    if (stem.length == 0) {
+        return;
+    }
+
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    for (NSString *p in [stem componentsSeparatedByString:@"_"]) {
+        NSString *t = [p stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        if (t.length > 0) {
+            [parts addObject:t];
+        }
+    }
+    if (parts.count == 0) {
+        return;
+    }
+
+    NSDate *trailDate = SCIParseCompactDigitDateFromString(parts.lastObject);
+    if (trailDate) {
+        if (!m.importCapturedDate) {
+            m.importCapturedDate = trailDate;
+        }
+        [parts removeLastObject];
+    }
+    if (parts.count == 0) {
+        return;
+    }
+
+    NSString *slugLow = parts.lastObject.lowercaseString;
+    SCIGallerySource slugSource = SCIGallerySourceOther;
+    if (SCISourceFromBasenameSlug(slugLow, &slugSource)) {
+        if (m.source == (int16_t)SCIGallerySourceOther) {
+            m.source = (int16_t)slugSource;
+        }
+        [parts removeLastObject];
+    }
+    if (parts.count == 0) {
+        return;
+    }
+
+    if (parts.count >= 2) {
+        NSString *a = parts[0];
+        NSString *b = parts[1];
+        if (SCIDigitsOnlyString(a) && !SCIDigitsOnlyString(b)) {
+            if (!m.sourceUserPK.length) {
+                m.sourceUserPK = a;
+            }
+            if (!m.sourceUsername.length) {
+                m.sourceUsername = b;
+                [SCIGalleryOriginController populateProfileMetadata:m username:b user:nil];
+            }
+        } else if (!SCIDigitsOnlyString(a) && SCIDigitsOnlyString(b)) {
+            if (!m.sourceUsername.length) {
+                m.sourceUsername = a;
+                [SCIGalleryOriginController populateProfileMetadata:m username:a user:nil];
+            }
+            if (!m.sourceUserPK.length) {
+                m.sourceUserPK = b;
+            }
+        } else if (!SCIDigitsOnlyString(a) && !SCIDigitsOnlyString(b)) {
+            if (!m.sourceUsername.length) {
+                m.sourceUsername = a;
+                [SCIGalleryOriginController populateProfileMetadata:m username:a user:nil];
+            }
+        }
+        return;
+    }
+
+    NSString *only = parts[0];
+    if (SCIDigitsOnlyString(only)) {
+        if (!m.sourceUserPK.length) {
+            m.sourceUserPK = only;
+        }
+    } else {
+        if (!m.sourceUsername.length) {
+            m.sourceUsername = only;
+            [SCIGalleryOriginController populateProfileMetadata:m username:only user:nil];
+        }
+    }
+}
+
 NSString *SCIFileNameForMedia(NSURL *fileURL,
                               SCIGalleryMediaType mediaType,
                               SCIGallerySaveMetadata * _Nullable metadata) {
@@ -159,7 +327,8 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         compactDateFmt.timeZone = [NSTimeZone localTimeZone];
         compactDateFmt.dateFormat = @"yyyyMMddHHmmss";
     });
-    NSString *dateCompact = [compactDateFmt stringFromDate:[NSDate date]];
+    NSDate *refDate = metadata.importCapturedDate ?: [NSDate date];
+    NSString *dateCompact = [compactDateFmt stringFromDate:refDate];
 
     SCIGallerySource src = metadata ? (SCIGallerySource)metadata.source : SCIGallerySourceOther;
     NSString *slug = SCIGallerySourceSlug(src);
@@ -364,7 +533,7 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
     file.identifier = [NSUUID UUID].UUIDString;
     file.relativePath = fileName;
     file.mediaType = mediaType;
-    file.dateAdded = [NSDate date];
+    file.dateAdded = metadata.importCapturedDate ?: [NSDate date];
     file.fileSize = size;
     file.isFavorite = NO;
     file.folderPath = folderPath;

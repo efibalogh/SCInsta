@@ -4,7 +4,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Optional context when saving to the gallery (e.g. from the action button).
 /// `source` uses the same values as `SCIGallerySource` in SCIGalleryFile.
-@interface SCIGallerySaveMetadata : NSObject
+@interface SCIGallerySaveMetadata : NSObject <NSCopying>
 
 @property (nonatomic, copy, nullable) NSString *sourceUsername;
 @property (nonatomic, copy, nullable) NSString *sourceUserPK;
@@ -26,6 +26,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Stored on `SCIGalleryFile.customName` for list/grid display.
 @property (nonatomic, copy, nullable) NSString *customName;
+
+/// When set, used for `SCIGalleryFile.dateAdded` and the compact segment in `SCIFileNameForMedia` instead of “now”. Often parsed from tweak-style basenames (…_story_yyyyMMddHHmmss).
+@property (nonatomic, strong, nullable) NSDate *importCapturedDate;
 
 @end
 
