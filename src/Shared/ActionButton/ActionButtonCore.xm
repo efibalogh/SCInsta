@@ -10,6 +10,7 @@
 #import "../../InstagramHeaders.h"
 #import "../../AssetUtils.h"
 #import "../../Utils.h"
+#import "../MediaDownload/SCIMediaQualityManager.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../MediaPreview/SCIMediaItem.h"
 #import "../Gallery/SCIGalleryFile.h"
@@ -55,6 +56,8 @@ static NSDictionary<NSString *, NSString *> *SCIPendingRepostFeedback = nil;
 static void SCIPauseDirectPlaybackFromController(UIViewController *controller);
 static void SCIResumeDirectPlaybackFromController(UIViewController *controller);
 static BOOL SCIActionIdentifierOpensPreview(NSString *identifier);
+static UIViewController *SCIActionContextPresenter(SCIActionButtonContext *context);
+static UIView *SCIActionContextAnchorView(SCIActionButtonContext *context);
 void SCIPauseStoryPlaybackFromOverlaySubview(UIView *overlayView);
 void SCIResumeStoryPlaybackFromOverlaySubview(UIView *overlayView);
 SCIActionButtonContext *SCIActionButtonContextFromButton(UIButton *button);
@@ -777,6 +780,7 @@ static NSArray<SCIMediaItem *> *SCIPlayerItemsFromEntries(NSArray<SCIResolvedMed
 		item.mediaType = entry.videoURL ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
 		item.gallerySaveSource = SCIGallerySourceForActionSource(source);
 		item.galleryMetadata = SCIGalleryMetadata(source, username, metadataObject);
+        item.sourceMediaObject = metadataObject;
 		if (username.length > 0) item.title = username;
 		[items addObject:item];
 	}
@@ -1382,9 +1386,24 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		if ([identifier isEqualToString:kSCIActionDownloadShare]) action = share;
 		else if ([identifier isEqualToString:kSCIActionDownloadGallery]) action = saveToGallery;
 
-		SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:shouldShowFeedbackPill];
-		delegate.pendingGallerySaveMetadata = meta;
-		[delegate downloadFileWithURL:currentURL fileExtension:SCIExtensionForURL(currentURL, isVideo) hudLabel:nil];
+        id mediaForDownload = currentEntry.metadataObject ?: currentEntry.mediaObject ?: media;
+        UIViewController *presenter = SCIActionContextPresenter(context);
+        UIView *anchorView = SCIActionContextAnchorView(context);
+        if ([SCIMediaQualityManager handleDownloadAction:action
+                                             identifier:identifier
+                                              presenter:presenter
+                                             sourceView:anchorView
+                                              mediaObject:mediaForDownload
+                                                photoURL:currentEntry.photoURL
+                                                videoURL:currentEntry.videoURL
+                                         galleryMetadata:meta
+                                           showProgress:shouldShowFeedbackPill]) {
+            return YES;
+        }
+
+        SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:shouldShowFeedbackPill];
+        delegate.pendingGallerySaveMetadata = meta;
+        [delegate downloadFileWithURL:currentURL fileExtension:SCIExtensionForURL(currentURL, isVideo) hudLabel:nil];
 		return YES;
 	}
 
@@ -1409,6 +1428,17 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 	}
 
     if ([identifier isEqualToString:kSCIActionCopyMedia]) {
+        id mediaForCopy = currentEntry.metadataObject ?: currentEntry.mediaObject ?: media;
+        if ([SCIMediaQualityManager handleCopyActionWithIdentifier:identifier
+                                                         presenter:SCIActionContextPresenter(context)
+                                                        sourceView:SCIActionContextAnchorView(context)
+                                                         mediaObject:mediaForCopy
+                                                           photoURL:currentEntry.photoURL
+                                                           videoURL:currentEntry.videoURL
+                                                      showProgress:shouldShowFeedbackPill]) {
+            return YES;
+        }
+
         if (!currentURL && !currentEntry.photoURL) {
             if (shouldShowFeedbackPill) {
                 [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];

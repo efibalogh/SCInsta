@@ -29,10 +29,16 @@ typedef NS_ENUM(NSUInteger, DownloadAction) {
 /// Set immediately before `downloadFileWithURL:` when `action == saveToGallery`; consumed when the download finishes.
 @property (nonatomic, strong, nullable) SCIGallerySaveMetadata *pendingGallerySaveMetadata;
 @property (nonatomic, copy, nullable) SCIDownloadCompletionBlock completionBlock;
+@property (nonatomic, copy, nullable) dispatch_block_t customCancelHandler;
 
 - (instancetype)initWithAction:(DownloadAction)action showProgress:(BOOL)showProgress;
 
 - (void)downloadFileWithURL:(NSURL *)url fileExtension:(NSString *)fileExtension hudLabel:(NSString *)hudLabel;
+- (void)beginCustomProgressWithTitle:(nullable NSString *)title subtitle:(nullable NSString *)subtitle;
+- (void)updateCustomProgress:(float)progress title:(nullable NSString *)title subtitle:(nullable NSString *)subtitle;
+- (void)showCustomErrorWithTitle:(NSString *)title subtitle:(nullable NSString *)subtitle;
+- (void)finishWithLocalFileURL:(NSURL *)fileURL;
+- (void)cancelCustomOperation;
 
 + (BOOL)isVideoFileAtURL:(NSURL *)fileURL;
 + (void)saveFileURLToPhotos:(NSURL *)fileURL completion:(void(^)(BOOL success, NSError * _Nullable error))completion;

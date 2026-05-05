@@ -120,6 +120,7 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
             @"app": @{@"candidates": @[@"ig_icon_app_instagram_pano_outline_24", @"ig_icon_app_instagram_outline_24"]},
             @"action": @{@"candidates": @[@"ig_icon_flash_outline_24", @"ig_icon_flash_outline_20"]},
             @"action_reels": @{@"candidates": @[@"ig_icon_flash_outline_44"]},
+            @"audio": @{@"candidates": @[@"ig_icon_audio_wave_outline_24"]},
             @"arrow_up": @{@"candidates": @[@"ig_icon_arrow_up_outline_24"]},
             @"arrow_down": @{@"candidates": @[@"ig_icon_arrow_down_outline_24"]},
             @"arrow_left": @{@"candidates": @[@"ig_icon_arrow_left_outline_24"]},

@@ -190,6 +190,24 @@ UIMenu *SCICacheAutoClearMenu(void) {
     ]];
 }
 
+UIMenu *SCIMediaVideoQualityMenu(void) {
+    return [UIMenu menuWithChildren:@[
+        SCIMenuCommand(@"Always Ask", nil, nil, @"media_video_quality_default", @"always_ask", NO),
+        SCIMenuCommand(@"High", nil, nil, @"media_video_quality_default", @"high", NO),
+        SCIMenuCommand(@"High (Ignore Dash)", nil, nil, @"media_video_quality_default", @"high_ignore_dash", NO),
+        SCIMenuCommand(@"Medium", nil, nil, @"media_video_quality_default", @"medium", NO),
+        SCIMenuCommand(@"Low", nil, nil, @"media_video_quality_default", @"low", NO)
+    ]];
+}
+
+UIMenu *SCIMediaPhotoQualityMenu(void) {
+    return [UIMenu menuWithChildren:@[
+        SCIMenuCommand(@"Always Ask", nil, nil, @"media_photo_quality_default", @"always_ask", NO),
+        SCIMenuCommand(@"High", nil, nil, @"media_photo_quality_default", @"high", NO),
+        SCIMenuCommand(@"Low", nil, nil, @"media_photo_quality_default", @"low", NO)
+    ]];
+}
+
 NSArray *SCIDevExampleSections(void) {
     return @[
         SCITopicSection(@"_ Example", @[

@@ -1,6 +1,8 @@
 #import "SCIGeneralSettingsProvider.h"
 
 #import "../SCITopicSettingsSupport.h"
+#import "../../Shared/MediaDownload/SCIMediaFFmpeg.h"
+#import "../../Shared/MediaDownload/SCIMediaQualityManager.h"
 #import "../../Utils.h"
 
 @implementation SCIGeneralSettingsProvider
@@ -8,13 +10,19 @@
 + (SCISetting *)rootSetting {
     return SCITopicNavigationSetting(@"General", @"settings", 24.0, @[
         SCITopicSection(@"Core", @[
-            [SCISetting switchCellWithTitle:@"Hide Ads" subtitle:@"Removes all ads from the Instagram app" defaultsKey:@"hide_ads"],
-            [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the Meta AI buttons and related functionality within the app" defaultsKey:@"hide_meta_ai"],
-            [SCISetting switchCellWithTitle:@"Copy Description" subtitle:@"Copy description text fields by long-pressing on them" defaultsKey:@"copy_description"],
-            [SCISetting switchCellWithTitle:@"Do Not Save Recent Searches" subtitle:@"Search bars will no longer save your recent searches" defaultsKey:@"no_recent_searches"],
-            [SCISetting switchCellWithTitle:@"Remove User from Copied Share Link" subtitle:@"Cleans copied Instagram share links into canonical post or reel URLs without the username path or tracking parameters" defaultsKey:@"remove_user_from_copied_share_link"],
-            [SCISetting switchCellWithTitle:@"Enhanced Media Resolution" subtitle:@"Increases the screen size reported to Instagram in outgoing requests, allowing higher-resolution media in feeds and downloads." defaultsKey:@"enhanced_media_resolution"]
+            [SCISetting switchCellWithTitle:@"Hide Ads" subtitle:@"Removes all ads from the app" defaultsKey:@"hide_ads"],
+            [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the Meta AI buttons and related functionality" defaultsKey:@"hide_meta_ai"],
+            [SCISetting switchCellWithTitle:@"Copy Description" subtitle:@"Long press on text fields" defaultsKey:@"copy_description"],
+            [SCISetting switchCellWithTitle:@"Do Not Save Recent Searches" subtitle:@"Search bars will no longer save recent searches" defaultsKey:@"no_recent_searches"],
+            [SCISetting switchCellWithTitle:@"Remove User from Copied Link" subtitle:@"Copy links without the username path or tracking parameters" defaultsKey:@"remove_user_from_copied_share_link"]
         ], nil),
+        SCITopicSection(@"Media", @[
+            [SCISetting switchCellWithTitle:@"Enhanced Media Resolution" subtitle:@"Allows higher-resolution media downloads" defaultsKey:@"enhanced_media_resolution"],
+            [SCISetting menuCellWithTitle:@"Default Video Quality" subtitle:@"Choose the default save/share quality for videos" menu:SCIMediaVideoQualityMenu()],
+            [SCISetting menuCellWithTitle:@"Default Photo Quality" subtitle:@"Choose the default save/share quality for photos" menu:SCIMediaPhotoQualityMenu()],
+            [SCISetting navigationCellWithTitle:@"Encoding Settings" subtitle:@"Default-mode speed plus advanced codec, preset, bitrate, CRF, and fast-start controls" icon:nil viewController:[SCIMediaQualityManager encodingSettingsViewController]],
+            [SCISetting navigationCellWithTitle:@"View Encoding Logs" subtitle:@"Inspect or share recent FFmpeg loader, merge, and validation logs inside the app" icon:nil viewController:[SCIMediaFFmpeg logsViewController]]
+        ], @"\"High\" prefers merged DASH when available. \"High (Ignore Dash)\" forces the best ready-to-play progressive file instead. \"Always Ask\" opens a quality selection sheet for each photo or video."),
         SCITopicSection(@"Cache", @[
             [SCISetting buttonCellWithTitle:@"Clear Cache Now" subtitle:@"Remove temporary caches immediately" icon:nil action:^(void) {
                 [SCIUtils cleanCache];

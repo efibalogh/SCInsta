@@ -18,6 +18,7 @@
 #import "../../AssetUtils.h"
 #import "../../Downloader/Download.h"
 #import "../../Downloader/BulkDownload.h"
+#import "../MediaDownload/SCIMediaQualityManager.h"
 
 static CGFloat const kDismissAxisLockSlop = 20.0;
 static CGFloat const kDismissDistanceRatio = 50.0 / 667.0;
@@ -1110,6 +1111,10 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)saveToPhotos {
+    if ([self handleRemoteOperationWithAction:saveToPhotos feedbackIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos]) {
+        return;
+    }
+
     NSURL *url = [self currentFileURL];
     SCIMediaItem *item = [self currentItem];
     if (!url && !item.image) return;
@@ -1163,7 +1168,50 @@ fromViewController:(UIViewController *)presenter {
     }
 }
 
+- (BOOL)handleRemoteOperationWithAction:(DownloadAction)action feedbackIdentifier:(NSString *)feedbackIdentifier {
+    SCIMediaItem *item = [self currentItem];
+    NSURL *url = [self currentFileURL];
+    if (!item.sourceMediaObject || !item.fileURL || item.fileURL.isFileURL) {
+        return NO;
+    }
+
+    NSURL *sourceURL = item.fileURL ?: url;
+    NSURL *photoURL = item.mediaType == SCIMediaItemTypeImage ? sourceURL : nil;
+    NSURL *videoURL = item.mediaType == SCIMediaItemTypeVideo ? sourceURL : nil;
+    BOOL showProgress = [SCIUtils shouldShowFeedbackPillForActionIdentifier:feedbackIdentifier];
+    return [SCIMediaQualityManager handleDownloadAction:action
+                                            identifier:feedbackIdentifier
+                                             presenter:self
+                                            sourceView:(action == share ? self.shareButton : action == saveToGallery ? self.saveGalleryButton : self.savePhotosButton)
+                                             mediaObject:item.sourceMediaObject
+                                               photoURL:photoURL
+                                               videoURL:videoURL
+                                        galleryMetadata:item.galleryMetadata
+                                           showProgress:showProgress];
+}
+
+- (BOOL)handleRemoteCopyOperation {
+    SCIMediaItem *item = [self currentItem];
+    if (!item.sourceMediaObject || !item.fileURL || item.fileURL.isFileURL) {
+        return NO;
+    }
+
+    NSURL *sourceURL = item.fileURL;
+    BOOL showProgress = [SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy];
+    return [SCIMediaQualityManager handleCopyActionWithIdentifier:kSCIFeedbackActionMediaPreviewCopy
+                                                        presenter:self
+                                                       sourceView:self.clipboardButton
+                                                        mediaObject:item.sourceMediaObject
+                                                          photoURL:(item.mediaType == SCIMediaItemTypeImage ? sourceURL : nil)
+                                                          videoURL:(item.mediaType == SCIMediaItemTypeVideo ? sourceURL : nil)
+                                                     showProgress:showProgress];
+}
+
 - (void)saveToGallery {
+    if ([self handleRemoteOperationWithAction:saveToGallery feedbackIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery]) {
+        return;
+    }
+
     NSURL *targetURL = [self currentFileURL];
     SCIMediaItem *item = [self currentItem];
 
@@ -1253,6 +1301,10 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)shareMedia {
+    if ([self handleRemoteOperationWithAction:share feedbackIdentifier:kSCIFeedbackActionMediaPreviewShare]) {
+        return;
+    }
+
     NSURL *url = [self currentFileURL];
     SCIMediaItem *item = [self currentItem];
     if (!url && !item.image) return;
@@ -1282,6 +1334,10 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)copyMedia {
+    if ([self handleRemoteCopyOperation]) {
+        return;
+    }
+
     SCIMediaItem *item = [self currentItem];
     NSURL *url = [self currentFileURL];
     if (!url && !item.image) return;

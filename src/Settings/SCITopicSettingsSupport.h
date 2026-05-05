@@ -18,6 +18,8 @@ UIMenu *SCINavigationIconOrderingMenu(void);
 UIMenu *SCISwipeBetweenTabsMenu(void);
 UIMenu *SCIFeedbackPillStyleMenu(void);
 UIMenu *SCICacheAutoClearMenu(void);
+UIMenu *SCIMediaVideoQualityMenu(void);
+UIMenu *SCIMediaPhotoQualityMenu(void);
 NSArray *SCIDevExampleSections(void);
 
 NS_ASSUME_NONNULL_END

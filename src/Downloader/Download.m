@@ -40,10 +40,22 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
     }
 }
 
+static NSError *SCIDownloadErrorWithDescription(NSString *description, NSInteger code) {
+    return [NSError errorWithDomain:@"SCInsta.Download"
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey: description ?: @"Download failed"}];
+}
+
 + (BOOL)isVideoFileAtURL:(NSURL *)fileURL {
     NSString *ext = fileURL.pathExtension.lowercaseString;
     NSSet<NSString *> *videoExtensions = [NSSet setWithArray:@[@"mp4", @"mov", @"m4v", @"avi", @"webm", @"mkv", @"3gp"]];
     return [videoExtensions containsObject:ext];
+}
+
+static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
+    NSString *ext = fileURL.pathExtension.lowercaseString;
+    NSSet<NSString *> *audioExtensions = [NSSet setWithArray:@[@"m4a", @"aac", @"mp3", @"wav", @"caf", @"aiff", @"flac", @"opus", @"ogg"]];
+    return [audioExtensions containsObject:ext];
 }
 
 + (void)saveFileURLToPhotos:(NSURL *)fileURL completion:(void(^)(BOOL success, NSError *error))completion {
@@ -117,6 +129,7 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
 
 - (void)downloadFileWithURL:(NSURL *)url fileExtension:(NSString *)fileExtension hudLabel:(NSString *)hudLabel {
     SCIRetainActiveDownloadDelegate(self);
+    self.customCancelHandler = nil;
 
     if (self.showProgress) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -139,6 +152,69 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
 
     // Start download using manager
     [self.downloadManager downloadFileWithURL:url fileExtension:fileExtension];
+}
+
+- (void)beginCustomProgressWithTitle:(NSString *)title subtitle:(NSString *)subtitle {
+    SCIRetainActiveDownloadDelegate(self);
+
+    if (!self.showProgress) {
+        return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.progressView) {
+            self.progressView = [SCIUtils showProgressPill];
+        }
+        __weak typeof(self) weakSelf = self;
+        self.progressView.onCancel = ^{
+            [weakSelf cancelCustomOperation];
+        };
+        self.progressView.onRetry = nil;
+        [self.progressView updateProgressTitle:title subtitle:subtitle];
+        [self.progressView setProgress:0.02f animated:NO];
+    });
+}
+
+- (void)updateCustomProgress:(float)progress title:(NSString *)title subtitle:(NSString *)subtitle {
+    if (!self.showProgress) {
+        return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.progressView) {
+            self.progressView = [SCIUtils showProgressPill];
+        }
+        [self.progressView updateProgressTitle:title subtitle:subtitle];
+        [self.progressView setProgress:progress animated:YES];
+    });
+}
+
+- (void)showCustomErrorWithTitle:(NSString *)title subtitle:(NSString *)subtitle {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.showProgress && self.progressView) {
+            [self.progressView showErrorWithTitle:title subtitle:subtitle icon:nil];
+        }
+        SCIInvokeDownloadCompletion(self, nil, SCIDownloadErrorWithDescription(subtitle.length > 0 ? subtitle : title, 50));
+        SCIReleaseActiveDownloadDelegate(self);
+    });
+}
+
+- (void)finishWithLocalFileURL:(NSURL *)fileURL {
+    [self downloadDidFinishWithFileURL:fileURL];
+}
+
+- (void)cancelCustomOperation {
+    dispatch_block_t cancelHandler = [self.customCancelHandler copy];
+    self.customCancelHandler = nil;
+    if (cancelHandler) {
+        cancelHandler();
+    }
+    self.pendingGallerySaveMetadata = nil;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.progressView dismiss];
+    });
+    SCIInvokeDownloadCompletion(self, nil, [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil]);
+    SCIReleaseActiveDownloadDelegate(self);
 }
 
 // Delegate methods
@@ -200,8 +276,13 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
     self.pendingGallerySaveMetadata = nil;
 
     BOOL isVideo = [[self class] isVideoFileAtURL:fileURL];
+    BOOL isAudio = SCIIsAudioFileAtURL(fileURL);
     SCIGalleryMediaType galleryType = isVideo ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
     NSString *fileName = SCIFileNameForMedia(fileURL, galleryType, galleryMeta);
+    if (isAudio) {
+        NSString *audioExtension = fileURL.pathExtension.length > 0 ? fileURL.pathExtension.lowercaseString : @"m4a";
+        fileName = [[fileName stringByDeletingPathExtension] stringByAppendingPathExtension:audioExtension];
+    }
     NSString *newPath = [[fileURL.path stringByDeletingLastPathComponent] stringByAppendingPathComponent:fileName];
     NSURL *newURL = [NSURL fileURLWithPath:newPath];
 
@@ -214,7 +295,7 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
                 if (self.showProgress) {
                     [self.progressView showError:@"Failed to prepare file"];
                 }
-                SCIInvokeDownloadCompletion(self, nil, [NSError errorWithDomain:@"SCInsta.Download" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Failed to prepare file"}]);
+                SCIInvokeDownloadCompletion(self, nil, SCIDownloadErrorWithDescription(@"Failed to prepare file", 1));
             });
             SCIReleaseActiveDownloadDelegate(self);
             return;
@@ -227,7 +308,7 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
                 if (self.showProgress) {
                     [self.progressView showError:@"Failed to finalize file"];
                 }
-                SCIInvokeDownloadCompletion(self, nil, [NSError errorWithDomain:@"SCInsta.Download" code:2 userInfo:@{NSLocalizedDescriptionKey: @"Failed to finalize file"}]);
+                SCIInvokeDownloadCompletion(self, nil, SCIDownloadErrorWithDescription(@"Failed to finalize file", 2));
             });
             SCIReleaseActiveDownloadDelegate(self);
             return;
@@ -247,6 +328,8 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
         }
 
         if (self.action == share) {
+            [self.progressView updateProgressTitle:@"Preparing share" subtitle:nil];
+            [self.progressView setProgress:0.98f animated:YES];
             [self showCompletionPillWithSubtitle:@"Shared successfully" completionImmediately:YES completion:^{
                 [SCIUtils showShareVC:newURL];
                 SCIInvokeDownloadCompletion(self, newURL, nil);
@@ -256,6 +339,8 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
         }
 
         if (self.action == saveToPhotos) {
+            [self.progressView updateProgressTitle:@"Saving to Photos" subtitle:nil];
+            [self.progressView setProgress:0.98f animated:YES];
             [[self class] saveFileURLToPhotos:newURL completion:^(BOOL success, NSError *error) {
                 if (success) {
                     [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:^{
@@ -271,7 +356,7 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
                     if (self.progressView) {
                         [self.progressView showError:@"Failed to save"];
                     }
-                    SCIInvokeDownloadCompletion(self, nil, error ?: [NSError errorWithDomain:@"SCInsta.Download" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Failed to save"}]);
+                    SCIInvokeDownloadCompletion(self, nil, error ?: SCIDownloadErrorWithDescription(@"Failed to save", 3));
                     SCIReleaseActiveDownloadDelegate(self);
                 }
             }];
@@ -279,6 +364,8 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
         }
 
         if (self.action == saveToGallery) {
+            [self.progressView updateProgressTitle:@"Saving to Gallery" subtitle:nil];
+            [self.progressView setProgress:0.98f animated:YES];
             NSError *error;
             SCIGalleryFile *file = [[self class] saveFileURLToGallery:newURL metadata:galleryMeta error:&error];
             if (file) {
@@ -295,7 +382,7 @@ static void SCIInvokeDownloadCompletion(SCIDownloadDelegate *delegate, NSURL *fi
                 if (self.progressView) {
                     [self.progressView showError:@"Failed to save to Gallery"];
                 }
-                SCIInvokeDownloadCompletion(self, nil, error ?: [NSError errorWithDomain:@"SCInsta.Download" code:4 userInfo:@{NSLocalizedDescriptionKey: @"Failed to save to Gallery"}]);
+                SCIInvokeDownloadCompletion(self, nil, error ?: SCIDownloadErrorWithDescription(@"Failed to save to Gallery", 4));
                 SCIReleaseActiveDownloadDelegate(self);
             }
             return;

@@ -16,6 +16,7 @@ typedef NS_ENUM(NSInteger, SCIMediaItemType) {
 @property (nonatomic, strong, nullable) NSURL *resolvedFileURL;
 @property (nonatomic, strong, nullable) UIImage *image;
 @property (nonatomic, strong, nullable) UIImage *thumbnail;
+@property (nonatomic, strong, nullable) id sourceMediaObject;
 @property (nonatomic, copy, nullable) NSString *title;
 /// When >= 0, `SCIGallerySaveMetadata.source` uses this value (`SCIGallerySource`). Default -1 = not set.
 @property (nonatomic, assign) NSInteger gallerySaveSource;

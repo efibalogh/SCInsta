@@ -1030,6 +1030,35 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     }
 }
 
+- (void)updateProgressTitle:(NSString *)title subtitle:(NSString *)subtitle {
+    if (self.mode != SCIFeedbackPillModeProgress) {
+        [self configureForProgressMode];
+    }
+
+    self.isCompleted = NO;
+    self.isErrorState = NO;
+    self.titleLabel.text = title.length > 0 ? title : @"Downloading...";
+    self.subtitleLabel.text = subtitle;
+    self.subtitleLabel.hidden = (subtitle.length == 0);
+
+    if (self.style == SCIFeedbackPillStyleDynamic) {
+        self.heightConstraint.constant = self.subtitleLabel.hidden ? kDynamicPillHeight : kDynamicTallHeight;
+        [self sci_updateDynamicWidthForTitle:self.titleLabel.text subtitle:subtitle hasButton:YES];
+    } else {
+        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
+    }
+
+    [self setProgressVisible:YES];
+    [self setCloseButtonVisible:YES];
+    [self sci_applyProgressModeInfoIcon];
+    [self applyTone:SCIPillVisualToneInfo animated:YES];
+    [self applyCancelButtonStyle];
+
+    [UIView animateWithDuration:0.2 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+        [self layoutIfNeeded];
+    } completion:nil];
+}
+
 - (void)showSuccess {
     [self showSuccessWithTitle:@"Download complete" subtitle:nil icon:nil];
 }
