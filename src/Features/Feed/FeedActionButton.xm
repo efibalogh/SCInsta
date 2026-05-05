@@ -319,6 +319,15 @@ static SCIGallerySaveMetadata *SCIFeedMetadataForMedia(id media) {
 	return metadata;
 }
 
+static SCIGallerySaveMetadata *SCIFeedMetadataForMediaWithUsernameFallback(id media, NSString *username) {
+	SCIGallerySaveMetadata *metadata = SCIFeedMetadataForMedia(media);
+	if (metadata.sourceUsername.length == 0 && username.length > 0) {
+		metadata.sourceUsername = username;
+		[SCIGalleryOriginController populateProfileMetadata:metadata username:username user:nil];
+	}
+	return metadata;
+}
+
 static id SCIFeedPostObjectFromFeedCell(UIView *feedCell) {
 	if (!feedCell) return nil;
 	id post = SCIObjectForSelector(feedCell, @"post");
@@ -496,7 +505,7 @@ static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecogni
 	if (!media) return;
 
 	NSString *username = SCIUsernameFromMediaObject(media);
-	SCIGallerySaveMetadata *metadata = SCIFeedMetadataForMedia(media);
+	SCIGallerySaveMetadata *metadata = SCIFeedMetadataForMediaWithUsernameFallback(media, username);
 
 	if (SCIFeedIsCarouselMedia(media)) {
 		NSArray *children = SCIFeedCarouselChildren(media);
@@ -509,7 +518,8 @@ static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecogni
 			SCIMediaItem *item = [SCIMediaItem itemWithFileURL:(videoURL ?: photoURL)];
 			item.mediaType = videoURL ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
 			item.gallerySaveSource = SCIGallerySourceFeed;
-			item.galleryMetadata = SCIFeedMetadataForMedia(child);
+			item.galleryMetadata = SCIFeedMetadataForMediaWithUsernameFallback(child, username);
+			item.sourceMediaObject = child;
 			if (username.length > 0) item.title = username;
 			[items addObject:item];
 		}
@@ -538,6 +548,7 @@ static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecogni
 	item.mediaType = videoURL ? SCIMediaItemTypeVideo : SCIMediaItemTypeImage;
 	item.gallerySaveSource = SCIGallerySourceFeed;
 	item.galleryMetadata = metadata;
+	item.sourceMediaObject = media;
 	if (username.length > 0) item.title = username;
 
 	[SCIUtils showToastForActionIdentifier:kSCIActionExpand duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];

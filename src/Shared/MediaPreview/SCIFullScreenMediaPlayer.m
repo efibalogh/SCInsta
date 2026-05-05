@@ -14,6 +14,7 @@
 #import "../Gallery/SCIGalleryOriginController.h"
 #import "../Gallery/SCIGallerySaveMetadata.h"
 #import "../Gallery/SCIGalleryCoreDataStack.h"
+#import "../Gallery/SCIGalleryViewController.h"
 #import "../ActionButton/ActionButtonCore.h"
 #import "../../AssetUtils.h"
 #import "../../Downloader/Download.h"
@@ -925,6 +926,76 @@ fromViewController:(UIViewController *)presenter {
     return bestURL ?: item.fileURL;
 }
 
+- (NSURL *)currentOperationURL {
+    SCIMediaItem *item = [self currentItem];
+    if (item.fileURL && !item.fileURL.isFileURL) {
+        return item.fileURL;
+    }
+    return [self currentFileURL];
+}
+
+- (SCIGallerySaveMetadata *)metadataForCurrentItem {
+    SCIMediaItem *item = [self currentItem];
+    if (item.galleryMetadata) {
+        return item.galleryMetadata;
+    }
+
+    if (item.title.length == 0 && item.gallerySaveSource < 0) {
+        return nil;
+    }
+
+    SCIGallerySaveMetadata *meta = [[SCIGallerySaveMetadata alloc] init];
+    meta.source = item.gallerySaveSource >= 0 ? (int16_t)item.gallerySaveSource : (int16_t)SCIGallerySourceOther;
+    if (item.title.length > 0) {
+        meta.sourceUsername = item.title;
+    }
+    return meta;
+}
+
+- (void)showCompletedPillForActionIdentifier:(NSString *)identifier
+                                       title:(NSString *)title
+                                    subtitle:(NSString *)subtitle
+                               completedTap:(void(^)(void))completedTap {
+    if (![SCIUtils shouldShowFeedbackPillForActionIdentifier:identifier]) {
+        [SCIUtils showToastForActionIdentifier:identifier
+                                      duration:2.0
+                                         title:title
+                                      subtitle:nil
+                                  iconResource:@"circle_check_filled"
+                                          tone:SCIFeedbackPillToneSuccess];
+        return;
+    }
+
+    SCIFeedbackPillView *pill = [SCIUtils showProgressPill];
+    [pill setProgress:1.0f animated:NO];
+    [pill showSuccessWithTitle:title subtitle:subtitle icon:nil];
+    pill.onTapWhenCompleted = completedTap;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [pill dismiss];
+    });
+}
+
+- (void)saveLocalFileURLToPhotos:(NSURL *)fileURL temporaryFile:(BOOL)temporaryFile {
+    if (!fileURL) return;
+
+    [SCIDownloadDelegate saveFileURLToPhotos:fileURL completion:^(BOOL success, NSError *error) {
+        if (temporaryFile) {
+            [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+        }
+
+        if (success) {
+            [self showCompletedPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos
+                                                 title:@"Saved to Photos"
+                                              subtitle:@"Saved to Photos successfully"
+                                         completedTap:^{
+                [SCIUtils openPhotosApp];
+            }];
+        } else {
+            [self showSaveResult:NO error:error];
+        }
+    }];
+}
+
 #pragma mark - Playback Suppression
 
 - (BOOL)shouldUseLifecycleSuppressingPresentation {
@@ -1115,31 +1186,25 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    NSURL *url = [self currentFileURL];
+    NSURL *url = [self currentOperationURL];
     SCIMediaItem *item = [self currentItem];
     if (!url && !item.image) return;
 
-    if (url.isFileURL || (!url && item.image)) {
-        if (item.mediaType == SCIMediaItemTypeImage || item.image) {
-            NSData *imageData = url ? [NSData dataWithContentsOfURL:url] : nil;
-            UIImage *image = item.image ?: [UIImage imageWithData:imageData];
-            if (image) {
-                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-                    [PHAssetChangeRequest creationRequestForAssetFromImage:image];
-                } completionHandler:^(BOOL success, NSError *error) {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        [self showSaveResult:success error:error];
-                    });
-                }];
+    if (url.isFileURL) {
+        [self saveLocalFileURLToPhotos:url temporaryFile:NO];
+        return;
+    }
+
+    if (!url && item.image) {
+        NSData *jpegData = UIImageJPEGRepresentation(item.image, 0.95);
+        if (jpegData) {
+            SCIGallerySaveMetadata *meta = [self metadataForCurrentItem];
+            NSString *fileName = SCIFileNameForMedia([NSURL fileURLWithPath:@"preview.jpg"], SCIGalleryMediaTypeImage, meta);
+            NSURL *tempURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+            if ([jpegData writeToURL:tempURL atomically:YES]) {
+                [self saveLocalFileURLToPhotos:tempURL temporaryFile:YES];
+                return;
             }
-        } else {
-            [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-                [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:url];
-            } completionHandler:^(BOOL success, NSError *error) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self showSaveResult:success error:error];
-                });
-            }];
         }
         return;
     }
@@ -1148,7 +1213,7 @@ fromViewController:(UIViewController *)presenter {
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos]];
-    delegate.pendingGallerySaveMetadata = item.galleryMetadata;
+    delegate.pendingGallerySaveMetadata = [self metadataForCurrentItem];
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
@@ -1170,7 +1235,7 @@ fromViewController:(UIViewController *)presenter {
 
 - (BOOL)handleRemoteOperationWithAction:(DownloadAction)action feedbackIdentifier:(NSString *)feedbackIdentifier {
     SCIMediaItem *item = [self currentItem];
-    NSURL *url = [self currentFileURL];
+    NSURL *url = [self currentOperationURL];
     if (!item.sourceMediaObject || !item.fileURL || item.fileURL.isFileURL) {
         return NO;
     }
@@ -1186,7 +1251,7 @@ fromViewController:(UIViewController *)presenter {
                                              mediaObject:item.sourceMediaObject
                                                photoURL:photoURL
                                                videoURL:videoURL
-                                        galleryMetadata:item.galleryMetadata
+                                        galleryMetadata:[self metadataForCurrentItem]
                                            showProgress:showProgress];
 }
 
@@ -1212,7 +1277,7 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    NSURL *targetURL = [self currentFileURL];
+    NSURL *targetURL = [self currentOperationURL];
     SCIMediaItem *item = [self currentItem];
 
     if (!targetURL && !item.image) {
@@ -1244,18 +1309,7 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = targetURL.pathExtension;
     if (ext.length == 0) ext = galleryType == SCIGalleryMediaTypeVideo ? @"mp4" : @"jpg";
 
-    SCIGallerySaveMetadata *meta = item.galleryMetadata;
-    if (!meta && (item.title.length > 0 || item.gallerySaveSource >= 0)) {
-        meta = [[SCIGallerySaveMetadata alloc] init];
-        if (item.title.length) {
-            meta.sourceUsername = item.title;
-        }
-        if (item.gallerySaveSource >= 0) {
-            meta.source = (int16_t)item.gallerySaveSource;
-        } else {
-            meta.source = (int16_t)SCIGallerySourceOther;
-        }
-    }
+    SCIGallerySaveMetadata *meta = [self metadataForCurrentItem];
     
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery]];
     delegate.pendingGallerySaveMetadata = meta;
@@ -1264,19 +1318,7 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)gallerySaveLocalFile:(NSURL *)localURL mediaType:(SCIGalleryMediaType)galleryType {
     NSError *error;
-    SCIMediaItem *item = [self currentItem];
-    SCIGallerySaveMetadata *meta = item.galleryMetadata;
-    if (!meta && (item.title.length > 0 || item.gallerySaveSource >= 0)) {
-        meta = [[SCIGallerySaveMetadata alloc] init];
-        if (item.title.length) {
-            meta.sourceUsername = item.title;
-        }
-        if (item.gallerySaveSource >= 0) {
-            meta.source = (int16_t)item.gallerySaveSource;
-        } else {
-            meta.source = (int16_t)SCIGallerySourceOther;
-        }
-    }
+    SCIGallerySaveMetadata *meta = [self metadataForCurrentItem];
     SCIGalleryFile *file = [SCIGalleryFile saveFileToGallery:localURL
                                                 source:SCIGallerySourceOther
                                              mediaType:galleryType
@@ -1285,11 +1327,12 @@ fromViewController:(UIViewController *)presenter {
                                                  error:&error];
 
     if (file) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:2.0
-                                 title:@"Saved to Gallery"
-                              subtitle:nil
-                          iconResource:@"circle_check_filled"
-                                  tone:SCIFeedbackPillToneSuccess];
+        [self showCompletedPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery
+                                             title:@"Saved to Gallery"
+                                          subtitle:@"Saved to Gallery successfully"
+                                     completedTap:^{
+            [SCIGalleryViewController presentGallery];
+        }];
     } else {
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:3.0
@@ -1305,7 +1348,7 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    NSURL *url = [self currentFileURL];
+    NSURL *url = [self currentOperationURL];
     SCIMediaItem *item = [self currentItem];
     if (!url && !item.image) return;
 
@@ -1329,7 +1372,7 @@ fromViewController:(UIViewController *)presenter {
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewShare]];
-    delegate.pendingGallerySaveMetadata = item.galleryMetadata;
+    delegate.pendingGallerySaveMetadata = [self metadataForCurrentItem];
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
