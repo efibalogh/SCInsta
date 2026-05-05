@@ -3,6 +3,7 @@
 
 #import "SCIActionSectionEditViewController.h"
 #import "SCIBulkActionMenuEditViewController.h"
+#import "../Shared/UI/SCISwitch.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../AssetUtils.h"
 #import "../Utils.h"
@@ -191,9 +192,8 @@ static char kSCIActionsListSwitchAssocKey;
         config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
-        UISwitch *toggle = [[UISwitch alloc] init];
+        SCISwitch *toggle = [[SCISwitch alloc] init];
         toggle.on = ![self.configuration.disabledActions containsObject:identifier];
-        toggle.onTintColor = [SCIUtils SCIColor_Primary];
         objc_setAssociatedObject(toggle, &kSCIActionsListSwitchAssocKey, identifier, OBJC_ASSOCIATION_COPY_NONATOMIC);
         [toggle addTarget:self action:@selector(disabledSwitchChanged:) forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = toggle;

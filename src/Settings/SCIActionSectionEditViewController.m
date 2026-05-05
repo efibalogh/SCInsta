@@ -1,5 +1,6 @@
 #import "SCIActionSectionEditViewController.h"
 #import "SCIActionSectionIconPickerViewController.h"
+#import "../Shared/UI/SCISwitch.h"
 
 #import "../AssetUtils.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
@@ -135,9 +136,8 @@ static char kSCISectionEditSwitchAssocKey;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         } else {
             config.text = @"Collapsible";
-            UISwitch *toggle = [[UISwitch alloc] init];
+            SCISwitch *toggle = [[SCISwitch alloc] init];
             toggle.on = section.collapsible;
-            toggle.onTintColor = [SCIUtils SCIColor_Primary];
             objc_setAssociatedObject(toggle, &kSCISectionEditSwitchAssocKey, self, OBJC_ASSOCIATION_ASSIGN);
             [toggle addTarget:self action:@selector(collapsibleSwitchChanged:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = toggle;

@@ -43,6 +43,23 @@ static NSURL *SCINormalizedInstagramClipboardURL(NSString *raw) {
     return nil;
 }
 
+static BOOL SCICanAttemptOpenInstagramClipboardURL(NSURL *url) {
+    if (!url) return NO;
+
+    NSString *scheme = url.scheme.lowercaseString ?: @"";
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+        return url.host.length > 0;
+    }
+
+    if ([scheme isEqualToString:@"instagram"]) {
+        UIApplication *application = [UIApplication sharedApplication];
+        id<UIApplicationDelegate> delegate = application.delegate;
+        return [application canOpenURL:url] || [delegate respondsToSelector:@selector(application:openURL:options:)];
+    }
+
+    return NO;
+}
+
 @interface SCIClipboardExploreLinkHandler : NSObject <UIGestureRecognizerDelegate>
 + (instancetype)sharedHandler;
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture;
@@ -61,14 +78,17 @@ static NSURL *SCINormalizedInstagramClipboardURL(NSString *raw) {
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
     (void)gestureRecognizer;
-    return [SCIUtils getBoolPref:@"search_bar_open_clipboard_link"];
+    if (![SCIUtils getBoolPref:@"search_bar_open_clipboard_link"]) return NO;
+
+    NSURL *url = SCINormalizedInstagramClipboardURL(UIPasteboard.generalPasteboard.string);
+    return SCICanAttemptOpenInstagramClipboardURL(url);
 }
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateBegan) return;
 
     NSURL *url = SCINormalizedInstagramClipboardURL(UIPasteboard.generalPasteboard.string);
-    if (!url) return;
+    if (!SCICanAttemptOpenInstagramClipboardURL(url)) return;
     if (![SCIUtils openInstagramMediaURL:url]) return;
 
     UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];

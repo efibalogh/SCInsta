@@ -72,6 +72,10 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 + (UIColor *)SCIColor_InstagramFavorite;
 + (UIColor *)SCIColor_InstagramDestructive;
 + (UIColor *)SCIColor_InstagramPressedBackground;
++ (UIColor *)SCIColor_SettingsSwitchOnTint;
++ (UIColor *)SCIColor_SettingsSwitchThumbTint;
++ (UIColor *)SCIColor_SettingsSwitchOnTintForTraitCollection:(UITraitCollection *)traitCollection;
++ (UIColor *)SCIColor_SettingsSwitchThumbTintForTraitCollection:(UITraitCollection *)traitCollection;
 
 // Errors
 + (NSError *)errorWithDescription:(NSString *)errorDesc;

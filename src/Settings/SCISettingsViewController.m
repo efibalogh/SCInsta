@@ -1,5 +1,6 @@
 #import "SCISettingsViewController.h"
 #import "../App/SCIStartupHooks.h"
+#import "../Shared/UI/SCISwitch.h"
 
 static char rowStaticRef[] = "row";
 static NSInteger const kSCIUINavigationItemSearchBarPlacementIntegratedButton = 4;
@@ -286,12 +287,11 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
         }
             
         case SCITableCellSwitch: {
-            UISwitch *toggle = [UISwitch new];
+            SCISwitch *toggle = [SCISwitch new];
             NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
             id storedValue = [defaults objectForKey:row.defaultsKey];
             NSNumber *defaultValue = row.userInfo[@"defaultValue"];
             toggle.on = storedValue ? [defaults boolForKey:row.defaultsKey] : defaultValue.boolValue;
-            toggle.onTintColor = [SCIUtils SCIColor_Primary];
             if (row.mutuallyExclusiveDefaultsKey.length) {
                 BOOL otherOn = [defaults boolForKey:row.mutuallyExclusiveDefaultsKey];
                 toggle.enabled = toggle.isOn || !otherOn;

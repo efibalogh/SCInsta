@@ -1,4 +1,6 @@
 #import "../../Utils.h"
+#import <objc/message.h>
+#import <objc/runtime.h>
 
 ///////////////////////////////////////////////////////////
 
@@ -7,16 +9,6 @@
 #define CONFIRMFEEDLIKE(orig)                             \
     if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {      \
         NSLog(@"[SCInsta] Confirm feed like triggered");  \
-                                                          \
-        [SCIUtils showConfirmation:^(void) { orig; }];    \
-    }                                                     \
-    else {                                                \
-        return orig;                                      \
-    }                                                     \
-
-#define CONFIRMSTORYLIKE(orig)                            \
-    if ([SCIUtils getBoolPref:@"like_confirm_stories"]) {   \
-        NSLog(@"[SCInsta] Confirm story like triggered"); \
                                                           \
         [SCIUtils showConfirmation:^(void) { orig; }];    \
     }                                                     \
@@ -37,6 +29,8 @@
 ///////////////////////////////////////////////////////////
 
 // Liking posts
+%group SCILikeConfirmHooks
+
 %hook IGUFIButtonBarView
 - (void)_onLikeButtonPressed:(id)arg1 {
     CONFIRMFEEDLIKE(%orig);
@@ -106,51 +100,63 @@
 }
 %end
 
-// Liking stories
-%hook IGStoryFullscreenDefaultFooterView
-- (void)_handleLikeTapped {
-    CONFIRMSTORYLIKE(%orig);
-}
-- (void)_likeTapped {
-    CONFIRMSTORYLIKE(%orig);
-}
-- (void)inputView:(id)arg1 didTapLikeButton:(id)arg2 {
-    CONFIRMSTORYLIKE(%orig);
-}
+// Liking stories (newer Instagram builds)
+static void (*orig_sciStoryLikeTap)(id, SEL, id);
+static void new_sciStoryLikeTap(id self, SEL _cmd, id button) {
+    if (![SCIUtils getBoolPref:@"like_confirm_stories"]) {
+        orig_sciStoryLikeTap(self, _cmd, button);
+        return;
+    }
 
-// For some stupid reason they removed the "liketapped" methods on newer Instagram versions
-// Now we have to do a shitty workaround instead :(
-// Works 99% of the time, but sometimes clicks get through directly to the like button (somehow)
-- (void)layoutSubviews {
-    %orig;
+    BOOL isSelected = [button isKindOfClass:[UIButton class]] ? [(UIButton *)button isSelected] : NO;
+    if (!isSelected) {
+        orig_sciStoryLikeTap(self, _cmd, button);
+        return;
+    }
 
-    if (![SCIUtils getBoolPref:@"like_confirm_stories"]) return;
-
-    UIButton *likeButton = [self valueForKey:@"likeButton"];
-    if (!likeButton) return;
-
-    // 129115 = L(12) I(9) K(11) E(5)
-    static NSInteger kOverlayTag = 129115;
-    if ([likeButton viewWithTag:kOverlayTag]) return;
-
-    UIButton *overlay = [UIButton buttonWithType:UIButtonTypeCustom];
-    overlay.tag = kOverlayTag;
-    overlay.frame = likeButton.bounds;
-    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [overlay addTarget:self action:@selector(overlayTapped:) forControlEvents:UIControlEventTouchUpInside];
-    [likeButton addSubview:overlay];
-}
-
-%new - (void)overlayTapped:(UIButton *)overlay {
-    UIButton *likeButton = (UIButton *)overlay.superview;
+    UIButton *btn = [button isKindOfClass:[UIButton class]] ? (UIButton *)button : nil;
+    SEL setLikedSel = NSSelectorFromString(@"setIsLiked:animated:");
 
     [SCIUtils showConfirmation:^{
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [likeButton sendActionsForControlEvents:UIControlEventTouchUpInside];
-        });
+        if (btn) {
+            [btn setSelected:YES];
+            if ([btn respondsToSelector:setLikedSel]) {
+                ((void (*)(id, SEL, BOOL, BOOL))objc_msgSend)(btn, setLikedSel, YES, YES);
+            }
+        }
+        orig_sciStoryLikeTap(self, _cmd, button);
     }];
+
+    if (btn) {
+        [UIView performWithoutAnimation:^{
+            [btn setSelected:NO];
+            if ([btn respondsToSelector:setLikedSel]) {
+                ((void (*)(id, SEL, BOOL, BOOL))objc_msgSend)(btn, setLikedSel, NO, NO);
+            }
+        }];
+    }
 }
-%end
+
+static void SCIInstallStoryLikeConfirmHookIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"like_confirm_stories"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = NSClassFromString(@"_TtC22IGStoryLikesController38IGStoryLikesInteractionControllingImpl");
+        if (!cls) cls = NSClassFromString(@"IGStoryLikesInteractionControllingImpl");
+        if (!cls) return;
+
+        SEL sel = NSSelectorFromString(@"handleStoryLikeTapWith:");
+        if (!class_getInstanceMethod(cls, sel)) {
+            sel = NSSelectorFromString(@"handleStoryLikeTapWithButton:");
+        }
+        if (!class_getInstanceMethod(cls, sel)) return;
+
+        MSHookMessageEx(cls, sel, (IMP)new_sciStoryLikeTap, (IMP *)&orig_sciStoryLikeTap);
+    });
+}
 
 // DM like button (seems to be hidden)
 %hook IGDirectThreadViewController
@@ -158,3 +164,20 @@
     CONFIRMFEEDLIKE(%orig);
 }
 %end
+
+%end
+
+void SCIInstallLikeConfirmHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"like_confirm_feed"] &&
+        ![SCIUtils getBoolPref:@"like_confirm_reels"] &&
+        ![SCIUtils getBoolPref:@"like_confirm_stories"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCILikeConfirmHooks);
+    });
+
+    SCIInstallStoryLikeConfirmHookIfNeeded();
+}

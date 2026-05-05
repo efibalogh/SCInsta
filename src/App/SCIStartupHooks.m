@@ -17,6 +17,7 @@ FOUNDATION_EXPORT void SCIInstallSharedLinkCleanupHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallHideMetaAIHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallFeedFilteringHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallNoSuggestedUsersHooksIfEnabled(void);
+FOUNDATION_EXPORT void SCIInstallLikeConfirmHooksIfNeeded(void);
 
 void SCIInstallEnabledFeatureHooks(void) {
     SCIInstallLiquidGlassHooksIfEnabled();
@@ -34,4 +35,5 @@ void SCIInstallEnabledFeatureHooks(void) {
     SCIInstallHideMetaAIHooksIfEnabled();
     SCIInstallFeedFilteringHooksIfEnabled();
     SCIInstallNoSuggestedUsersHooksIfEnabled();
+    SCIInstallLikeConfirmHooksIfNeeded();
 }

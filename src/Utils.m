@@ -898,6 +898,28 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     return SCIDynamicInstagramColor(232.0, 233.0, 238.0, 51.0, 60.0, 69.0);
 }
 
++ (UIColor *)SCIColor_SettingsSwitchOnTint {
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        return traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark ? UIColor.whiteColor : UIColor.blackColor;
+    }];
+}
+
++ (UIColor *)SCIColor_SettingsSwitchThumbTint {
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        return traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark ? UIColor.blackColor : UIColor.whiteColor;
+    }];
+}
+
++ (UIColor *)SCIColor_SettingsSwitchOnTintForTraitCollection:(UITraitCollection *)traitCollection {
+    BOOL isDark = traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    return isDark ? UIColor.whiteColor : UIColor.blackColor;
+}
+
++ (UIColor *)SCIColor_SettingsSwitchThumbTintForTraitCollection:(UITraitCollection *)traitCollection {
+    BOOL isDark = traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    return isDark ? UIColor.blackColor : UIColor.whiteColor;
+}
+
 // MARK: Errors
 + (NSError *)errorWithDescription:(NSString *)errorDesc {
     return [self errorWithDescription:errorDesc code:1];

@@ -4,6 +4,7 @@
 #import "SCIGalleryLockViewController.h"
 #import "SCIGalleryFile.h"
 #import "SCIGalleryCoreDataStack.h"
+#import "../UI/SCISwitch.h"
 #import "../../Utils.h"
 
 static NSString * const kFavoritesAtTopKey = @"show_favorites_at_top";
@@ -164,7 +165,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     cell.textLabel.text = @"Show Favorites at Top";
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-    UISwitch *sw = [[UISwitch alloc] init];
+    SCISwitch *sw = [[SCISwitch alloc] init];
     sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:kFavoritesAtTopKey];
     [sw addTarget:self action:@selector(favoritesAtTopSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     cell.accessoryView = sw;
@@ -175,7 +176,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     if (row == 0) {
         cell.textLabel.text = @"Enable Passcode Lock";
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        UISwitch *sw = [[UISwitch alloc] init];
+        SCISwitch *sw = [[SCISwitch alloc] init];
         sw.on = mgr.isLockEnabled;
         [sw addTarget:self action:@selector(lockSwitchChanged:) forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = sw;
@@ -190,7 +191,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     cell.textLabel.text = @"Quick Gallery Access";
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-    UISwitch *sw = [[UISwitch alloc] init];
+    SCISwitch *sw = [[SCISwitch alloc] init];
     sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:@"header_long_press_gallery"];
     [sw addTarget:self action:@selector(quickAccessSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     cell.accessoryView = sw;

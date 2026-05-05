@@ -7,6 +7,7 @@
 #import "../../Utils.h"
 #import "../Gallery/SCIGallerySaveMetadata.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
+#import "../UI/SCISwitch.h"
 
 #import <AVFoundation/AVFoundation.h>
 #import <AVKit/AVKit.h>
@@ -1278,8 +1279,7 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
         cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
         cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
         cell.detailTextLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
-        UISwitch *toggle = [[UISwitch alloc] init];
-        toggle.onTintColor = [SCIUtils SCIColor_Primary];
+        SCISwitch *toggle = [[SCISwitch alloc] init];
         toggle.on = [row isEqualToString:@"advanced"] ? [SCIUtils getBoolPref:@"media_advanced_encoding_enabled"] : [SCIUtils getBoolPref:@"media_encoding_faststart"];
         [toggle addTarget:self action:@selector(toggleChanged:) forControlEvents:UIControlEventValueChanged];
         toggle.tag = [row isEqualToString:@"advanced"] ? 1 : 2;
