@@ -1160,14 +1160,14 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     [SCIUtils showToastForDuration:duration
                              title:title
                           subtitle:nil
-                      iconResource:@"info"
+                      iconResource:@"info_filled"
                               tone:SCIFeedbackPillToneInfo];
 }
 + (void)showToastForDuration:(double)duration title:(NSString *)title subtitle:(NSString *)subtitle {
     [SCIUtils showToastForDuration:duration
                              title:title
                           subtitle:subtitle
-                      iconResource:@"info"
+                      iconResource:@"info_filled"
                               tone:SCIFeedbackPillToneInfo];
 }
 

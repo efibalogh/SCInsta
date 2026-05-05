@@ -1597,14 +1597,14 @@ static void SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL) {
         NSData *data = [NSData dataWithContentsOfURL:fileURL];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.audio"];
-            [SCIUtils showToastForDuration:1.5 title:@"Copied audio to clipboard" subtitle:nil iconResource:@"copy_filled" tone:SCIFeedbackPillToneSuccess];
+            [SCIUtils showToastForDuration:1.5 title:@"Copied audio to clipboard" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
             return;
         }
     } else if ([[SCIDownloadDelegate class] isVideoFileAtURL:fileURL]) {
         NSData *data = [NSData dataWithContentsOfURL:fileURL];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
-            [SCIUtils showToastForDuration:1.5 title:@"Copied video to clipboard" subtitle:nil iconResource:@"copy_filled" tone:SCIFeedbackPillToneSuccess];
+            [SCIUtils showToastForDuration:1.5 title:@"Copied video to clipboard" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
             return;
         }
     } else {
@@ -1612,7 +1612,7 @@ static void SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL) {
         UIImage *image = imageData ? [UIImage imageWithData:imageData] : nil;
         if (image) {
             [[UIPasteboard generalPasteboard] setImage:image];
-            [SCIUtils showToastForDuration:1.5 title:@"Copied photo to clipboard" subtitle:nil iconResource:@"copy_filled" tone:SCIFeedbackPillToneSuccess];
+            [SCIUtils showToastForDuration:1.5 title:@"Copied photo to clipboard" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
             return;
         }
     }

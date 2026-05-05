@@ -191,7 +191,7 @@ static void SCIProfileCopyValue(NSString *value, NSString *successTitle) {
         return;
     }
     UIPasteboard.generalPasteboard.string = value;
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:1.6 title:successTitle subtitle:nil iconResource:@"copy_filled"];
+    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:1.6 title:successTitle subtitle:nil iconResource:@"circle_check_filled"];
 }
 
 static void SCIProfileExecuteCopyInfoAction(id user, NSString *identifier) {

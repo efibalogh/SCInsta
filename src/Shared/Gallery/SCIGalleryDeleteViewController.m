@@ -261,7 +261,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryDeleteSection) {
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:2.0
                                  title:@"No files to delete"
                               subtitle:nil
-                          iconResource:@"info"
+                          iconResource:@"info_filled"
                                   tone:SCIFeedbackPillToneInfo];
         return;
     }

@@ -961,7 +961,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
         return;
     }
     [UIPasteboard generalPasteboard].string = _textView.text;
-    [SCIUtils showToastForDuration:1.5 title:@"Log copied" subtitle:nil iconResource:@"copy_filled" tone:SCIFeedbackPillToneSuccess];
+    [SCIUtils showToastForDuration:1.5 title:@"Log copied" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
 }
 
 - (void)shareTapped {
@@ -1015,7 +1015,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
 - (void)shareAllTapped {
     NSString *exportPath = SCIFFmpegExportLogsFile();
     if (exportPath.length == 0) {
-        [SCIUtils showToastForDuration:1.5 title:@"No encoding logs" subtitle:@"FFmpeg runs will appear here after merge attempts." iconResource:@"info"];
+        [SCIUtils showToastForDuration:1.5 title:@"No encoding logs" subtitle:@"FFmpeg runs will appear here after merge attempts." iconResource:@"info_filled"];
         return;
     }
     [SCIUtils showShareVC:[NSURL fileURLWithPath:exportPath]];
@@ -1104,7 +1104,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
         files = SCIFFmpegSortedLogFiles();
     }
     if (files.count == 0) {
-        [SCIUtils showToastForDuration:1.8 title:@"No encoding logs" subtitle:@"FFmpeg runs will appear here after merge attempts." iconResource:@"info"];
+        [SCIUtils showToastForDuration:1.8 title:@"No encoding logs" subtitle:@"FFmpeg runs will appear here after merge attempts." iconResource:@"info_filled"];
         return;
     }
 

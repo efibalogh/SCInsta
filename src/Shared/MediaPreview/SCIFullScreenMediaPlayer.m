@@ -1049,7 +1049,7 @@ fromViewController:(UIViewController *)presenter {
                                   duration:1.5
                                      title:@"Download links copied"
                                   subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)links.count, links.count == 1 ? @"" : @"s"]
-                              iconResource:@"copy_filled"
+                              iconResource:@"circle_check_filled"
                                       tone:SCIFeedbackPillToneSuccess];
 }
 
@@ -1350,7 +1350,7 @@ fromViewController:(UIViewController *)presenter {
             [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5
                                      title:@"Copied photo to clipboard"
                                   subtitle:nil
-                              iconResource:@"copy_filled"
+                              iconResource:@"circle_check_filled"
                                       tone:SCIFeedbackPillToneSuccess];
         }
     } else {
@@ -1360,7 +1360,7 @@ fromViewController:(UIViewController *)presenter {
             [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5
                                      title:@"Copied video to clipboard"
                                   subtitle:nil
-                              iconResource:@"copy_filled"
+                              iconResource:@"circle_check_filled"
                                       tone:SCIFeedbackPillToneSuccess];
         }
     }

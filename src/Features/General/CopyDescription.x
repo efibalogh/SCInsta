@@ -41,7 +41,7 @@
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionCopyDescription duration:2.0
                              title:@"Copied text to clipboard"
                           subtitle:nil
-                      iconResource:@"copy_filled"
+                      iconResource:@"circle_check_filled"
                               tone:SCIFeedbackPillToneSuccess];
 }
 %end
