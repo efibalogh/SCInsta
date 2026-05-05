@@ -3,6 +3,8 @@
 #define QUICKSNAPENABLED(orig) return [SCIUtils getBoolPref:@"disable_instants_creation"] ? false : orig;
 
 // Demangled name: IGQuickSnapExperimentation.IGQuickSnapExperimentationHelper
+%group SCIDisableInstantsCreationHooks
+
 %hook _TtC26IGQuickSnapExperimentation32IGQuickSnapExperimentationHelper
 + (_Bool)isQuicksnapEnabled:(id)enabled {
     QUICKSNAPENABLED(%orig);
@@ -50,6 +52,17 @@
 //     return true;
 // }
 // %end
+
+%end
+
+void SCIInstallDisableInstantsCreationHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"disable_instants_creation"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDisableInstantsCreationHooks);
+    });
+}
 
 // %hook IGDirectNotesTrayRowSectionController
 // - (_Bool)isQuicksnapPeekVisible {

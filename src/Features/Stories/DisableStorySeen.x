@@ -6,6 +6,8 @@ static inline BOOL SCIShouldBlockStoryAutoAdvance(void) {
     return [SCIUtils getBoolPref:@"stop_story_auto_advance"] && !SCIForceStoryAutoAdvance;
 }
 
+%group SCIDisableStorySeenHooks
+
 %hook IGStoryViewerViewController
 - (void)fullscreenSectionController:(id)arg1 didMarkItemAsSeen:(id)arg2 {
     (void)arg1;
@@ -36,3 +38,17 @@ static inline BOOL SCIShouldBlockStoryAutoAdvance(void) {
     %orig;
 }
 %end
+
+%end
+
+void SCIInstallDisableStorySeenHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"no_seen_receipt"] &&
+        ![SCIUtils getBoolPref:@"stop_story_auto_advance"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDisableStorySeenHooks);
+    });
+}

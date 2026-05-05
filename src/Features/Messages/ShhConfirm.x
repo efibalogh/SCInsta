@@ -8,6 +8,8 @@ static inline BOOL SCIHideVanishScreenshotEnabled(void) {
     return [SCIUtils getBoolPref:@"hide_vanish_screenshot"];
 }
 
+%group SCIShhConfirmHooks
+
 %hook IGDirectBottomSwipeableScrollManager
 - (id)initWithKeyboardVisibleSwipeThreshold:(double)arg1
                 keyboardHiddenSwipeThreshold:(double)arg2
@@ -109,3 +111,18 @@ static inline BOOL SCIHideVanishScreenshotEnabled(void) {
     %orig;
 }
 %end
+
+%end
+
+void SCIInstallShhConfirmHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"disable_disappearing_swipe_up"] &&
+        ![SCIUtils getBoolPref:@"hide_vanish_screenshot"] &&
+        ![SCIUtils getBoolPref:@"shh_mode_confirm"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIShhConfirmHooks);
+    });
+}

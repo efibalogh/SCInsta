@@ -2,6 +2,8 @@
 
 static char targetStaticRef[] = "target";
 
+%group SCINotesCustomizationHooks
+
 %hook IGDirectNotesCreationView
 - (id)initWithViewModel:(id)model
          featureSupport:(IGNotesCreationFeatureSupportModel *)support
@@ -291,3 +293,17 @@ static char targetStaticRef[] = "target";
     }];
 }
 %end
+
+%end
+
+void SCIInstallNotesCustomizationHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"enable_notes_customization"] &&
+        ![SCIUtils getBoolPref:@"custom_note_themes"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCINotesCustomizationHooks);
+    });
+}

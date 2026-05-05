@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCIReelsPlaybackHooks
+
 %hook IGSundialPlaybackControlsTestConfiguration
 - (id)initWithLauncherSet:(id)set
                      tapToPauseEnabled:(_Bool)tapPauseEnabled
@@ -70,3 +72,19 @@
     }
 }
 %end
+
+%end
+
+extern "C" void SCIInstallReelsPlaybackHooksIfNeeded(void) {
+    BOOL shouldInstall = ![[SCIUtils getStringPref:@"reels_tap_control"] isEqualToString:@"default"] ||
+                         [SCIUtils getBoolPref:@"reels_show_scrubber"] ||
+                         [SCIUtils getBoolPref:@"prevent_doom_scrolling"] ||
+                         [SCIUtils getBoolPref:@"refresh_reel_confirm"] ||
+                         [SCIUtils getBoolPref:@"disable_auto_unmuting_reels"];
+    if (!shouldInstall) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIReelsPlaybackHooks);
+    });
+}

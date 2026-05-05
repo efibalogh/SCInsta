@@ -97,6 +97,8 @@ static void SCIRenderFollowBadge(UIViewController *controller) {
     [container addSubview:badge];
 }
 
+%group SCIFollowIndicatorHooks
+
 %hook IGProfileViewController
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -144,3 +146,14 @@ static void SCIRenderFollowBadge(UIViewController *controller) {
 }
 
 %end
+
+%end
+
+void SCIInstallFollowIndicatorHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"follow_indicator"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIFollowIndicatorHooks);
+    });
+}

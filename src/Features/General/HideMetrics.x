@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCIHideMetricsHooks
+
 %hook IGSundialViewerVerticalUFI
 - (void)setNumLikes:(NSInteger)num {
     return %orig([SCIUtils getBoolPref:@"hide_metrics"] ? 0 : num);
@@ -23,3 +25,14 @@
     return %orig([SCIUtils getBoolPref:@"hide_metrics"] ? @"" : string, showButton);
 }
 %end
+
+%end
+
+void SCIInstallHideMetricsHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"hide_metrics"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIHideMetricsHooks);
+    });
+}

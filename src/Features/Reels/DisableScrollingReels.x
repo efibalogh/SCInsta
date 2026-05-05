@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+%group SCIDisableScrollingReelsHooks
+
 %hook IGUnifiedVideoCollectionView
 - (void)didMoveToWindow {
     %orig;
@@ -34,3 +36,14 @@
     }
 }
 %end
+
+%end
+
+void SCIInstallDisableScrollingReelsHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"disable_scrolling_reels"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDisableScrollingReelsHooks);
+    });
+}

@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCIHideFriendsMapHooks
+
 %hook IGDirectNotesTrayRowCell
 - (id)listAdapterObjects {
     NSArray *originalObjs = %orig();
@@ -31,3 +33,14 @@
     return [filteredObjs copy];
 }
 %end
+
+%end
+
+void SCIInstallHideFriendsMapHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"hide_friends_map"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIHideFriendsMapHooks);
+    });
+}

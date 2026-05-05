@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 
 // Legacy hook (for non ai voices interface)
+%group SCIDMAudioMsgConfirmHooks
+
 %hook IGDirectThreadViewController
 - (void)voiceRecordViewController:(id)arg1 didRecordAudioClipWithURL:(id)arg2 waveform:(id)arg3 duration:(CGFloat)arg4 entryPoint:(NSInteger)arg5 {
     if ([SCIUtils getBoolPref:@"voice_message_confirm"]) {
@@ -36,3 +38,14 @@
     }
 }
 %end
+
+%end
+
+void SCIInstallDMAudioMsgConfirmHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"voice_message_confirm"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDMAudioMsgConfirmHooks);
+    });
+}

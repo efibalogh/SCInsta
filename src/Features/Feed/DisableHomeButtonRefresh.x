@@ -20,6 +20,8 @@ static BOOL sciScrollViewToTopWithoutRefresh(UIScrollView *scrollView) {
     return NO;
 }
 
+%group SCIDisableHomeButtonRefreshHooks
+
 %hook IGMainFeedViewController
 - (void)refreshFeedWithFetchReason:(NSInteger)reason animated:(BOOL)animated {
     if (sciShouldBlockFeedRefresh() && reason == kSCIFeedRefreshReasonHomeButton) {
@@ -51,3 +53,14 @@ static BOOL sciScrollViewToTopWithoutRefresh(UIScrollView *scrollView) {
     return %orig;
 }
 %end
+
+%end
+
+void SCIInstallDisableHomeButtonRefreshHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"disable_home_button_refresh"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDisableHomeButtonRefreshHooks);
+    });
+}

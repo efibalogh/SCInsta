@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCIFollowRequestConfirmHooks
+
 %hook IGPendingRequestView
 - (void)_onApproveButtonTapped {
     if ([SCIUtils getBoolPref:@"follow_request_confirm"]) {
@@ -20,3 +22,14 @@
     }
 }
 %end
+
+%end
+
+extern "C" void SCIInstallFollowRequestConfirmHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"follow_request_confirm"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIFollowRequestConfirmHooks);
+    });
+}

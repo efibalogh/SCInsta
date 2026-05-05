@@ -47,6 +47,8 @@ NSArray *filterSurfacesArray(NSArray *surfaces) {
 
 ///////////////////////////////////////////////
 
+%group SCINavigationHooks
+
 %hook IGTabBarControllerSwipeCoordinator
 - (id)initWithSurfaces:(id)surfaces parentViewController:(id)controller enableHaptics:(_Bool)haptics launcherSet:(id)set {
     // Removes the surface from the main swipeable app collection view
@@ -118,3 +120,21 @@ NSArray *filterSurfacesArray(NSArray *surfaces) {
     }
 }
 %end
+
+%end
+
+extern "C" void SCIInstallNavigationHooksIfNeeded(void) {
+    BOOL shouldInstall = ![[SCIUtils getStringPref:@"nav_icon_ordering"] isEqualToString:@"default"] ||
+                         ![[SCIUtils getStringPref:@"swipe_nav_tabs"] isEqualToString:@"default"] ||
+                         [SCIUtils getBoolPref:@"hide_feed_tab"] ||
+                         [SCIUtils getBoolPref:@"hide_reels_tab"] ||
+                         [SCIUtils getBoolPref:@"hide_messages_tab"] ||
+                         [SCIUtils getBoolPref:@"hide_explore_tab"] ||
+                         [SCIUtils getBoolPref:@"hide_create_tab"];
+    if (!shouldInstall) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCINavigationHooks);
+    });
+}

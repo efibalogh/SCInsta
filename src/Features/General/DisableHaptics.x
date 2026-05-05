@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCIDisableHapticsHooks
+
 %hook UIImpactFeedbackGenerator
 - (void)impactOccurred {
     if (![SCIUtils getBoolPref:@"disable_haptics"]) %orig;
@@ -31,3 +33,14 @@
     }
 }
 %end
+
+%end
+
+void SCIInstallDisableHapticsHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"disable_haptics"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDisableHapticsHooks);
+    });
+}

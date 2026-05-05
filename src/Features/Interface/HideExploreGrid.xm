@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+%group SCIHideExploreGridHooks
+
 %hook IGExploreGridViewController
 - (void)viewDidLoad {
     if ([SCIUtils getBoolPref:@"hide_explore_grid"]) {
@@ -29,3 +31,14 @@
     }
 }
 %end
+
+%end
+
+extern "C" void SCIInstallHideExploreGridHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"hide_explore_grid"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIHideExploreGridHooks);
+    });
+}

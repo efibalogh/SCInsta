@@ -1,6 +1,8 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
 
+%group SCITeenAppIconsHooks
+
 %hook IGImageWithAccessoryButton
 
 - (void)didMoveToSuperview {
@@ -36,3 +38,14 @@
 }
 
 %end
+
+%end
+
+void SCIInstallTeenAppIconsHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"teen_app_icons"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCITeenAppIconsHooks);
+    });
+}

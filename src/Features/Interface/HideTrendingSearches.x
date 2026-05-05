@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+%group SCIHideTrendingSearchesHooks
+
 %hook IGDSSegmentedPillBarView
 - (void)didMoveToWindow {
     %orig;
@@ -14,3 +16,14 @@
     }
 }
 %end
+
+%end
+
+void SCIInstallHideTrendingSearchesHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"hide_trending_searches"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIHideTrendingSearchesHooks);
+    });
+}

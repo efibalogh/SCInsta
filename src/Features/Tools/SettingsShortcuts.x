@@ -1,6 +1,7 @@
 #import <objc/runtime.h>
 
 #import "../../InstagramHeaders.h"
+#import "../../Utils.h"
 #import "../../Settings/SCISettingsViewController.h"
 #import "../../Shared/Gallery/SCIGalleryViewController.h"
 
@@ -16,6 +17,8 @@ static const NSTimeInterval kSCIDirectTabGalleryLongPressDuration = 1.0;
 @end
 
 // Show SCInsta tweak settings by holding on the settings/more icon under profile for ~1 second
+%group SCISettingsShortcutsHooks
+
 %hook IGBadgedNavigationButton
 - (void)didMoveToWindow {
     %orig;
@@ -88,3 +91,17 @@ static const NSTimeInterval kSCIDirectTabGalleryLongPressDuration = 1.0;
     [SCIGalleryViewController presentGallery];
 }
 %end
+
+%end
+
+void SCIInstallSettingsShortcutsHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"settings_shortcut"] &&
+        ![SCIUtils getBoolPref:@"header_long_press_gallery"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCISettingsShortcutsHooks);
+    });
+}

@@ -1,6 +1,8 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
 
+%group SCIChangeThemeConfirmHooks
+
 %hook IGDirectThreadThemePickerViewController
 - (void)themeNewPickerSectionController:(id)arg1 didSelectTheme:(id)arg2 atIndex:(NSInteger)arg3 {
     if ([SCIUtils getBoolPref:@"change_direct_theme_confirm"]) {
@@ -33,3 +35,14 @@
     }
 }
 %end
+
+%end
+
+void SCIInstallChangeThemeConfirmHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"change_direct_theme_confirm"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIChangeThemeConfirmHooks);
+    });
+}

@@ -2,6 +2,8 @@
 #import "../../InstagramHeaders.h"
 
 // Modern Instagram versions
+%group SCIKeepDeletedMessagesHooks
+
 %hook IGDirectRealtimeIrisDeltaHandler
 - (void)handleIrisDeltas:(NSArray<IGDirectRealtimeIrisDelta *> *)deltas {
     if (![SCIUtils getBoolPref:@"keep_deleted_message"]) {
@@ -78,3 +80,14 @@
     return %orig(arg1);
 }
 %end
+
+%end
+
+void SCIInstallKeepDeletedMessagesHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"keep_deleted_message"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIKeepDeletedMessagesHooks);
+    });
+}

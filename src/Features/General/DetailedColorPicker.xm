@@ -1,6 +1,8 @@
 #import "../../InstagramHeaders.h"
 #import "../../Utils.h"
 
+%group SCIDetailedColorPickerHooks
+
 %hook IGStoryEyedropperToggleButton
 - (void)didMoveToWindow {
     %orig;
@@ -85,3 +87,14 @@
     return %orig;
 }
 %end
+
+%end
+
+extern "C" void SCIInstallDetailedColorPickerHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"detailed_color_picker"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDetailedColorPickerHooks);
+    });
+}

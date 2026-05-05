@@ -135,6 +135,10 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
 }
 %end
 
+%end
+
+%group SCIFeedFilteringDeferredHooks
+
 %hook IGSundialFeedDataSource
 - (NSArray *)objectsForListAdapter:(id)arg1 {
     NSArray *filteredList = removeItemsInList(%orig, NO);
@@ -358,7 +362,7 @@ static BOOL SCIAnyFeedFilteringPrefEnabled(void) {
     return NO;
 }
 
-extern "C" void SCIInstallFeedFilteringHooksIfEnabled(void) {
+extern "C" void SCIInstallFeedFilteringFeedHooksIfEnabled(void) {
     if (!SCIAnyFeedFilteringPrefEnabled()) {
         return;
     }
@@ -366,5 +370,18 @@ extern "C" void SCIInstallFeedFilteringHooksIfEnabled(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         %init(SCIFeedFilteringHooks);
+    });
+}
+
+extern "C" void SCIInstallFeedFilteringHooksIfEnabled(void) {
+    if (!SCIAnyFeedFilteringPrefEnabled()) {
+        return;
+    }
+
+    SCIInstallFeedFilteringFeedHooksIfEnabled();
+
+    static dispatch_once_t deferredOnceToken;
+    dispatch_once(&deferredOnceToken, ^{
+        %init(SCIFeedFilteringDeferredHooks);
     });
 }

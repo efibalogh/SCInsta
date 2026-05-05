@@ -138,7 +138,7 @@
         [defaults setBool:NO forKey:@"IGLiquidGlassOverrideEnabled"];
     }
     [SCIUtils applyLiquidGlassNavigationExperimentOverride];
-    SCIInstallEnabledFeatureHooks();
+    SCIInstallLaunchCriticalHooks();
 
     return %orig;
 }
@@ -168,7 +168,9 @@
 - (void)applicationDidBecomeActive:(id)arg1 {
     %orig;
 
-    [SCIUtils evaluateAutomaticCacheClearIfNeeded];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        [SCIUtils evaluateAutomaticCacheClearIfNeeded];
+    });
 
     if ([SCIUtils getBoolPref:@"flex_app_start"]) {
         [[objc_getClass("FLEXManager") sharedManager] showExplorer];

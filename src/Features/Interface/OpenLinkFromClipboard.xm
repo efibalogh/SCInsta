@@ -109,6 +109,8 @@ static void SCIAttachClipboardGestureToExploreButton(UIButton *button) {
     objc_setAssociatedObject(button, kSCIClipboardExploreGestureKey, gesture, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
+%group SCIOpenLinkFromClipboardHooks
+
 %hook IGTabBarController
 
 - (void)viewDidLayoutSubviews {
@@ -124,3 +126,14 @@ static void SCIAttachClipboardGestureToExploreButton(UIButton *button) {
 }
 
 %end
+
+%end
+
+extern "C" void SCIInstallOpenLinkFromClipboardHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"search_bar_open_clipboard_link"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIOpenLinkFromClipboardHooks);
+    });
+}

@@ -142,6 +142,8 @@ static void SCIApplyStoryPollVoteCountsIfNeeded(UIView *overlayView) {
     objc_setAssociatedObject(overlayView, kSCIStoryPollSignatureAssocKey, signature, OBJC_ASSOCIATION_COPY_NONATOMIC);
 }
 
+%group SCIStoryPollVoteCountsHooks
+
 %hook IGStoryFullscreenOverlayView
 
 - (void)layoutSubviews {
@@ -150,3 +152,14 @@ static void SCIApplyStoryPollVoteCountsIfNeeded(UIView *overlayView) {
 }
 
 %end
+
+%end
+
+extern "C" void SCIInstallStoryPollVoteCountsHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"story_poll_vote_counts"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIStoryPollVoteCountsHooks);
+    });
+}

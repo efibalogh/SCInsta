@@ -54,6 +54,8 @@ static NSString *SCIHighResHeaderValueIfNeeded(NSString *value, NSString *field)
 	return SCIHighResUserAgentStringFromString(value);
 }
 
+%group SCIEnhancedMediaResolutionHooks
+
 %hook NSMutableURLRequest
 
 - (void)setValue:(NSString *)value forHTTPHeaderField:(NSString *)field {
@@ -92,3 +94,14 @@ static NSString *SCIHighResHeaderValueIfNeeded(NSString *value, NSString *field)
 }
 
 %end
+
+%end
+
+extern "C" void SCIInstallEnhancedMediaResolutionHooksIfEnabled(void) {
+	if (!SCIEnhancedMediaResolutionEnabled()) return;
+
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		%init(SCIEnhancedMediaResolutionHooks);
+	});
+}

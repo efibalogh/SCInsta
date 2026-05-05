@@ -35,6 +35,8 @@ static void SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSource source) {
 
 // MARK: Liquid glass
 
+%group SCITweakLaunchCriticalHooks
+
 %hook IGDSLauncherConfig
 - (_Bool)isLiquidGlassInAppNotificationEnabled {
     return [SCIUtils sci_liquidGlassLauncherPrefKey:@"liquid_glass_in_app_notifications" orig:%orig];
@@ -80,7 +82,11 @@ shouldPersistLastBugReportId:(id)arg6
 }
 %end
 
+%end
+
 // MARK: Screenshots
+
+%group SCITweakPrivacyHooks
 
 // Disable anti-screenshot feature on visual messages
 %hook IGStoryViewerContainerView
@@ -140,6 +146,8 @@ shouldPersistLastBugReportId:(id)arg6
 - (void)screenshotObserverDidSeeActiveScreenCapture:(id)arg1 event:(NSInteger)arg2 { VOID_HANDLESCREENSHOT(%orig); }
 %end
 
+%end
+
 /////////////////////////////////////////////////////////////////////////////
 
 // MARK: Hide items
@@ -157,6 +165,8 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
     return true;
 }
+
+%group SCITweakMessagesHooks
 
 %hook IGDirectInboxSearchSectionPartitioningComponent
 - (id)initWithSectionTitle:(id)arg1
@@ -376,6 +386,10 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 %end
 
+%end
+
+%group SCITweakGeneralUIHooks
+
 // Explore page results
 %hook IGSearchListKitDataSource
 - (id)objectsForListAdapter:(id)arg1 {
@@ -466,6 +480,10 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 %end
 
+%end
+
+%group SCITweakFeedHooks
+
 // Story tray
 %hook IGMainStoryTrayDataSource
 - (id)allItemsForTrayUsingCachedValue:(BOOL)cached {
@@ -517,6 +535,10 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 %end
 
+%end
+
+%group SCITweakGeneralMenuHooks
+
 // Modern IGDS app menus
 %hook IGDSMenu
 - (id)initWithMenuItems:(NSArray<IGDSMenuItem *> *)originalObjs edr:(BOOL)edr headerLabelText:(id)headerLabelText {
@@ -550,9 +572,13 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 %end
 
+%end
+
 /////////////////////////////////////////////////////////////////////////////
 
 // MARK: Confirm buttons
+
+%group SCITweakFeedConfirmHooks
 
 %hook IGFeedItemUFICell
 - (void)UFIButtonBarDidTapOnLike:(id)arg1 {
@@ -601,6 +627,10 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     }
 }
 %end
+
+%end
+
+%group SCITweakReelsConfirmHooks
 
 %hook IGSundialViewerVerticalUFI
 - (void)_didTapLikeButton:(id)arg1 {
@@ -669,9 +699,13 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 %end
 
+%end
+
 /////////////////////////////////////////////////////////////////////////////
 
 // FLEX explorer gesture handler
+%group SCITweakRootUIHooks
+
 %hook IGRootViewController
 - (void)viewDidLoad {
     %orig;
@@ -691,7 +725,11 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 }
 %end
 
+%end
+
 // Disable safe mode (defaults reset upon subsequent crashes)
+%group SCITweakSafeModeHooks
+
 %hook IGSafeModeChecker
 - (id)initWithInstacrashCounterProvider:(void *)provider crashThreshold:(unsigned long long)threshold {
     if ([SCIUtils getBoolPref:@"disable_safe_mode"]) return nil;
@@ -706,3 +744,129 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     return %orig;
 }
 %end
+
+%end
+
+static BOOL SCIPrefEnabled(NSString *key) {
+    return [SCIUtils getBoolPref:key];
+}
+
+static BOOL SCIAnyPrefEnabled(NSArray<NSString *> *keys) {
+    for (NSString *key in keys) {
+        if (SCIPrefEnabled(key)) {
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
+static void SCIInstallTweakPrivacyHooksIfNeeded(void) {
+    if (!SCIPrefEnabled(@"remove_screenshot_alert")) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCITweakPrivacyHooks);
+    });
+}
+
+void SCIInstallTweakLaunchCriticalHooks(void) {
+    static dispatch_once_t launchOnceToken;
+    dispatch_once(&launchOnceToken, ^{
+        %init(SCITweakLaunchCriticalHooks);
+    });
+
+    static dispatch_once_t safeModeOnceToken;
+    dispatch_once(&safeModeOnceToken, ^{
+        %init(SCITweakSafeModeHooks);
+    });
+}
+
+void SCIInstallTweakFeedHooksIfNeeded(void) {
+    if (SCIAnyPrefEnabled(@[
+        @"hide_ads",
+        @"no_suggested_users"
+    ])) {
+        static dispatch_once_t feedOnceToken;
+        dispatch_once(&feedOnceToken, ^{
+            %init(SCITweakFeedHooks);
+        });
+    }
+
+    if (SCIAnyPrefEnabled(@[
+        @"like_confirm_feed",
+        @"repost_confirm_feed"
+    ])) {
+        static dispatch_once_t confirmOnceToken;
+        dispatch_once(&confirmOnceToken, ^{
+            %init(SCITweakFeedConfirmHooks);
+        });
+    }
+}
+
+void SCIInstallTweakStoryHooksIfNeeded(void) {
+    SCIInstallTweakPrivacyHooksIfNeeded();
+    SCIInstallTweakFeedHooksIfNeeded();
+}
+
+void SCIInstallTweakReelsHooksIfNeeded(void) {
+    SCIInstallTweakPrivacyHooksIfNeeded();
+
+    if (!SCIAnyPrefEnabled(@[
+        @"like_confirm_reels",
+        @"repost_confirm_reels"
+    ])) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCITweakReelsConfirmHooks);
+    });
+}
+
+void SCIInstallTweakMessagesHooksIfNeeded(void) {
+    SCIInstallTweakPrivacyHooksIfNeeded();
+
+    if (!SCIAnyPrefEnabled(@[
+        @"hide_meta_ai",
+        @"no_suggested_users",
+        @"no_suggested_chats",
+        @"hide_notes_tray"
+    ])) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCITweakMessagesHooks);
+    });
+}
+
+void SCIInstallTweakGeneralUIHooksIfNeeded(void) {
+    if (SCIAnyPrefEnabled(@[
+        @"hide_meta_ai",
+        @"no_suggested_users"
+    ])) {
+        static dispatch_once_t generalOnceToken;
+        dispatch_once(&generalOnceToken, ^{
+            %init(SCITweakGeneralUIHooks);
+        });
+    }
+
+    if (SCIPrefEnabled(@"hide_meta_ai")) {
+        static dispatch_once_t menuOnceToken;
+        dispatch_once(&menuOnceToken, ^{
+            %init(SCITweakGeneralMenuHooks);
+        });
+    }
+
+    if (SCIPrefEnabled(@"flex_instagram")) {
+        static dispatch_once_t rootOnceToken;
+        dispatch_once(&rootOnceToken, ^{
+            %init(SCITweakRootUIHooks);
+        });
+    }
+}

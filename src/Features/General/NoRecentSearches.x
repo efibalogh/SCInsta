@@ -2,6 +2,8 @@
 #import "../../InstagramHeaders.h"
 
 // Disable logging of searches at server-side
+%group SCINoRecentSearchesHooks
+
 %hook IGSearchEntityRouter
 - (id)initWithUserSession:(id)arg1 analyticsModule:(id)arg2 shouldAddToRecents:(BOOL)shouldAddToRecents {
     if ([SCIUtils getBoolPref:@"no_recent_searches"]) {
@@ -48,3 +50,14 @@
     return %orig(arg1, arg2, arg3, arg4, arg5);
 }
 %end
+
+%end
+
+void SCIInstallNoRecentSearchesHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"no_recent_searches"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCINoRecentSearchesHooks);
+    });
+}

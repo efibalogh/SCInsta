@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCICallConfirmHooks
+
 %hook IGDirectThreadCallButtonsCoordinator
 // Voice Call
 - (void)_didTapAudioButton:(id)arg1 {
@@ -23,3 +25,14 @@
     }
 }
 %end
+
+%end
+
+void SCIInstallCallConfirmHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"call_confirm"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCICallConfirmHooks);
+    });
+}

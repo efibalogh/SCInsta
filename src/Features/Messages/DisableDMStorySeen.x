@@ -9,6 +9,8 @@ static inline BOOL SCIShouldPassThroughManualDirectSeen(id message) {
     return (message && SCIPendingDirectVisualMessageToMarkSeen && message == SCIPendingDirectVisualMessageToMarkSeen);
 }
 
+%group SCIDisableDMStorySeenHooks
+
 %hook IGDirectVisualMessageViewerEventHandler
 - (void)visualMessageViewerController:(id)arg1 didBeginPlaybackForVisualMessage:(id)arg2 atIndex:(NSInteger)arg3 {
     if (!SCIUnlimitedReplayEnabled()) {
@@ -30,3 +32,17 @@ static inline BOOL SCIShouldPassThroughManualDirectSeen(id message) {
     }
 }
 %end
+
+%end
+
+void SCIInstallDisableDMStorySeenHooksIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"unlimited_replay"] &&
+        ![SCIUtils getBoolPref:@"no_seen_receipt"]) {
+        return;
+    }
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIDisableDMStorySeenHooks);
+    });
+}

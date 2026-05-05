@@ -1,5 +1,7 @@
 #import "../../Utils.h"
 
+%group SCIVisualMsgModifierHooks
+
 %hook IGDirectVisualMessage
 - (NSInteger)viewMode {
     NSInteger mode = %orig;
@@ -19,3 +21,14 @@
     return mode;
 }
 %end
+
+%end
+
+void SCIInstallVisualMsgModifierHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"disable_view_once_limitations"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIVisualMsgModifierHooks);
+    });
+}

@@ -34,6 +34,8 @@ static void SCIHideFeedRepostButtons(id view) {
     }
 }
 
+%group SCIHideRepostButtonHooks
+
 %hook IGUFIButtonBarView
 - (void)layoutSubviews {
     %orig;
@@ -59,3 +61,14 @@ static void SCIHideFeedRepostButtons(id view) {
     return %orig;
 }
 %end
+
+%end
+
+extern "C" void SCIInstallHideRepostButtonHooksIfEnabled(void) {
+    if (!SCIHideFeedRepostEnabled() && !SCIHideReelsRepostEnabled()) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCIHideRepostButtonHooks);
+    });
+}

@@ -1,6 +1,8 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+%group SCICopyDescriptionHooks
+
 %hook IGCoreTextView
 - (void)didMoveToSuperview {
     %orig;
@@ -45,3 +47,14 @@
                               tone:SCIFeedbackPillToneSuccess];
 }
 %end
+
+%end
+
+void SCIInstallCopyDescriptionHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"copy_description"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        %init(SCICopyDescriptionHooks);
+    });
+}
