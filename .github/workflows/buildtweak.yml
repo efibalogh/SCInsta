@@ -25,7 +25,7 @@ jobs:
                 submodules: recursive
 
             - name: Install Dependencies
-              run: brew install ldid dpkg make
+              run: brew install ldid dpkg make autoconf automake cmake libtool meson nasm ninja pkgconf wget yasm
 
             - name: Set PATH environment variable
               run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH 
@@ -66,6 +66,21 @@ jobs:
 
                 echo "SCINSTA_VERSION=${SCINSTA_VERSION}" >> "$GITHUB_ENV"
                 echo "version=${SCINSTA_VERSION}" >> "$GITHUB_OUTPUT"
+
+            - name: Cache FFmpeg frameworks
+              id: ffmpeg_cache
+              uses: actions/cache@v4
+              with:
+                path: |
+                  main/modules/ffmpegkit
+                  main/.cache/ffmpegkit
+                key: ffmpegkit-${{ runner.os }}-${{ hashFiles('main/fetch-ffmpegkit.sh') }}
+
+            - name: Prepare FFmpeg frameworks
+              run: |
+                cd main
+                chmod +x ./fetch-ffmpegkit.sh
+                ./fetch-ffmpegkit.sh
             
             - name: Build SCInsta tweak for Rootless
               run: |                
@@ -81,7 +96,8 @@ jobs:
             - name: Rename deb to include version info
               run: |
                 cd main/packages
-                mv "$(ls -t | head -n1)" "com.socuul.scinsta_${SCINSTA_VERSION}+debug-rootless.deb"
+                DEB_FILE="$(ls -t com.socuul.scinsta_*.deb | head -n1)"
+                mv "$DEB_FILE" "com.socuul.scinsta_${SCINSTA_VERSION}+debug-rootless.deb"
 
             - name: Pass package name to upload action
               id: package_name

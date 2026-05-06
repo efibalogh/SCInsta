@@ -37,7 +37,7 @@ jobs:
                 submodules: recursive
 
             - name: Install Dependencies
-              run: brew install ldid dpkg make
+              run: brew install ldid dpkg make autoconf automake cmake libtool meson nasm ninja pkgconf wget yasm
 
             - name: Set PATH environment variable
               run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH 
@@ -91,6 +91,21 @@ jobs:
 
                 echo "SCINSTA_VERSION=${SCINSTA_VERSION}" >> "$GITHUB_ENV"
                 echo "version=${SCINSTA_VERSION}" >> "$GITHUB_OUTPUT"
+
+            - name: Cache FFmpeg frameworks
+              id: ffmpeg_cache
+              uses: actions/cache@v4
+              with:
+                path: |
+                  main/modules/ffmpegkit
+                  main/.cache/ffmpegkit
+                key: ffmpegkit-${{ runner.os }}-${{ hashFiles('main/fetch-ffmpegkit.sh') }}
+
+            - name: Prepare FFmpeg frameworks
+              run: |
+                cd main
+                chmod +x ./fetch-ffmpegkit.sh
+                ./fetch-ffmpegkit.sh
             
             - name: Build SCInsta tweak for sideloading (as IPA)
               run: |
@@ -111,12 +126,12 @@ jobs:
             - name: Rename IPA to include version info
               run: |
                 cd main/packages
-                mv "$(ls -t | head -n1)" "SCInsta_sideloaded_v${SCINSTA_VERSION}.ipa"
+                mv "SCInsta-no-flex.ipa" "SCInsta_sideloaded_v${SCINSTA_VERSION}.ipa"
 
             - name: Pass package name to upload action
               id: package_name
               run: |
-                echo "package=$(ls -t main/packages |  head -n1)" >> "$GITHUB_OUTPUT"
+                echo "package=SCInsta_sideloaded_v${SCINSTA_VERSION}.ipa" >> "$GITHUB_OUTPUT"
 
             - name: Upload Artifact
               if: ${{ inputs.upload_artifact }}
