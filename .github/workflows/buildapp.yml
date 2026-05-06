@@ -18,6 +18,11 @@ on:
                 default: true
                 required: false
                 type: boolean
+            with_flex:
+                description: "Include libflex"
+                default: true
+                required: false
+                type: boolean
   
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
@@ -117,7 +122,11 @@ jobs:
                 export PATH=.:$PATH
                 ls -la
 
-                ./build.sh sideload
+                if [ "${{ inputs.with_flex }}" = "true" ]; then
+                  ./build.sh sideload --with-flex
+                else
+                  ./build.sh sideload
+                fi
                 ls -la packages
                 
               env:
@@ -126,7 +135,11 @@ jobs:
             - name: Rename IPA to include version info
               run: |
                 cd main/packages
-                mv "SCInsta-no-flex.ipa" "SCInsta_sideloaded_v${SCINSTA_VERSION}.ipa"
+                if [ "${{ inputs.with_flex }}" = "true" ]; then
+                  mv "SCInsta.ipa" "SCInsta_sideloaded_v${SCINSTA_VERSION}.ipa"
+                else
+                  mv "SCInsta-no-flex.ipa" "SCInsta_sideloaded_v${SCINSTA_VERSION}.ipa"
+                fi
 
             - name: Pass package name to upload action
               id: package_name
