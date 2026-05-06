@@ -1,7 +1,9 @@
 #import <substrate.h>
+#import <objc/runtime.h>
 #import "InstagramHeaders.h"
 #import "Tweak.h"
 #import "Utils.h"
+#import "App/SCIFlexLoader.h"
 #import "Shared/ActionButton/ActionButtonCore.h"
 
 ///////////////////////////////////////////////////////////
@@ -32,6 +34,21 @@ static void SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSource source) {
                                   subtitle:nil
                               iconResource:feedback[@"iconResource"] ?: @"ig_icon_reshare_outline_24"];
 }
+
+@interface _UISheetDetent : NSObject
++ (instancetype)_mediumDetent;
++ (instancetype)_largeDetent;
+@end
+
+@interface _UISheetPresentationController : NSObject
+@property (nonatomic, assign, setter=_setPresentsAtStandardHalfHeight:) BOOL _presentsAtStandardHalfHeight;
+@property (nonatomic, copy, setter=_setDetents:) NSArray *_detents;
+@property (nonatomic, assign, setter=_setIndexOfCurrentDetent:) NSInteger _indexOfCurrentDetent;
+@property (nonatomic, assign, setter=_setPrefersScrollingExpandsToLargerDetentWhenScrolledToEdge:) BOOL _prefersScrollingExpandsToLargerDetentWhenScrolledToEdge;
+@property (nonatomic, assign, setter=_setIndexOfLastUndimmedDetent:) NSInteger _indexOfLastUndimmedDetent;
+@end
+
+static const void *kSCIFlexThreeFingerGestureKey = &kSCIFlexThreeFingerGestureKey;
 
 // MARK: Liquid glass
 
@@ -709,19 +726,68 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 %hook IGRootViewController
 - (void)viewDidLoad {
     %orig;
-    
-    // Recognize 5-finger long press
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-    longPress.minimumPressDuration = 1;
-    longPress.numberOfTouchesRequired = 5;
+
+    if (objc_getAssociatedObject(self.view, kSCIFlexThreeFingerGestureKey)) {
+        return;
+    }
+
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(sci_handleFlexGesture:)];
+    longPress.minimumPressDuration = 1.5;
+    longPress.numberOfTouchesRequired = 3;
+    longPress.cancelsTouchesInView = NO;
+    longPress.delaysTouchesBegan = NO;
+    longPress.delaysTouchesEnded = NO;
     [self.view addGestureRecognizer:longPress];
+    objc_setAssociatedObject(self.view, kSCIFlexThreeFingerGestureKey, longPress, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
-%new - (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
+%new - (void)sci_handleFlexGesture:(UILongPressGestureRecognizer *)sender {
     if (sender.state != UIGestureRecognizerStateBegan) return;
 
     if ([SCIUtils getBoolPref:@"flex_instagram"]) {
-        [[objc_getClass("FLEXManager") sharedManager] showExplorer];
+        SCIFlexShowExplorer(@"three_finger");
     }
+}
+%end
+
+%end
+
+%group SCITweakFlexEarlyCompatibilityHooks
+
+%hook UIWindow
+- (BOOL)_shouldCreateContextAsSecure {
+    Class flexWindowClass = SCIFlexWindowClass();
+    if (flexWindowClass && [self isKindOfClass:flexWindowClass]) {
+        return YES;
+    }
+    return %orig;
+}
+%end
+
+%hook _UISheetPresentationController
+- (id)initWithPresentedViewController:(id)present presentingViewController:(id)presenter {
+    self = %orig;
+    if ([present isKindOfClass:%c(FLEXNavigationController)]) {
+        if ([self respondsToSelector:@selector(_setPresentsAtStandardHalfHeight:)]) {
+            self._presentsAtStandardHalfHeight = YES;
+        } else {
+            self._detents = @[[%c(_UISheetDetent) _mediumDetent], [%c(_UISheetDetent) _largeDetent]];
+        }
+        self._indexOfCurrentDetent = 1;
+        self._prefersScrollingExpandsToLargerDetentWhenScrolledToEdge = NO;
+        self._indexOfLastUndimmedDetent = 1;
+    }
+
+    return self;
+}
+%end
+
+%end
+
+%group SCITweakFlexLoadedCompatibilityHooks
+
+%hook FLEXExplorerViewController
+- (BOOL)_canShowWhileLocked {
+    return YES;
 }
 %end
 
@@ -772,6 +838,39 @@ static void SCIInstallTweakPrivacyHooksIfNeeded(void) {
     });
 }
 
+static BOOL SCIAnyFlexOpeningPrefEnabled(void) {
+    return SCIAnyPrefEnabled(@[
+        @"flex_app_launch",
+        @"flex_app_start",
+        @"flex_instagram"
+    ]);
+}
+
+static void SCIInstallTweakFlexSupportHooksIfNeeded(void) {
+    if (!SCIAnyFlexOpeningPrefEnabled()) {
+        return;
+    }
+
+    static dispatch_once_t flexEarlyOnceToken;
+    dispatch_once(&flexEarlyOnceToken, ^{
+        %init(SCITweakFlexEarlyCompatibilityHooks);
+    });
+
+    if (SCIPrefEnabled(@"flex_instagram")) {
+        static dispatch_once_t rootOnceToken;
+        dispatch_once(&rootOnceToken, ^{
+            %init(SCITweakRootUIHooks);
+        });
+    }
+}
+
+void SCIInstallFlexLoadedCompatibilityHooksIfNeeded(void) {
+    static dispatch_once_t flexLoadedOnceToken;
+    dispatch_once(&flexLoadedOnceToken, ^{
+        %init(SCITweakFlexLoadedCompatibilityHooks);
+    });
+}
+
 void SCIInstallTweakLaunchCriticalHooks(void) {
     static dispatch_once_t launchOnceToken;
     dispatch_once(&launchOnceToken, ^{
@@ -782,6 +881,8 @@ void SCIInstallTweakLaunchCriticalHooks(void) {
     dispatch_once(&safeModeOnceToken, ^{
         %init(SCITweakSafeModeHooks);
     });
+
+    SCIInstallTweakFlexSupportHooksIfNeeded();
 }
 
 void SCIInstallTweakFeedHooksIfNeeded(void) {
@@ -863,10 +964,5 @@ void SCIInstallTweakGeneralUIHooksIfNeeded(void) {
         });
     }
 
-    if (SCIPrefEnabled(@"flex_instagram")) {
-        static dispatch_once_t rootOnceToken;
-        dispatch_once(&rootOnceToken, ^{
-            %init(SCITweakRootUIHooks);
-        });
-    }
+    SCIInstallTweakFlexSupportHooksIfNeeded();
 }

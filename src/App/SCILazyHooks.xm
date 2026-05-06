@@ -1,46 +1,52 @@
 #import <UIKit/UIKit.h>
 
-#import "SCIStartupHooks.h"
+#import "SCICore.h"
+#import "SCIStartupProfiler.h"
 
 static void SCIScheduleGeneralUIHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            SCIInstallGeneralUIHooksIfNeeded();
+            SCICoreInstallSurfaceHooks(SCISurfaceGeneralUI);
         });
     });
 }
 
 static void SCIInstallLazyHooksForViewController(UIViewController *controller) {
+    static dispatch_once_t firstSurfaceOnceToken;
+    dispatch_once(&firstSurfaceOnceToken, ^{
+        SCIStartupMark([NSString stringWithFormat:@"first viewWillAppear %@", NSStringFromClass([controller class]) ?: @""]);
+    });
+
     NSString *className = NSStringFromClass([controller class]);
     if (className.length == 0) {
         return;
     }
 
     if ([className isEqualToString:@"IGMainFeedViewController"]) {
-        SCIInstallFeedSurfaceHooksIfNeeded();
+        SCICoreInstallSurfaceHooks(SCISurfaceFeed);
         return;
     }
 
     if ([className isEqualToString:@"IGStoryViewerViewController"]) {
-        SCIInstallStorySurfaceHooksIfNeeded();
+        SCICoreInstallSurfaceHooks(SCISurfaceStories);
         return;
     }
 
     if ([className isEqualToString:@"IGSundialFeedViewController"]) {
-        SCIInstallReelsSurfaceHooksIfNeeded();
+        SCICoreInstallSurfaceHooks(SCISurfaceReels);
         return;
     }
 
     if ([className isEqualToString:@"IGDirectInboxViewController"] ||
         [className isEqualToString:@"IGDirectThreadViewController"] ||
         [className isEqualToString:@"IGDirectVisualMessageViewerController"]) {
-        SCIInstallMessagesSurfaceHooksIfNeeded();
+        SCICoreInstallSurfaceHooks(SCISurfaceMessages);
         return;
     }
 
     if ([className isEqualToString:@"IGProfileViewController"]) {
-        SCIInstallProfileSurfaceHooksIfNeeded();
+        SCICoreInstallSurfaceHooks(SCISurfaceProfile);
         return;
     }
 

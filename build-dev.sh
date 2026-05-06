@@ -8,7 +8,7 @@
 set -e
 
 echo 'Note: This script is meant to be used while developing the tweak.'
-echo '      This does not build "libflex" or "FLEXing", they must be built manually and moved to ./packages'
+echo '      It does not build libFLEX; run ./build.sh sideload --buildonly-flex if you need that dylib.'
 echo
 
 if [ "${1:-}" == "base" ] || [ "${1:-}" == "--base" ];
