@@ -152,6 +152,10 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
 }
 %end
 
+%end
+
+%group SCIAdBlockingEarlyHooks
+
 %hook IGContextualFeedViewController
 - (NSArray *)objectsForListAdapter:(id)arg1 {
     if ([SCIUtils getBoolPref:@"hide_ads"]) {
@@ -321,6 +325,10 @@ static NSArray *removeItemsInList(NSArray *list, BOOL isFeed) {
 %end
 
 
+%end
+
+%group SCIFeedFilteringDeferredHooks
+
 // Hide "suggested for you" text at end of feed
 %hook IGEndOfFeedDemarcatorCellTopOfFeed
 - (void)configureWithViewConfig:(id)arg1 {
@@ -383,5 +391,16 @@ extern "C" void SCIInstallFeedFilteringHooksIfEnabled(void) {
     static dispatch_once_t deferredOnceToken;
     dispatch_once(&deferredOnceToken, ^{
         %init(SCIFeedFilteringDeferredHooks);
+    });
+}
+
+extern "C" void SCIInstallAdBlockingEarlyHooksIfEnabled(void) {
+    if (![SCIUtils getBoolPref:@"hide_ads"]) {
+        return;
+    }
+
+    static dispatch_once_t earlyAdsOnceToken;
+    dispatch_once(&earlyAdsOnceToken, ^{
+        %init(SCIAdBlockingEarlyHooks);
     });
 }

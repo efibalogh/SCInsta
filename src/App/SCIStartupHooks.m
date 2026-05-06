@@ -15,6 +15,7 @@ FOUNDATION_EXPORT void SCIInstallFollowConfirmHooksIfNeeded(void);
 FOUNDATION_EXPORT void SCIInstallCreateGroupButtonControlHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallSharedLinkCleanupHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallHideMetaAIHooksIfEnabled(void);
+FOUNDATION_EXPORT void SCIInstallAdBlockingEarlyHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallFeedFilteringHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallFeedFilteringFeedHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallNoSuggestedUsersHooksIfEnabled(void);
@@ -68,6 +69,7 @@ void SCIInstallLaunchCriticalHooks(void) {
     SCIInstallTweakLaunchCriticalHooks();
     SCIInstallSettingsShortcutsHooksIfNeeded();
     SCIInstallOpenLinkFromClipboardHooksIfEnabled();
+    SCIInstallAdBlockingEarlyHooksIfEnabled();
 }
 
 void SCIInstallFeedSurfaceHooksIfNeeded(void) {
