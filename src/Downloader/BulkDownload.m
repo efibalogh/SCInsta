@@ -123,6 +123,26 @@ static UTType *SCIBulkUTTypeForFileURL(NSURL *fileURL, BOOL isVideo) {
     return isVideo ? UTTypeMPEG4Movie : UTTypePNG;
 }
 
+static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fileURL) {
+    if (!fileURL.isFileURL) return fileURL;
+
+    SCIGalleryMediaType mediaType = item.video ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
+    NSString *fileName = SCIFileNameForMedia(fileURL, mediaType, item.galleryMetadata);
+    if ([fileURL.lastPathComponent isEqualToString:fileName]) {
+        return fileURL;
+    }
+
+    NSURL *targetURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm removeItemAtURL:targetURL error:nil];
+    NSError *copyError = nil;
+    if ([fm copyItemAtURL:fileURL toURL:targetURL error:&copyError]) {
+        return targetURL;
+    }
+    NSLog(@"[SCInsta BulkDownload] Failed preparing named file %@: %@", targetURL.path, copyError);
+    return fileURL;
+}
+
 + (void)performOperation:(SCIBulkDownloadOperation)operation
                    items:(NSArray<SCIBulkDownloadItem *> *)items
         actionIdentifier:(NSString *)actionIdentifier
@@ -226,7 +246,7 @@ static UTType *SCIBulkUTTypeForFileURL(NSURL *fileURL, BOOL isVideo) {
                 return;
             }
 
-            NSString *filename = [NSString stringWithFormat:@"scinsta_bulk_%@.png", NSUUID.UUID.UUIDString];
+            NSString *filename = SCIFileNameForMedia([NSURL fileURLWithPath:@"bulk.png"], SCIGalleryMediaTypeImage, item.galleryMetadata);
             NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:filename];
             NSURL *url = [NSURL fileURLWithPath:path];
             NSError *writeError = nil;
@@ -248,6 +268,7 @@ static UTType *SCIBulkUTTypeForFileURL(NSURL *fileURL, BOOL isVideo) {
     NSString *extension = item.fileExtension.length > 0 ? item.fileExtension : (item.video ? @"mp4" : @"jpg");
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:downloadOnly showProgress:NO];
     self.currentDownloadDelegate = delegate;
+    delegate.pendingGallerySaveMetadata = item.galleryMetadata;
     delegate.completionBlock = ^(NSURL *fileURL, NSError *error) {
         completion(fileURL, error);
     };
@@ -255,8 +276,9 @@ static UTType *SCIBulkUTTypeForFileURL(NSURL *fileURL, BOOL isVideo) {
 }
 
 - (void)handleResolvedLocalFile:(NSURL *)fileURL forItem:(SCIBulkDownloadItem *)item {
+    NSURL *preparedURL = SCIBulkPreparedFileURLForItem(item, fileURL);
     if (self.operation == SCIBulkDownloadOperationSaveToPhotos) {
-        [SCIDownloadDelegate saveFileURLToPhotos:fileURL completion:^(BOOL success, NSError *error) {
+        [SCIDownloadDelegate saveFileURLToPhotos:preparedURL completion:^(BOOL success, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (success) self.successCount += 1;
                 else self.failureCount += 1;
@@ -270,7 +292,7 @@ static UTType *SCIBulkUTTypeForFileURL(NSURL *fileURL, BOOL isVideo) {
 
     if (self.operation == SCIBulkDownloadOperationSaveToGallery) {
         NSError *saveError = nil;
-        SCIGalleryFile *file = [SCIDownloadDelegate saveFileURLToGallery:fileURL metadata:item.galleryMetadata error:&saveError];
+        SCIGalleryFile *file = [SCIDownloadDelegate saveFileURLToGallery:preparedURL metadata:item.galleryMetadata error:&saveError];
         if (file) self.successCount += 1;
         else self.failureCount += 1;
         self.currentIndex += 1;
@@ -278,7 +300,7 @@ static UTType *SCIBulkUTTypeForFileURL(NSURL *fileURL, BOOL isVideo) {
         return;
     }
 
-    [self.resolvedFileURLs addObject:fileURL];
+    [self.resolvedFileURLs addObject:preparedURL];
     [self.resolvedItems addObject:item];
     self.successCount += 1;
     self.currentIndex += 1;

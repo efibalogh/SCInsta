@@ -937,6 +937,9 @@ fromViewController:(UIViewController *)presenter {
 - (SCIGallerySaveMetadata *)metadataForCurrentItem {
     SCIMediaItem *item = [self currentItem];
     if (item.galleryMetadata) {
+        if (item.sourceMediaObject && !item.galleryMetadata.importPostedDate) {
+            [SCIGalleryOriginController populateMetadata:item.galleryMetadata fromMedia:item.sourceMediaObject];
+        }
         return item.galleryMetadata;
     }
 
@@ -948,6 +951,9 @@ fromViewController:(UIViewController *)presenter {
     meta.source = item.gallerySaveSource >= 0 ? (int16_t)item.gallerySaveSource : (int16_t)SCIGallerySourceOther;
     if (item.title.length > 0) {
         meta.sourceUsername = item.title;
+    }
+    if (item.sourceMediaObject) {
+        [SCIGalleryOriginController populateMetadata:meta fromMedia:item.sourceMediaObject];
     }
     return meta;
 }
@@ -978,9 +984,28 @@ fromViewController:(UIViewController *)presenter {
 - (void)saveLocalFileURLToPhotos:(NSURL *)fileURL temporaryFile:(BOOL)temporaryFile {
     if (!fileURL) return;
 
-    [SCIDownloadDelegate saveFileURLToPhotos:fileURL completion:^(BOOL success, NSError *error) {
+    SCIMediaItem *item = [self currentItem];
+    SCIGalleryMediaType mediaType = (item.mediaType == SCIMediaItemTypeVideo) ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
+    SCIGallerySaveMetadata *meta = [self metadataForCurrentItem];
+    NSString *fileName = SCIFileNameForMedia(fileURL, mediaType, meta);
+    NSURL *saveURL = fileURL;
+    BOOL copiedForName = NO;
+    if (![fileURL.lastPathComponent isEqualToString:fileName]) {
+        NSURL *targetURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+        NSFileManager *fm = [NSFileManager defaultManager];
+        [fm removeItemAtURL:targetURL error:nil];
+        if ([fm copyItemAtURL:fileURL toURL:targetURL error:nil]) {
+            saveURL = targetURL;
+            copiedForName = YES;
+        }
+    }
+
+    [SCIDownloadDelegate saveFileURLToPhotos:saveURL completion:^(BOOL success, NSError *error) {
         if (temporaryFile) {
             [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+        }
+        if (copiedForName) {
+            [[NSFileManager defaultManager] removeItemAtURL:saveURL error:nil];
         }
 
         if (success) {
@@ -1353,7 +1378,29 @@ fromViewController:(UIViewController *)presenter {
     if (!url && !item.image) return;
 
     if (url.isFileURL || (!url && item.image)) {
-        id activityItem = url.isFileURL ? url : item.image;
+        id activityItem = url;
+        SCIGallerySaveMetadata *meta = [self metadataForCurrentItem];
+        if (url.isFileURL) {
+            SCIGalleryMediaType mediaType = (item.mediaType == SCIMediaItemTypeVideo) ? SCIGalleryMediaTypeVideo : SCIGalleryMediaTypeImage;
+            NSString *fileName = SCIFileNameForMedia(url, mediaType, meta);
+            if (![url.lastPathComponent isEqualToString:fileName]) {
+                NSURL *targetURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+                [[NSFileManager defaultManager] removeItemAtURL:targetURL error:nil];
+                if ([[NSFileManager defaultManager] copyItemAtURL:url toURL:targetURL error:nil]) {
+                    activityItem = targetURL;
+                }
+            }
+        } else if (item.image) {
+            NSData *jpegData = UIImageJPEGRepresentation(item.image, 0.95);
+            NSString *fileName = SCIFileNameForMedia([NSURL fileURLWithPath:@"preview.jpg"], SCIGalleryMediaTypeImage, meta);
+            NSURL *targetURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+            [[NSFileManager defaultManager] removeItemAtURL:targetURL error:nil];
+            if (jpegData && [jpegData writeToURL:targetURL atomically:YES]) {
+                activityItem = targetURL;
+            } else {
+                activityItem = item.image;
+            }
+        }
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewShare duration:1.4
                                          title:@"Opened share sheet"
                                       subtitle:nil

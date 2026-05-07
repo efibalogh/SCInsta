@@ -5,6 +5,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <ImageIO/ImageIO.h>
 #import <ctype.h>
+#import <math.h>
 
 static CGFloat const kThumbnailSize = 300.0;
 
@@ -64,6 +65,14 @@ static NSString *SCIGallerySourceSlug(SCIGallerySource source) {
     }
 }
 
+static long long SCIEpochMillisecondsForDate(NSDate *date) {
+    NSTimeInterval interval = [date timeIntervalSince1970];
+    if (interval <= 0.0) {
+        interval = [[NSDate date] timeIntervalSince1970];
+    }
+    return (long long)llround(interval * 1000.0);
+}
+
 /// Safe single path segment: ASCII-ish, no path separators.
 static NSString *SCISanitizedGalleryUsername(NSString *raw) {
     if (!raw.length) {
@@ -97,53 +106,6 @@ static NSString *SCISanitizedGalleryUsername(NSString *raw) {
     }
     collapsed = [collapsed stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"._-"]];
     return collapsed.length ? collapsed : @"user";
-}
-
-static BOOL SCIStringLooksLikeUUIDFilename(NSString *baseName) {
-    if (baseName.length < 32 || baseName.length > 40) {
-        return NO;
-    }
-    NSUUID *u = [[NSUUID alloc] initWithUUIDString:baseName];
-    return u != nil;
-}
-
-/// Single path segment for imported files: no slashes, trimmed, limited length.
-static NSString *SCISanitizedImportFileStem(NSString *raw) {
-    if (!raw.length) {
-        return @"";
-    }
-    NSString *s = [[raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lastPathComponent];
-    NSMutableString *out = [NSMutableString stringWithCapacity:MIN((NSUInteger)80, s.length)];
-    NSUInteger maxLen = 80;
-    [s enumerateSubstringsInRange:NSMakeRange(0, s.length)
-                          options:NSStringEnumerationByComposedCharacterSequences
-                       usingBlock:^(NSString * _Nullable substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
-        if (out.length >= maxLen) {
-            *stop = YES;
-            return;
-        }
-        if (substring.length != 1) {
-            [out appendString:@"_"];
-            return;
-        }
-        unichar c = [substring characterAtIndex:0];
-        if (c == '/' || c == '\\' || c == ':' || c == 0) {
-            return;
-        }
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.') {
-            [out appendString:substring];
-        } else if (c == ' ') {
-            [out appendString:@"_"];
-        } else {
-            [out appendString:@"_"];
-        }
-    }];
-    NSString *collapsed = [out stringByReplacingOccurrencesOfString:@"__" withString:@"_"];
-    while ([collapsed containsString:@"__"]) {
-        collapsed = [collapsed stringByReplacingOccurrencesOfString:@"__" withString:@"_"];
-    }
-    collapsed = [collapsed stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"._-"]];
-    return collapsed.length ? collapsed : @"";
 }
 
 static BOOL SCIDigitsOnlyString(NSString *s) {
@@ -193,6 +155,36 @@ static NSDate * _Nullable SCIParseCompactDigitDateFromString(NSString *s) {
         return [fmt12 dateFromString:s];
     }
     return [fmt8 dateFromString:s];
+}
+
+/// Parses unix epoch seconds/milliseconds, with sanity bounds to avoid confusing user ids for timestamps.
+static NSDate * _Nullable SCIParseEpochDateFromString(NSString *s) {
+    if (!SCIDigitsOnlyString(s)) {
+        return nil;
+    }
+    if (s.length < 10 || s.length > 13) {
+        return nil;
+    }
+    unsigned long long raw = strtoull(s.UTF8String, NULL, 10);
+    if (raw == 0ULL) {
+        return nil;
+    }
+    NSTimeInterval seconds = (s.length >= 13) ? ((NSTimeInterval)raw / 1000.0) : (NSTimeInterval)raw;
+    // Keep plausible Instagram-era timestamps and avoid treating pk values as epochs.
+    if (seconds < 946684800.0 || seconds > 4102444800.0) { // 2000-01-01 ... 2100-01-01
+        return nil;
+    }
+    return [NSDate dateWithTimeIntervalSince1970:seconds];
+}
+
+static BOOL SCIBasenameUsesCurrentNamingScheme(NSString *fileName) {
+    NSString *baseName = [[fileName lastPathComponent] stringByDeletingPathExtension];
+    NSArray<NSString *> *parts = [baseName componentsSeparatedByString:@"_"];
+    if (parts.count < 4) {
+        return NO;
+    }
+    NSString *lead = parts.firstObject;
+    return lead.length == 13 && SCIParseEpochDateFromString(lead) != nil;
 }
 
 /// Recognizes slug segments matching `SCIGallerySourceSlug` output (feed, story, reel, …).
@@ -248,8 +240,23 @@ void SCIGalleryApplyImportHeuristicsFromFilename(NSString *fileName, SCIGalleryS
         return;
     }
 
+    NSDate *leadEpochDate = SCIParseEpochDateFromString(parts.firstObject);
+    if (leadEpochDate) {
+        if (!m.importCapturedDate) {
+            m.importCapturedDate = leadEpochDate;
+        }
+        [parts removeObjectAtIndex:0];
+    }
+    if (parts.count == 0) {
+        return;
+    }
+
     NSDate *trailDate = SCIParseCompactDigitDateFromString(parts.lastObject);
     if (trailDate) {
+        if (!m.importPostedDate) {
+            m.importPostedDate = trailDate;
+        }
+        // Backward-compatible fallback: if no epoch/save-time token exists, use trailing date.
         if (!m.importCapturedDate) {
             m.importCapturedDate = trailDate;
         }
@@ -327,32 +334,35 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         compactDateFmt.timeZone = [NSTimeZone localTimeZone];
         compactDateFmt.dateFormat = @"yyyyMMddHHmmss";
     });
-    NSDate *refDate = metadata.importCapturedDate ?: [NSDate date];
-    NSString *dateCompact = [compactDateFmt stringFromDate:refDate];
+    NSDate *saveDate = metadata.importCapturedDate ?: [NSDate date];
+    if (metadata && !metadata.importCapturedDate) {
+        metadata.importCapturedDate = saveDate;
+    }
+    NSDate *postedDate = metadata.importPostedDate ?: saveDate;
+    if (metadata && !metadata.importPostedDate) {
+        metadata.importPostedDate = postedDate;
+    }
+    NSString *dateCompact = [compactDateFmt stringFromDate:postedDate];
+    NSString *epoch = [NSString stringWithFormat:@"%lld", SCIEpochMillisecondsForDate(saveDate)];
 
     SCIGallerySource src = metadata ? (SCIGallerySource)metadata.source : SCIGallerySourceOther;
     NSString *slug = SCIGallerySourceSlug(src);
+    NSString *user = @"media";
 
     if (metadata.sourceUsername.length > 0) {
-        NSString *user = SCISanitizedGalleryUsername(metadata.sourceUsername);
-        return [NSString stringWithFormat:@"%@_%@_%@.%@", user, slug, dateCompact, ext];
-    }
-
-    NSString *base = nil;
-    if (metadata.importFileNameStem.length > 0) {
-        NSString *stem = SCISanitizedImportFileStem(metadata.importFileNameStem);
-        if (stem.length > 0) {
-            base = stem;
+        NSString *sanitizedUser = SCISanitizedGalleryUsername(metadata.sourceUsername);
+        if (sanitizedUser.length > 0) {
+            user = sanitizedUser;
         }
     }
-    if (base.length == 0) {
-        base = [orig stringByDeletingPathExtension];
-    }
-    if (SCIStringLooksLikeUUIDFilename(base) || base.length == 0) {
-        return [NSString stringWithFormat:@"media_%@_%@.%@", slug, dateCompact, ext];
-    }
 
-    return [NSString stringWithFormat:@"%@_%@.%@", base, dateCompact, ext];
+    return [NSString stringWithFormat:@"%@_%@_%@_%@.%@", epoch, user, slug, dateCompact, ext];
+}
+
+static NSDate *SCIGalleryBestFileDate(NSString *path, NSDate *fallbackDate) {
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+    NSDate *date = fallbackDate ?: attrs[NSFileCreationDate] ?: attrs[NSFileModificationDate];
+    return date ?: [NSDate date];
 }
 
 @implementation SCIGalleryFile
@@ -419,6 +429,96 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
         file.durationSeconds = 0;
         file.customName = nil;
     }
+}
+
++ (NSInteger)migrateLegacyFilenamesWithError:(NSError **)error {
+    NSManagedObjectContext *ctx = [SCIGalleryCoreDataStack shared].viewContext;
+    NSFetchRequest *req = [[NSFetchRequest alloc] initWithEntityName:@"SCIGalleryFile"];
+    NSArray<SCIGalleryFile *> *files = [ctx executeFetchRequest:req error:error] ?: @[];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSInteger migrated = 0;
+
+    for (SCIGalleryFile *file in files) {
+        if (SCIBasenameUsesCurrentNamingScheme(file.relativePath)) {
+            continue;
+        }
+
+        NSString *oldPath = [file filePath];
+        if (![fm fileExistsAtPath:oldPath]) {
+            continue;
+        }
+
+        SCIGallerySaveMetadata *metadata = [SCIGallerySaveMetadata new];
+        metadata.source = file.source;
+        metadata.sourceUsername = file.sourceUsername;
+        metadata.sourceUserPK = file.sourceUserPK;
+        metadata.sourceProfileURLString = file.sourceProfileURLString;
+        metadata.sourceMediaPK = file.sourceMediaPK;
+        metadata.sourceMediaCode = file.sourceMediaCode;
+        metadata.sourceMediaURLString = file.sourceMediaURLString;
+        metadata.pixelWidth = file.pixelWidth;
+        metadata.pixelHeight = file.pixelHeight;
+        metadata.durationSeconds = file.durationSeconds;
+        metadata.importCapturedDate = SCIGalleryBestFileDate(oldPath, file.dateAdded);
+
+        SCIGallerySaveMetadata *parsedMetadata = [SCIGallerySaveMetadata new];
+        parsedMetadata.source = SCIGallerySourceOther;
+        SCIGalleryApplyImportHeuristicsFromFilename(file.relativePath, parsedMetadata);
+        if (!metadata.sourceUsername.length && parsedMetadata.sourceUsername.length) {
+            metadata.sourceUsername = parsedMetadata.sourceUsername;
+        }
+        if (file.source == SCIGallerySourceOther && parsedMetadata.source != SCIGallerySourceOther) {
+            metadata.source = parsedMetadata.source;
+        }
+        metadata.importPostedDate = parsedMetadata.importPostedDate ?: parsedMetadata.importCapturedDate ?: metadata.importCapturedDate;
+
+        NSString *newName = SCIFileNameForMedia([NSURL fileURLWithPath:oldPath], (SCIGalleryMediaType)file.mediaType, metadata);
+        NSString *destPath = [[SCIGalleryPaths galleryMediaDirectory] stringByAppendingPathComponent:newName];
+        if ([oldPath isEqualToString:destPath]) {
+            continue;
+        }
+
+        if ([fm fileExistsAtPath:destPath]) {
+            NSString *stem = [newName stringByDeletingPathExtension];
+            NSString *ext = newName.pathExtension;
+            for (int n = 1; n < 100; n++) {
+                NSString *candidate = [NSString stringWithFormat:@"%@-%d.%@", stem, n, ext];
+                NSString *candidatePath = [[SCIGalleryPaths galleryMediaDirectory] stringByAppendingPathComponent:candidate];
+                if (![fm fileExistsAtPath:candidatePath]) {
+                    newName = candidate;
+                    destPath = candidatePath;
+                    break;
+                }
+            }
+        }
+
+        NSError *moveError = nil;
+        if (![fm moveItemAtPath:oldPath toPath:destPath error:&moveError]) {
+            if (error) *error = moveError;
+            return migrated;
+        }
+
+        NSString *oldRelativePath = file.relativePath;
+        file.relativePath = newName;
+        file.source = metadata.source;
+        if (!file.sourceUsername.length && metadata.sourceUsername.length) {
+            file.sourceUsername = metadata.sourceUsername;
+        }
+        if (!file.dateAdded && metadata.importCapturedDate) {
+            file.dateAdded = metadata.importCapturedDate;
+        }
+        migrated += 1;
+
+        NSError *saveError = nil;
+        if (![ctx save:&saveError]) {
+            [fm moveItemAtPath:destPath toPath:oldPath error:nil];
+            file.relativePath = oldRelativePath;
+            if (error) *error = saveError;
+            return migrated - 1;
+        }
+    }
+
+    return migrated;
 }
 
 + (SCIGalleryMediaType)inferMediaTypeFromFileURL:(NSURL *)fileURL {
@@ -533,7 +633,7 @@ NSString *SCIFileNameForMedia(NSURL *fileURL,
     file.identifier = [NSUUID UUID].UUIDString;
     file.relativePath = fileName;
     file.mediaType = mediaType;
-    file.dateAdded = metadata.importCapturedDate ?: [NSDate date];
+    file.dateAdded = metadata.importCapturedDate ?: metadata.importPostedDate ?: [NSDate date];
     file.fileSize = size;
     file.isFavorite = NO;
     file.folderPath = folderPath;

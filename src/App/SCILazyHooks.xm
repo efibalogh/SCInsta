@@ -1,7 +1,9 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
 #import "SCICore.h"
 #import "SCIStartupProfiler.h"
+#import "../Shared/ActionButton/ActionButtonLayout.h"
 
 static void SCIScheduleGeneralUIHooks(void) {
     static dispatch_once_t onceToken;
@@ -59,6 +61,22 @@ static void SCIInstallPostAppearLazyHooksForViewController(UIViewController *con
     }
 }
 
+static void SCIInstallLazyHooksForView(UIView *view) {
+    if (!view) {
+        return;
+    }
+
+    const char *className = object_getClassName(view);
+    if (!className) {
+        return;
+    }
+
+    if (strcmp(className, "IGSundialViewerVerticalUFI") == 0) {
+        SCICoreInstallSurfaceHooks(SCISurfaceReels);
+        SCIInstallReelsActionButton(view);
+    }
+}
+
 %hook UIViewController
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -69,6 +87,15 @@ static void SCIInstallPostAppearLazyHooksForViewController(UIViewController *con
 - (void)viewDidAppear:(BOOL)animated {
     %orig(animated);
     SCIInstallPostAppearLazyHooksForViewController(self);
+}
+
+%end
+
+%hook UIView
+
+- (void)didMoveToWindow {
+    %orig;
+    SCIInstallLazyHooksForView((UIView *)self);
 }
 
 %end

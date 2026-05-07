@@ -25,6 +25,7 @@
     c.importFileNameStem = [self.importFileNameStem copy];
     c.customName = [self.customName copy];
     c.importCapturedDate = self.importCapturedDate;
+    c.importPostedDate = self.importPostedDate;
     return c;
 }
 

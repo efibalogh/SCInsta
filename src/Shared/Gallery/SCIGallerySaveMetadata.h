@@ -27,8 +27,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// Stored on `SCIGalleryFile.customName` for list/grid display.
 @property (nonatomic, copy, nullable) NSString *customName;
 
-/// When set, used for `SCIGalleryFile.dateAdded` and the compact segment in `SCIFileNameForMedia` instead of “now”. Often parsed from tweak-style basenames (…_story_yyyyMMddHHmmss).
+/// When set, used for `SCIGalleryFile.dateAdded` as the import/save time (e.g. parsed from a leading epoch segment in tweak-style basenames).
 @property (nonatomic, strong, nullable) NSDate *importCapturedDate;
+
+/// Optional media posted time parsed from tweak-style trailing compact dates (…_story_yyyyMMddHHmmss). Used for generated filename compact segment when available.
+@property (nonatomic, strong, nullable) NSDate *importPostedDate;
 
 @end
 

@@ -24,6 +24,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     SCIGallerySettingsSectionLock,
     SCIGallerySettingsSectionShortcuts,
     SCIGallerySettingsSectionImport,
+    SCIGallerySettingsSectionMaintenance,
     SCIGallerySettingsSectionDelete,
     SCIGallerySettingsSectionCount
 };
@@ -104,6 +105,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionLock: return @"Lock";
         case SCIGallerySettingsSectionShortcuts: return @"Shortcuts";
         case SCIGallerySettingsSectionImport: return @"Import";
+        case SCIGallerySettingsSectionMaintenance: return @"Maintenance";
         case SCIGallerySettingsSectionDelete: return @"Delete";
     }
     return nil;
@@ -119,6 +121,8 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
             return @"Long press Messages tab to open. Requires app restart to take effect.";
         case SCIGallerySettingsSectionImport:
             return @"Import from the Files app with full metadata (username, shortcode, URLs) so Open profile / Open original behave like saves from Instagram. Batch: set shared fields, Add files, then edit or merge per row.";
+        case SCIGallerySettingsSectionMaintenance:
+            return @"Renames older media files to the current epoch_username_source_posted format. Custom display names and thumbnails are preserved.";
         default:
             return nil;
     }
@@ -135,6 +139,8 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionShortcuts:
             return 1;
         case SCIGallerySettingsSectionImport:
+            return 1;
+        case SCIGallerySettingsSectionMaintenance:
             return 1;
         case SCIGallerySettingsSectionDelete:
             return 1;
@@ -210,6 +216,12 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 }
 
+- (void)configureMaintenanceCell:(UITableViewCell *)cell {
+    cell.textLabel.text = @"Migrate Saved Filenames";
+    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+}
+
 - (void)configureDeleteCell:(UITableViewCell *)cell {
     cell.textLabel.text = @"Delete Files";
     cell.textLabel.textColor = [SCIUtils SCIColor_InstagramDestructive];
@@ -244,6 +256,9 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
             break;
         case SCIGallerySettingsSectionImport:
             [self configureImportCell:cell];
+            break;
+        case SCIGallerySettingsSectionMaintenance:
+            [self configureMaintenanceCell:cell];
             break;
         case SCIGallerySettingsSectionDelete:
             [self configureDeleteCell:cell];
@@ -292,6 +307,27 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     [SCIUtils showRestartConfirmation];
 }
 
+- (void)confirmFilenameMigration {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Migrate Saved Filenames?"
+                                                                   message:@"Older gallery media files will be renamed on disk to the current epoch_username_source_posted format. Existing custom display names are not changed."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Migrate" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        NSError *error = nil;
+        NSInteger count = [SCIGalleryFile migrateLegacyFilenamesWithError:&error];
+        if (error) {
+            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:3.0 title:@"Migration failed" subtitle:error.localizedDescription iconResource:@"error_filled"];
+            return;
+        }
+        NSString *subtitle = count == 1 ? @"1 file was renamed." : [NSString stringWithFormat:@"%ld files were renamed.", (long)count];
+        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:3.0 title:@"Migration complete" subtitle:subtitle iconResource:@"circle_check_filled"];
+        [self reloadStats];
+        [self.tableView reloadData];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"SCIGalleryFavoritesSortPreferenceChanged" object:nil];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
@@ -305,6 +341,11 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     if (indexPath.section == SCIGallerySettingsSectionImport) {
         SCIGalleryImportViewController *vc = [[SCIGalleryImportViewController alloc] initWithDestinationFolderPath:self.importDestinationFolderPath];
         [self.navigationController pushViewController:vc animated:YES];
+        return;
+    }
+
+    if (indexPath.section == SCIGallerySettingsSectionMaintenance) {
+        [self confirmFilenameMigration];
         return;
     }
 

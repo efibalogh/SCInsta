@@ -185,7 +185,7 @@ static SCIActionButtonContext *SCIReelsActionContext(UIView *verticalUFIView) {
 	return context;
 }
 
-static void SCIInstallReelsActionButton(UIView *verticalUFIView) {
+void SCIInstallReelsActionButton(UIView *verticalUFIView) {
 	if (!verticalUFIView) return;
 
 	UIButton *button = (UIButton *)[verticalUFIView viewWithTag:kSCIReelsActionButtonTag];

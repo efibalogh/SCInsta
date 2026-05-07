@@ -249,6 +249,9 @@ typedef NS_ENUM(NSInteger, SCIGalleryImportMainSection) {
         if (src.importCapturedDate) {
             d.importCapturedDate = src.importCapturedDate;
         }
+        if (src.importPostedDate) {
+            d.importPostedDate = src.importPostedDate;
+        }
     }
     [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:SCIGalleryImportMainSectionQueue] withRowAnimation:UITableViewRowAnimationNone];
 }

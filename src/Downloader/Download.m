@@ -274,6 +274,10 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
 - (void)downloadDidFinishWithFileURL:(NSURL *)fileURL {
     SCIGallerySaveMetadata *galleryMeta = self.pendingGallerySaveMetadata;
     self.pendingGallerySaveMetadata = nil;
+    if (!galleryMeta) {
+        galleryMeta = [[SCIGallerySaveMetadata alloc] init];
+        galleryMeta.source = (int16_t)SCIGallerySourceOther;
+    }
 
     BOOL isVideo = [[self class] isVideoFileAtURL:fileURL];
     BOOL isAudio = SCIIsAudioFileAtURL(fileURL);

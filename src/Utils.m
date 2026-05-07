@@ -838,6 +838,15 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 
     UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
     navigationController.modalPresentationStyle = UIModalPresentationPageSheet;
+    UIViewController *presenter = topMostController();
+    UIUserInterfaceStyle interfaceStyle = presenter.view.window.traitCollection.userInterfaceStyle;
+    if (interfaceStyle == UIUserInterfaceStyleUnspecified) {
+        interfaceStyle = presenter.traitCollection.userInterfaceStyle;
+    }
+    if (interfaceStyle != UIUserInterfaceStyleUnspecified) {
+        navigationController.overrideUserInterfaceStyle = interfaceStyle;
+        settingsViewController.overrideUserInterfaceStyle = interfaceStyle;
+    }
     UISheetPresentationController *sheet = navigationController.sheetPresentationController;
     sheet.detents = @[
         [UISheetPresentationControllerDetent mediumDetent],
@@ -845,7 +854,6 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     ];
     sheet.selectedDetentIdentifier = UISheetPresentationControllerDetentIdentifierLarge;
 
-    UIViewController *presenter = topMostController();
     [presenter presentViewController:navigationController animated:YES completion:nil];
 }
 

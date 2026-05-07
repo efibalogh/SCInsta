@@ -1,6 +1,7 @@
 #import "SCIGalleryOriginController.h"
 
 #import <objc/message.h>
+#import <objc/runtime.h>
 
 #import "SCIGalleryFile.h"
 #import "SCIGallerySaveMetadata.h"
@@ -19,6 +20,55 @@ static NSString *SCIGalleryStringValue(id value) {
         return string.length > 0 ? string : nil;
     }
     return nil;
+}
+
+static id SCIGalleryFieldCacheValue(id target, NSString *key) {
+    if (!target || key.length == 0) return nil;
+    if ([target isKindOfClass:[NSDictionary class]]) {
+        id value = ((NSDictionary *)target)[key];
+        return [value isKindOfClass:[NSNull class]] ? nil : value;
+    }
+
+    Ivar fieldCacheIvar = NULL;
+    @try {
+        for (Class cls = object_getClass(target); cls && !fieldCacheIvar; cls = class_getSuperclass(cls)) {
+            fieldCacheIvar = class_getInstanceVariable(cls, "_fieldCache");
+        }
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+    if (!fieldCacheIvar) return nil;
+
+    id fieldCache = nil;
+    @try {
+        fieldCache = object_getIvar(target, fieldCacheIvar);
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+    if (![fieldCache isKindOfClass:[NSDictionary class]]) return nil;
+
+    id value = ((NSDictionary *)fieldCache)[key];
+    return [value isKindOfClass:[NSNull class]] ? nil : value;
+}
+
+static NSTimeInterval SCIGalleryTimestampFromValue(id value) {
+    if (!value || [value isKindOfClass:[NSNull class]]) return 0.0;
+    if ([value isKindOfClass:[NSDate class]]) return [(NSDate *)value timeIntervalSince1970];
+
+    double raw = 0.0;
+    if ([value respondsToSelector:@selector(doubleValue)]) {
+        raw = [value doubleValue];
+    }
+    if (raw <= 0.0) return 0.0;
+    if (raw > 1e15) raw /= 1000000.0;
+    else if (raw > 1e12) raw /= 1000.0;
+    return raw;
+}
+
+static NSDate *SCIGalleryDateFromTimestampValue(id value) {
+    NSTimeInterval timestamp = SCIGalleryTimestampFromValue(value);
+    if (timestamp <= 0.0) return nil;
+    return [NSDate dateWithTimeIntervalSince1970:timestamp];
 }
 
 static NSString *SCIGalleryStringForSelector(id target, NSString *selectorName) {
@@ -62,6 +112,27 @@ static NSString *SCIGalleryRecursiveStringForSelectors(id target, NSArray<NSStri
         if (!nested || nested == target) continue;
         NSString *value = SCIGalleryRecursiveStringForSelectors(nested, selectorNames, depth + 1);
         if (value.length > 0) return value;
+    }
+
+    return nil;
+}
+
+static NSDate *SCIGalleryRecursiveDateForKeys(id target, NSArray<NSString *> *keys, NSInteger depth) {
+    if (!target || depth > 3) return nil;
+
+    for (NSString *key in keys) {
+        id value = SCIObjectForSelector(target, key);
+        if (!value) value = SCIKVCObject(target, key);
+        if (!value) value = SCIGalleryFieldCacheValue(target, key);
+        NSDate *date = SCIGalleryDateFromTimestampValue(value);
+        if (date) return date;
+    }
+
+    for (NSString *selectorName in @[@"media", @"item", @"storyItem", @"visualMessage", @"explorePostInFeed", @"rootItem", @"clipsItem", @"clipsMedia", @"post"]) {
+        id nested = SCIGalleryNestedObjectForSelector(target, selectorName);
+        if (!nested || nested == target) continue;
+        NSDate *date = SCIGalleryRecursiveDateForKeys(nested, keys, depth + 1);
+        if (date) return date;
     }
 
     return nil;
@@ -159,6 +230,11 @@ static NSString *SCIGalleryMediaURLStringFromMetadata(SCIGallerySaveMetadata *me
 
     NSString *mediaCode = SCIGalleryRecursiveStringForSelectors(media, @[@"code", @"shortCode", @"shortcode", @"mediaCode", @"mediaShortcode", @"shortCodeToken"], 0);
     if (mediaCode.length > 0) metadata.sourceMediaCode = mediaCode;
+
+    if (!metadata.importPostedDate) {
+        NSDate *postedDate = SCIGalleryRecursiveDateForKeys(media, @[@"taken_at", @"takenAt", @"takenAtDate", @"device_timestamp", @"deviceTimestamp", @"created_at", @"createdAt", @"upload_time", @"uploadTime", @"published_time", @"publishedTime"], 0);
+        if (postedDate) metadata.importPostedDate = postedDate;
+    }
 
     NSURL *mediaURL = SCIGalleryRecursiveURLForSelectors(media, @[@"permalink", @"permaLink", @"shareURL", @"shareUrl", @"canonicalURL", @"canonicalUrl", @"permalinkURL", @"instagramURL", @"instagramUrl", @"webURL", @"webUrl"], 0);
     if (!mediaURL) {

@@ -164,7 +164,7 @@ static NSDate * _Nullable SCIFormParsedGallerySortDate(NSString *raw) {
         case SCIGalleryImportFormRowDuration:
             return @"Video length in seconds. Leave empty to probe; override for broken files.";
         case SCIGalleryImportFormRowGallerySortDate:
-            return @"Used for the gallery “downloaded” line and sorting. Parsed from trailing digits in tweak-style names (e.g. …_20260210001603). Clear to use the device import time.";
+            return @"Used for the gallery “downloaded” line and sorting. In tweak-style names, we prefer a leading epoch token (save-time), and fall back to trailing compact digits when needed. Clear to use the device import time.";
         default:
             return @"";
     }

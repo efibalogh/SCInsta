@@ -14,17 +14,6 @@
 @property (nonatomic, assign) BOOL pendingImportGallery;
 @end
 
-@implementation SCISettingsTransferManager
-
-+ (instancetype)sharedManager {
-    static SCISettingsTransferManager *manager = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        manager = [[SCISettingsTransferManager alloc] init];
-    });
-    return manager;
-}
-
 static NSString *SCITemporaryTransferRoot(NSString *suffix) {
     NSString *root = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"scinsta-transfer-%@-%@", suffix, NSUUID.UUID.UUIDString]];
     [[NSFileManager defaultManager] createDirectoryAtPath:root withIntermediateDirectories:YES attributes:nil error:nil];
@@ -99,6 +88,364 @@ static BOOL SCICopyItemReplacingDestination(NSString *sourcePath, NSString *dest
     return [fm copyItemAtPath:sourcePath toPath:destinationPath error:error];
 }
 
+static BOOL SCIIsValidSettingsTransferBundleRoot(NSString *bundleRoot);
+static NSString *SCIResolvedSettingsTransferBundleRoot(NSURL *pickedURL);
+
+static void SCIAppendUInt16LE(NSMutableData *data, uint16_t value) {
+    uint8_t bytes[2] = { (uint8_t)(value & 0xff), (uint8_t)((value >> 8) & 0xff) };
+    [data appendBytes:bytes length:sizeof(bytes)];
+}
+
+static void SCIAppendUInt32LE(NSMutableData *data, uint32_t value) {
+    uint8_t bytes[4] = {
+        (uint8_t)(value & 0xff),
+        (uint8_t)((value >> 8) & 0xff),
+        (uint8_t)((value >> 16) & 0xff),
+        (uint8_t)((value >> 24) & 0xff)
+    };
+    [data appendBytes:bytes length:sizeof(bytes)];
+}
+
+static uint16_t SCIReadUInt16LE(const uint8_t *bytes, NSUInteger offset) {
+    return (uint16_t)bytes[offset] | ((uint16_t)bytes[offset + 1] << 8);
+}
+
+static uint32_t SCIReadUInt32LE(const uint8_t *bytes, NSUInteger offset) {
+    return (uint32_t)bytes[offset] |
+           ((uint32_t)bytes[offset + 1] << 8) |
+           ((uint32_t)bytes[offset + 2] << 16) |
+           ((uint32_t)bytes[offset + 3] << 24);
+}
+
+static uint32_t SCIZipCRC32ForBytes(uint32_t crc, const uint8_t *bytes, NSUInteger length) {
+    static uint32_t table[256];
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        for (uint32_t i = 0; i < 256; i++) {
+            uint32_t c = i;
+            for (int j = 0; j < 8; j++) {
+                c = (c & 1) ? (0xedb88320U ^ (c >> 1)) : (c >> 1);
+            }
+            table[i] = c;
+        }
+    });
+
+    crc = crc ^ 0xffffffffU;
+    for (NSUInteger i = 0; i < length; i++) {
+        crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >> 8);
+    }
+    return crc ^ 0xffffffffU;
+}
+
+static void SCIZipCurrentDOSTimeDate(uint16_t *timeOut, uint16_t *dateOut) {
+    NSDateComponents *components = [[NSCalendar currentCalendar] components:NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond fromDate:[NSDate date]];
+    NSInteger year = MAX(1980, MIN(2107, components.year));
+    if (timeOut) *timeOut = (uint16_t)((components.hour << 11) | (components.minute << 5) | (components.second / 2));
+    if (dateOut) *dateOut = (uint16_t)(((year - 1980) << 9) | (components.month << 5) | components.day);
+}
+
+@interface SCIZipEntry : NSObject
+@property (nonatomic, copy) NSString *relativePath;
+@property (nonatomic, copy) NSString *sourcePath;
+@property (nonatomic, assign) uint32_t crc32;
+@property (nonatomic, assign) uint32_t size;
+@property (nonatomic, assign) uint32_t localHeaderOffset;
+@property (nonatomic, assign) uint16_t dosTime;
+@property (nonatomic, assign) uint16_t dosDate;
+@end
+
+@implementation SCIZipEntry
+@end
+
+static NSArray<SCIZipEntry *> *SCIZipEntriesForDirectory(NSString *root, NSError **error) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSDirectoryEnumerator<NSString *> *enumerator = [fm enumeratorAtPath:root];
+    NSMutableArray<SCIZipEntry *> *entries = [NSMutableArray array];
+
+    for (NSString *relativePath in enumerator) {
+        NSString *sourcePath = [root stringByAppendingPathComponent:relativePath];
+        NSNumber *isDirectory = nil;
+        NSURL *sourceURL = [NSURL fileURLWithPath:sourcePath];
+        [sourceURL getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:nil];
+        if (isDirectory.boolValue) continue;
+
+        NSDictionary *attrs = [fm attributesOfItemAtPath:sourcePath error:error];
+        if (!attrs) return nil;
+        unsigned long long fileSize = [attrs[NSFileSize] unsignedLongLongValue];
+        if (fileSize > UINT32_MAX) {
+            if (error) {
+                *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                             code:2001
+                                         userInfo:@{NSLocalizedDescriptionKey: @"Export contains a file larger than 4 GB, which is not supported yet."}];
+            }
+            return nil;
+        }
+
+        SCIZipEntry *entry = [SCIZipEntry new];
+        entry.relativePath = [relativePath stringByReplacingOccurrencesOfString:@"\\" withString:@"/"];
+        entry.sourcePath = sourcePath;
+        entry.size = (uint32_t)fileSize;
+        if ([entry.relativePath dataUsingEncoding:NSUTF8StringEncoding].length > UINT16_MAX) {
+            if (error) {
+                *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                             code:2003
+                                         userInfo:@{NSLocalizedDescriptionKey: @"Export contains a path that is too long for zip."}];
+            }
+            return nil;
+        }
+        [entries addObject:entry];
+    }
+
+    [entries sortUsingComparator:^NSComparisonResult(SCIZipEntry *a, SCIZipEntry *b) {
+        return [a.relativePath compare:b.relativePath];
+    }];
+    if (entries.count > UINT16_MAX) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                         code:2004
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Export contains too many files for this zip writer."}];
+        }
+        return nil;
+    }
+    return entries;
+}
+
+static BOOL SCIWriteStoredZipFromDirectory(NSString *root, NSString *zipPath, NSError **error) {
+    NSArray<SCIZipEntry *> *entries = SCIZipEntriesForDirectory(root, error);
+    if (!entries) return NO;
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *parent = [zipPath stringByDeletingLastPathComponent];
+    [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:nil];
+    [fm createFileAtPath:zipPath contents:nil attributes:nil];
+    NSFileHandle *zip = [NSFileHandle fileHandleForWritingAtPath:zipPath];
+    if (!zip) return NO;
+
+    uint16_t dosTime = 0;
+    uint16_t dosDate = 0;
+    SCIZipCurrentDOSTimeDate(&dosTime, &dosDate);
+
+    for (SCIZipEntry *entry in entries) {
+        entry.dosTime = dosTime;
+        entry.dosDate = dosDate;
+        if ([zip offsetInFile] > UINT32_MAX) {
+            if (error) {
+                *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                             code:2005
+                                         userInfo:@{NSLocalizedDescriptionKey: @"Export is too large for this zip writer."}];
+            }
+            [zip closeFile];
+            return NO;
+        }
+        entry.localHeaderOffset = (uint32_t)[zip offsetInFile];
+        NSData *nameData = [entry.relativePath dataUsingEncoding:NSUTF8StringEncoding];
+
+        NSMutableData *local = [NSMutableData data];
+        SCIAppendUInt32LE(local, 0x04034b50);
+        SCIAppendUInt16LE(local, 20);
+        SCIAppendUInt16LE(local, 0);
+        SCIAppendUInt16LE(local, 0);
+        SCIAppendUInt16LE(local, entry.dosTime);
+        SCIAppendUInt16LE(local, entry.dosDate);
+        SCIAppendUInt32LE(local, 0);
+        SCIAppendUInt32LE(local, entry.size);
+        SCIAppendUInt32LE(local, entry.size);
+        SCIAppendUInt16LE(local, (uint16_t)nameData.length);
+        SCIAppendUInt16LE(local, 0);
+        [local appendData:nameData];
+        [zip writeData:local];
+
+        NSFileHandle *input = [NSFileHandle fileHandleForReadingAtPath:entry.sourcePath];
+        if (!input) {
+            if (error) {
+                *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                             code:2006
+                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not read %@.", entry.relativePath]}];
+            }
+            [zip closeFile];
+            return NO;
+        }
+        uint32_t crc = 0;
+        @autoreleasepool {
+            while (true) {
+                NSData *chunk = [input readDataOfLength:1024 * 1024];
+                if (chunk.length == 0) break;
+                crc = SCIZipCRC32ForBytes(crc, chunk.bytes, chunk.length);
+                [zip writeData:chunk];
+            }
+        }
+        [input closeFile];
+        entry.crc32 = crc;
+
+        unsigned long long returnOffset = [zip offsetInFile];
+        [zip seekToFileOffset:entry.localHeaderOffset + 14];
+        NSMutableData *sizes = [NSMutableData data];
+        SCIAppendUInt32LE(sizes, entry.crc32);
+        SCIAppendUInt32LE(sizes, entry.size);
+        SCIAppendUInt32LE(sizes, entry.size);
+        [zip writeData:sizes];
+        [zip seekToFileOffset:returnOffset];
+    }
+
+    if ([zip offsetInFile] > UINT32_MAX) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                         code:2005
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Export is too large for this zip writer."}];
+        }
+        [zip closeFile];
+        return NO;
+    }
+    uint32_t centralOffset = (uint32_t)[zip offsetInFile];
+    NSMutableData *central = [NSMutableData data];
+    for (SCIZipEntry *entry in entries) {
+        NSData *nameData = [entry.relativePath dataUsingEncoding:NSUTF8StringEncoding];
+        SCIAppendUInt32LE(central, 0x02014b50);
+        SCIAppendUInt16LE(central, 20);
+        SCIAppendUInt16LE(central, 20);
+        SCIAppendUInt16LE(central, 0);
+        SCIAppendUInt16LE(central, 0);
+        SCIAppendUInt16LE(central, entry.dosTime);
+        SCIAppendUInt16LE(central, entry.dosDate);
+        SCIAppendUInt32LE(central, entry.crc32);
+        SCIAppendUInt32LE(central, entry.size);
+        SCIAppendUInt32LE(central, entry.size);
+        SCIAppendUInt16LE(central, (uint16_t)nameData.length);
+        SCIAppendUInt16LE(central, 0);
+        SCIAppendUInt16LE(central, 0);
+        SCIAppendUInt16LE(central, 0);
+        SCIAppendUInt16LE(central, 0);
+        SCIAppendUInt32LE(central, 0);
+        SCIAppendUInt32LE(central, entry.localHeaderOffset);
+        [central appendData:nameData];
+    }
+    [zip writeData:central];
+
+    uint32_t centralSize = (uint32_t)central.length;
+    NSMutableData *eocd = [NSMutableData data];
+    SCIAppendUInt32LE(eocd, 0x06054b50);
+    SCIAppendUInt16LE(eocd, 0);
+    SCIAppendUInt16LE(eocd, 0);
+    SCIAppendUInt16LE(eocd, (uint16_t)entries.count);
+    SCIAppendUInt16LE(eocd, (uint16_t)entries.count);
+    SCIAppendUInt32LE(eocd, centralSize);
+    SCIAppendUInt32LE(eocd, centralOffset);
+    SCIAppendUInt16LE(eocd, 0);
+    [zip writeData:eocd];
+    [zip closeFile];
+    return YES;
+}
+
+static BOOL SCIIsSafeZipEntryName(NSString *name) {
+    if (name.length == 0 || [name hasPrefix:@"/"] || [name containsString:@"\\"]) return NO;
+    for (NSString *part in [name componentsSeparatedByString:@"/"]) {
+        if ([part isEqualToString:@".."]) return NO;
+    }
+    return YES;
+}
+
+static NSString *SCIExpandStoredZipSettingsTransferArchive(NSURL *archiveURL, NSError **error) {
+    NSData *zipData = [NSData dataWithContentsOfURL:archiveURL options:NSDataReadingMappedIfSafe error:error];
+    if (zipData.length < 22) return nil;
+
+    const uint8_t *bytes = zipData.bytes;
+    NSInteger eocdOffset = -1;
+    for (NSInteger i = (NSInteger)zipData.length - 22; i >= 0 && i >= (NSInteger)zipData.length - 65557; i--) {
+        if (SCIReadUInt32LE(bytes, (NSUInteger)i) == 0x06054b50) {
+            eocdOffset = i;
+            break;
+        }
+    }
+    if (eocdOffset < 0) return nil;
+
+    uint16_t entryCount = SCIReadUInt16LE(bytes, (NSUInteger)eocdOffset + 10);
+    uint32_t centralSize = SCIReadUInt32LE(bytes, (NSUInteger)eocdOffset + 12);
+    uint32_t centralOffset = SCIReadUInt32LE(bytes, (NSUInteger)eocdOffset + 16);
+    if ((NSUInteger)centralOffset + centralSize > zipData.length) return nil;
+
+    NSString *tempRoot = SCITemporaryTransferRoot(@"import");
+    NSString *expandedRoot = [tempRoot stringByAppendingPathComponent:@"Expanded"];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm createDirectoryAtPath:expandedRoot withIntermediateDirectories:YES attributes:nil error:nil];
+
+    NSFileHandle *archiveHandle = [NSFileHandle fileHandleForReadingFromURL:archiveURL error:error];
+    if (!archiveHandle) return nil;
+
+    NSUInteger cursor = centralOffset;
+    for (uint16_t i = 0; i < entryCount; i++) {
+        if (cursor + 46 > zipData.length || SCIReadUInt32LE(bytes, cursor) != 0x02014b50) {
+            [archiveHandle closeFile];
+            return nil;
+        }
+
+        uint16_t method = SCIReadUInt16LE(bytes, cursor + 10);
+        uint32_t compressedSize = SCIReadUInt32LE(bytes, cursor + 20);
+        uint32_t uncompressedSize = SCIReadUInt32LE(bytes, cursor + 24);
+        uint16_t nameLen = SCIReadUInt16LE(bytes, cursor + 28);
+        uint16_t extraLen = SCIReadUInt16LE(bytes, cursor + 30);
+        uint16_t commentLen = SCIReadUInt16LE(bytes, cursor + 32);
+        uint32_t localOffset = SCIReadUInt32LE(bytes, cursor + 42);
+        if (cursor + 46 + nameLen + extraLen + commentLen > zipData.length) {
+            [archiveHandle closeFile];
+            return nil;
+        }
+
+        NSData *nameData = [zipData subdataWithRange:NSMakeRange(cursor + 46, nameLen)];
+        NSString *entryName = [[NSString alloc] initWithData:nameData encoding:NSUTF8StringEncoding];
+        cursor += 46 + nameLen + extraLen + commentLen;
+        if (!SCIIsSafeZipEntryName(entryName)) {
+            [archiveHandle closeFile];
+            return nil;
+        }
+        if ([entryName hasSuffix:@"/"]) {
+            [fm createDirectoryAtPath:[expandedRoot stringByAppendingPathComponent:entryName] withIntermediateDirectories:YES attributes:nil error:nil];
+            continue;
+        }
+        if (method != 0 || compressedSize != uncompressedSize) {
+            if (error) {
+                *error = [NSError errorWithDomain:@"SCInstaSettingsTransfer"
+                                             code:2002
+                                         userInfo:@{NSLocalizedDescriptionKey: @"Compressed zip entries are not supported by this build."}];
+            }
+            [archiveHandle closeFile];
+            return nil;
+        }
+        if ((NSUInteger)localOffset + 30 > zipData.length || SCIReadUInt32LE(bytes, localOffset) != 0x04034b50) {
+            [archiveHandle closeFile];
+            return nil;
+        }
+        uint16_t localNameLen = SCIReadUInt16LE(bytes, localOffset + 26);
+        uint16_t localExtraLen = SCIReadUInt16LE(bytes, localOffset + 28);
+        unsigned long long dataOffset = (unsigned long long)localOffset + 30ULL + localNameLen + localExtraLen;
+        if (dataOffset + compressedSize > zipData.length) {
+            [archiveHandle closeFile];
+            return nil;
+        }
+
+        NSString *destPath = [expandedRoot stringByAppendingPathComponent:entryName];
+        [fm createDirectoryAtPath:[destPath stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+        [fm createFileAtPath:destPath contents:nil attributes:nil];
+        NSFileHandle *output = [NSFileHandle fileHandleForWritingAtPath:destPath];
+        [archiveHandle seekToFileOffset:dataOffset];
+        uint32_t remaining = compressedSize;
+        while (remaining > 0) {
+            NSUInteger chunkSize = MIN((NSUInteger)remaining, (NSUInteger)(1024 * 1024));
+            NSData *chunk = [archiveHandle readDataOfLength:chunkSize];
+            if (chunk.length == 0) break;
+            [output writeData:chunk];
+            remaining -= (uint32_t)chunk.length;
+        }
+        [output closeFile];
+        if (remaining > 0) {
+            [archiveHandle closeFile];
+            return nil;
+        }
+    }
+
+    [archiveHandle closeFile];
+    return SCIIsValidSettingsTransferBundleRoot(expandedRoot) ? expandedRoot : SCIResolvedSettingsTransferBundleRoot([NSURL fileURLWithPath:expandedRoot isDirectory:YES]);
+}
+
 static UTType *SCISettingsTransferArchiveType(void) {
     UTType *type = [UTType typeWithFilenameExtension:@"scinstaexport" conformingToType:UTTypeData];
     if (type) return type;
@@ -158,6 +505,9 @@ static NSString *SCIResolvedImportBundleRootForPickedURL(NSURL *pickedURL, NSErr
     [pickedURL getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:nil];
     if (isDirectory.boolValue) return nil;
 
+    NSString *zipBundleRoot = SCIExpandStoredZipSettingsTransferArchive(pickedURL, error);
+    if (zipBundleRoot.length > 0) return zipBundleRoot;
+
     return SCIExpandSerializedSettingsTransferArchive(pickedURL, error);
 }
 
@@ -169,6 +519,17 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
         @"includes_gallery": @(includeGallery),
         @"included_keys": includeSettings ? [[SCIExportedPreferenceKeys() allObjects] sortedArrayUsingSelector:@selector(compare:)] : @[]
     };
+}
+
+@implementation SCISettingsTransferManager
+
++ (instancetype)sharedManager {
+    static SCISettingsTransferManager *manager = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        manager = [[SCISettingsTransferManager alloc] init];
+    });
+    return manager;
 }
 
 - (void)exportSettingsAndGalleryFromController:(UIViewController *)controller {
@@ -252,20 +613,10 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
 
     [SCITransferManifest(includeSettings, includeGallery) writeToFile:manifestPath atomically:YES];
 
-    NSError *wrapperError = nil;
-    NSFileWrapper *wrapper = [[NSFileWrapper alloc] initWithURL:[NSURL fileURLWithPath:bundleRoot isDirectory:YES]
-                                                        options:NSFileWrapperReadingImmediate
-                                                          error:&wrapperError];
-    NSData *archiveData = wrapper.serializedRepresentation;
-    if (archiveData.length == 0) {
-        NSString *message = wrapperError.localizedDescription ?: @"The export archive could not be created.";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled"];
-        return;
-    }
-
-    NSString *archivePath = [root stringByAppendingPathComponent:@"SCInsta.scinstaexport"];
-    if (![archiveData writeToFile:archivePath options:NSDataWritingAtomic error:&wrapperError]) {
-        NSString *message = wrapperError.localizedDescription ?: @"The export archive could not be written.";
+    NSError *archiveError = nil;
+    NSString *archivePath = [root stringByAppendingPathComponent:@"SCInsta.zip"];
+    if (!SCIWriteStoredZipFromDirectory(bundleRoot, archivePath, &archiveError)) {
+        NSString *message = archiveError.localizedDescription ?: @"The export zip could not be created.";
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled"];
         return;
     }
@@ -285,6 +636,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     UTType *archiveType = SCISettingsTransferArchiveType();
     NSMutableArray<UTType *> *contentTypes = [NSMutableArray array];
     if (archiveType) [contentTypes addObject:archiveType];
+    [contentTypes addObject:UTTypeZIP];
     [contentTypes addObject:UTTypeFolder];
     [contentTypes addObject:UTTypeData];
     picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:YES];

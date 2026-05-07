@@ -12,7 +12,7 @@ typedef NS_ENUM(int16_t, SCIGalleryMediaType) {
 
 FOUNDATION_EXPORT NSString *SCIFileNameForMedia(NSURL *originalURL, SCIGalleryMediaType mediaType, SCIGallerySaveMetadata * _Nullable metadata);
 
-/// Best-effort parse of tweak/SCInsta-style basenames, e.g. \c 166635355_username_story_20260210001603 — fills user pk, username, source slug, and trailing compact date when \a metadata fields are still empty (or source is Other).
+/// Best-effort parse of tweak/SCInsta-style basenames, e.g. \c 1778088045602_username_story_20260210001603 — fills save-time epoch, posted-time compact date, user pk, username, and source slug when \a metadata fields are still empty (or source is Other).
 FOUNDATION_EXPORT void SCIGalleryApplyImportHeuristicsFromFilename(NSString *fileName, SCIGallerySaveMetadata *metadata);
 
 typedef NS_ENUM(int16_t, SCIGallerySource) {
@@ -111,6 +111,9 @@ typedef NS_ENUM(int16_t, SCIGallerySource) {
 
 /// Returns the symbol name for the given source.
 + (NSString *)symbolNameForSource:(SCIGallerySource)source;
+
+/// Renames legacy media files to the current saved-media naming scheme and updates Core Data paths. Returns the number of files renamed.
++ (NSInteger)migrateLegacyFilenamesWithError:(NSError *_Nullable *_Nullable)error;
 
 @end
 
