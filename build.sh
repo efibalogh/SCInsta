@@ -125,6 +125,42 @@ theos_dylib_path() {
     return 1
 }
 
+select_input_ipa() {
+    local ipa_files=("$@")
+    local selected_index
+
+    if [ ${#ipa_files[@]} -eq 1 ]; then
+        basename "${ipa_files[0]}"
+        return 0
+    fi
+
+    if [ -t 0 ] && [ -z "${CI:-}" ]; then
+        echo -e '\033[1m\033[0;33mMultiple IPA files found in packages directory. Choose one to build:\033[0m' >&2
+        local i=1
+        for ipa_path in "${ipa_files[@]}"; do
+            echo "  [$i] $(basename "$ipa_path")" >&2
+            i=$((i + 1))
+        done
+
+        while true; do
+            printf 'Selection [1-%d]: ' "${#ipa_files[@]}" >&2
+            read -r selected_index
+            if [[ "$selected_index" =~ ^[0-9]+$ ]] && [ "$selected_index" -ge 1 ] && [ "$selected_index" -le "${#ipa_files[@]}" ]; then
+                basename "${ipa_files[$((selected_index - 1))]}"
+                return 0
+            fi
+            echo -e '\033[1m\033[0;31mInvalid selection.\033[0m' >&2
+        done
+    fi
+
+    echo -e '\033[1m\033[0;33mMultiple IPA files found in packages directory. Non-interactive environment detected; using the latest one:\033[0m' >&2
+    for ipa_path in "${ipa_files[@]}"; do
+        echo "  - $(basename "$ipa_path")" >&2
+    done
+    echo >&2
+    basename "${ipa_files[${#ipa_files[@]}-1]}"
+}
+
 sideload_fix_dylib_path() {
     local path
     for path in \
@@ -136,34 +172,6 @@ sideload_fix_dylib_path() {
         fi
     done
     return 1
-}
-
-copy_flex_library_into_ipa() {
-    local input_ipa="$1"
-    local output_ipa="$2"
-    local libflex_path="$3"
-    local temp_dir
-    temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/scinsta-flex-ipa.XXXXXX")"
-
-    unzip -q "$input_ipa" -d "$temp_dir"
-
-    local app_dir
-    app_dir="$(find "$temp_dir/Payload" -maxdepth 1 -type d -name "*.app" | head -n 1)"
-    if [ -z "$app_dir" ]; then
-        echo -e '\033[1m\033[0;31mCould not find Payload/*.app in IPA.\033[0m'
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-
-    mkdir -p "$app_dir/Frameworks"
-    ditto "$libflex_path" "$app_dir/Frameworks/libFLEX.dylib"
-
-    rm -f "$output_ipa"
-    (
-        cd "$temp_dir"
-        zip -qry "$output_ipa" Payload
-    )
-    rm -rf "$temp_dir"
 }
 
 # Args: instagram ipa basename without .ipa; globals OPT_* must be set
@@ -260,14 +268,7 @@ then
             exit 1
         fi
 
-        if [ ${#ipaFiles[@]} -gt 1 ]; then
-            echo -e '\033[1m\033[0;33mMultiple IPA files found in packages directory. Using the latest one:\033[0m'
-            for f in "${ipaFiles[@]}"; do
-                echo "  - $(basename "$f")"
-            done
-            echo
-        fi
-        ipaFile=$(basename "${ipaFiles[${#ipaFiles[@]}-1]}")
+        ipaFile="$(select_input_ipa "${ipaFiles[@]}")"
     fi
 
     echo -e '\033[1m\033[32mSideload build...\033[0m'
@@ -315,27 +316,33 @@ then
     OUTPUT_IPA="$(scinsta_sideload_output_ipa "$ig_base")"
     ipa_out="$ROOT_DIR/packages/${OUTPUT_IPA}"
     ipa_ffmpeg_tmp="$ROOT_DIR/packages/.scinsta-build-tmp-ffmpeg.ipa"
-    ipa_flex_tmp="$ROOT_DIR/packages/.scinsta-build-tmp-flex.ipa"
-    rm -f "$ipa_out" "$ipa_ffmpeg_tmp" "$ipa_flex_tmp"
-
-    echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
-    if [ "$OPT_INJECT" -eq 1 ]; then
-        cyan -i "packages/${ipaFile}" -o "$ipa_out" -f "$SCINSTAPATH" -c "$COMPRESSION" -m 15.0 -duq
-    else
-        cp "packages/${ipaFile}" "$ipa_out"
-    fi
+    ipa_stage_input="$ROOT_DIR/packages/.scinsta-build-stage-input.ipa"
+    rm -f "$ipa_out" "$ipa_ffmpeg_tmp" "$ipa_stage_input"
 
     if [ "$OPT_FFMPEG" -eq 1 ]; then
         echo -e '\033[1m\033[32mInjecting FFmpeg frameworks...\033[0m'
-        inject_ffmpeg_frameworks "$ipa_out" "$ipa_ffmpeg_tmp"
-        mv -f "$ipa_ffmpeg_tmp" "$ipa_out"
+        inject_ffmpeg_frameworks "packages/${ipaFile}" "$ipa_ffmpeg_tmp"
+        mv -f "$ipa_ffmpeg_tmp" "$ipa_stage_input"
+    else
+        cp "packages/${ipaFile}" "$ipa_stage_input"
     fi
 
-    if [ "$OPT_FLEX" -eq 1 ]; then
-        echo -e '\033[1m\033[32mBundling libFLEX.dylib for lazy loading...\033[0m'
-        copy_flex_library_into_ipa "$ipa_out" "$ipa_flex_tmp" "$LIBFLEXPATH"
-        mv -f "$ipa_flex_tmp" "$ipa_out"
+    echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
+    if [ "$OPT_INJECT" -eq 1 ] || [ "$OPT_FLEX" -eq 1 ]; then
+        cyan_files=()
+        if [ "$OPT_INJECT" -eq 1 ]; then
+            cyan_files+=("$SCINSTAPATH")
+        fi
+        if [ "$OPT_FLEX" -eq 1 ]; then
+            cyan_files+=("$LIBFLEXPATH")
+        fi
+
+        cyan -i "$ipa_stage_input" -o "$ipa_out" -f "${cyan_files[@]}" -c "$COMPRESSION" -m 15.0 -duq
+    else
+        cp "$ipa_stage_input" "$ipa_out"
     fi
+
+    rm -f "$ipa_stage_input"
 
     if [ "$OPT_PATCH" -eq 1 ]; then
         echo -e '\033[1m\033[32mPatching IPA for sideloading...\033[0m'
@@ -404,10 +411,10 @@ else
     echo 'Usage: ./build.sh <sideload|rootless|rootful>'
     echo
     echo '  sideload   - Build a patched IPA; flags (combine as needed):'
-    echo '    --release   inject + ffmpeg + ipapatch (typical release; no flex)'
-    echo '    --inject    build SCInsta.dylib and inject with cyan'
-    echo '    --ffmpeg    bundle FFmpegKit frameworks'
-    echo '    --flex      bundle libFLEX.dylib for lazy loading'
+    echo '    --release   equivalent to --inject --fmpeg --patch'
+    echo '    --inject    include SCInsta.dylib'
+    echo '    --ffmpeg    include FFmpegKit frameworks'
+    echo '    --flex      include libFLEX.dylib'
     echo '    --patch     run ipapatch'
     echo '    --dev       DEV=1 build (use e.g. from build-dev.sh)'
     echo '    --buildonly build dylibs only, skip IPA'
