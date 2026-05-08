@@ -47,7 +47,9 @@ static inline BOOL SCIHideVanishScreenshotEnabled(void) {
     if ([SCIUtils getBoolPref:@"shh_mode_confirm"]) {
         NSLog(@"[SCInsta] Confirm shh mode triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Vanish Mode"
+                               message:@"Are you sure you want to change disappearing messages for this chat?"];
     } else {
         return %orig;
     }
@@ -66,7 +68,9 @@ static inline BOOL SCIHideVanishScreenshotEnabled(void) {
     if ([SCIUtils getBoolPref:@"shh_mode_confirm"]) {
         NSLog(@"[SCInsta] Confirm shh mode triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Vanish Mode"
+                               message:@"Are you sure you want to change disappearing messages for this chat?"];
     } else {
         return %orig;
     }
@@ -76,7 +80,9 @@ static inline BOOL SCIHideVanishScreenshotEnabled(void) {
     if ([SCIUtils getBoolPref:@"shh_mode_confirm"]) {
         NSLog(@"[SCInsta] Confirm shh mode triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Vanish Mode"
+                               message:@"Are you sure you want to change disappearing messages for this chat?"];
     } else {
         return %orig;
     }

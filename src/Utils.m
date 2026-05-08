@@ -4,6 +4,7 @@
 #import <objc/message.h>
 #import "Shared/MediaPreview/SCIMediaCacheManager.h"
 #import "Shared/Gallery/SCIGalleryPaths.h"
+#import "Shared/UI/SCIIGAlertPresenter.h"
 
 static NSNumber *SCINumericValueForSelector(id target, NSString *selectorName) {
     if (!target || !selectorName.length) return nil;
@@ -1123,30 +1124,27 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 
 // MARK: Alerts
 + (BOOL)showConfirmation:(void(^)(void))okHandler title:(NSString *)title {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:title message:@"Are you sure?" preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-        okHandler();
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"No!" style:UIAlertActionStyleCancel handler:nil]];
-
-    [topMostController() presentViewController:alert animated:YES completion:nil];
-
-    return nil;
+    return [self showConfirmation:okHandler cancelHandler:nil title:title message:nil];
+};
++ (BOOL)showConfirmation:(void(^)(void))okHandler title:(NSString *)title message:(NSString *)message {
+    return [self showConfirmation:okHandler cancelHandler:nil title:title message:message];
 };
 + (BOOL)showConfirmation:(void(^)(void))okHandler cancelHandler:(void(^)(void))cancelHandler title:(NSString *)title {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:title message:@"Are you sure?" preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-        okHandler();
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"No!" style:UIAlertActionStyleCancel handler:^(UIAlertAction * _Nonnull action) {
-        if (cancelHandler != nil) {
-            cancelHandler();
-        }
-    }]];
-
-    [topMostController() presentViewController:alert animated:YES completion:nil];
-
-    return nil;
+    return [self showConfirmation:okHandler cancelHandler:cancelHandler title:title message:nil];
+};
++ (BOOL)showConfirmation:(void(^)(void))okHandler cancelHandler:(void(^)(void))cancelHandler title:(NSString *)title message:(NSString *)message {
+    [SCIIGAlertPresenter presentAlertFromViewController:topMostController()
+                                                  title:title ?: @"Confirm Action"
+                                                message:message ?: @"Are you sure you want to continue?"
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:^{
+            if (cancelHandler) cancelHandler();
+        }],
+        [SCIIGAlertAction actionWithTitle:@"Continue" style:SCIIGAlertActionStyleDefault handler:^{
+            if (okHandler) okHandler();
+        }],
+    ]];
+    return YES;
 };
 + (BOOL)showConfirmation:(void(^)(void))okHandler {
     return [self showConfirmation:okHandler title:nil];
@@ -1155,13 +1153,15 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
     return [self showConfirmation:okHandler cancelHandler:cancelHandler title:nil];
 }
 + (void)showRestartConfirmation {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Restart required" message:@"You must restart the app to apply this change" preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Restart" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-        exit(0);
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Later" style:UIAlertActionStyleCancel handler:nil]];
-
-    [topMostController() presentViewController:alert animated:YES completion:nil];
+    [SCIIGAlertPresenter presentAlertFromViewController:topMostController()
+                                                  title:@"Restart required"
+                                                message:@"You must restart the app to apply this change"
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Later" style:SCIIGAlertActionStyleCancel handler:nil],
+        [SCIIGAlertAction actionWithTitle:@"Restart" style:SCIIGAlertActionStyleDefault handler:^{
+            exit(0);
+        }],
+    ]];
 };
 
 // MARK: Toasts

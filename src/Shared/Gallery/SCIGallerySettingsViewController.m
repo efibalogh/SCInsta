@@ -5,6 +5,7 @@
 #import "SCIGalleryImportViewController.h"
 #import "SCIGalleryFile.h"
 #import "SCIGalleryCoreDataStack.h"
+#import "../UI/SCIIGAlertPresenter.h"
 #import "../UI/SCISwitch.h"
 #import "../../Utils.h"
 
@@ -323,17 +324,18 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         return;
     }
 
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Disable Passcode?"
-                                                                  message:@"The gallery will no longer require authentication to open."
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
+    [SCIIGAlertPresenter presentAlertFromViewController:self
+                                                  title:@"Disable Passcode"
+                                                message:@"The gallery will no longer require authentication to open."
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:^{
         sw.on = YES;
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Disable" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action) {
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Disable" style:SCIIGAlertActionStyleDestructive handler:^{
         [mgr removePasscode];
         [self.tableView reloadData];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }],
+    ]];
 }
 
 - (void)quickAccessSwitchChanged:(UISwitch *)sw {

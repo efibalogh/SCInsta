@@ -7,7 +7,9 @@
     if ([SCIUtils getBoolPref:@"follow_request_confirm"]) {
         NSLog(@"[SCInsta] Confirm follow request triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Accept Request"
+                               message:@"Are you sure you want to accept this follow request?"];
     } else {
         return %orig;
     }
@@ -16,7 +18,9 @@
     if ([SCIUtils getBoolPref:@"follow_request_confirm"]) {
         NSLog(@"[SCInsta] Confirm follow request triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Decline Request"
+                               message:@"Are you sure you want to decline this follow request?"];
     } else {
         return %orig;
     }

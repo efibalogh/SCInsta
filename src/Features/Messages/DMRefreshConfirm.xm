@@ -11,7 +11,8 @@ static void replaced_inboxRefreshControl(id self, SEL _cmd, id arg) {
     }
     [SCIUtils showConfirmation:^{
         if (orig_inboxRefreshControl) orig_inboxRefreshControl(self, _cmd, arg);
-    }];
+    } title:@"Confirm Messages Refresh"
+      message:@"Are you sure you want to refresh your inbox?"];
 }
 
 static void SCIHookDMRefreshSelector(Class cls, SEL selector) {

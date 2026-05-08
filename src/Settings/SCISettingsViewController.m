@@ -1,6 +1,7 @@
 #import "SCISettingsViewController.h"
 #import "../App/SCIStartupHooks.h"
 #import "../Shared/ActionButton/ActionButtonCore.h"
+#import "../Shared/UI/SCIIGAlertPresenter.h"
 #import "../Shared/UI/SCISwitch.h"
 
 static char rowStaticRef[] = "row";
@@ -178,16 +179,13 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     [super viewWillDisappear:animated];
     
     if (![[[NSUserDefaults standardUserDefaults] objectForKey:@"SCInstaFirstRun"] isEqualToString:SCIVersionString]) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"SCInsta Settings Info"
-                                                                       message:@"In the future: Hold down on the three lines at the top right of your profile page, to re-open SCInsta settings."
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        
-        [alert addAction:[UIAlertAction actionWithTitle:@"I understand!"
-                                                  style:UIAlertActionStyleDefault
-                                                handler:nil]];
-        
         UIViewController *presenter = self.presentingViewController;
-        [presenter presentViewController:alert animated:YES completion:nil];
+        [SCIIGAlertPresenter presentAlertFromViewController:presenter
+                                                      title:@"SCInsta Settings Info"
+                                                    message:@"In the future: Hold down on the three lines at the top right of your profile page, to re-open SCInsta settings."
+                                                    actions:@[
+            [SCIIGAlertAction actionWithTitle:@"I understand!" style:SCIIGAlertActionStyleDefault handler:nil],
+        ]];
         
         // Done with first-time setup for this version
         [[NSUserDefaults standardUserDefaults] setValue:SCIVersionString forKey:@"SCInstaFirstRun"];

@@ -217,7 +217,7 @@ NSArray *SCIDevExampleSections(void) {
             [SCISetting stepperCellWithTitle:@"Stepper Cell" subtitle:@"I have %@%@" defaultsKey:@"test_stepper_cell" min:-10 max:1000 step:5.5 label:@"$" singularLabel:@"$"],
             SCISettingApplyIconTint([SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using icon" icon:SCISettingsSystemIcon(@"link", 20.0, UIImageSymbolWeightRegular) url:@"https://google.com"], [UIColor systemTealColor]),
             [SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using image" imageUrl:@"https://i.imgur.com/c9CbytZ.png" url:@"https://google.com"],
-            [SCISetting buttonCellWithTitle:@"Button Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"oval.inset.filled", 18.0, UIImageSymbolWeightRegular) action:^(void) { [SCIUtils showConfirmation:^(void){}]; }],
+            [SCISetting buttonCellWithTitle:@"Button Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"oval.inset.filled", 18.0, UIImageSymbolWeightRegular) action:^(void) { [SCIUtils showConfirmation:^(void){} title:@"Run Example Action?" message:@"Are you sure you want to run this example settings action?"]; }],
             [SCISetting menuCellWithTitle:@"Menu Cell" subtitle:@"Change the value on the right" menu:[UIMenu menuWithChildren:@[
                 [UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[
                     SCIMenuCommand(@"ABC", nil, nil, @"test_menu_cell", @"abc", NO),

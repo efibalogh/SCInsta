@@ -1,6 +1,7 @@
 #import "SCIGalleryDeleteViewController.h"
 #import "SCIGalleryCoreDataStack.h"
 #import "SCIGalleryFile.h"
+#import "../UI/SCIIGAlertPresenter.h"
 #import "../../AssetUtils.h"
 #import "../../Utils.h"
 
@@ -267,13 +268,12 @@ typedef NS_ENUM(NSInteger, SCIGalleryDeleteSection) {
     }
 
     NSString *message = [NSString stringWithFormat:@"This will permanently remove %ld file%@.", (long)files.count, files.count == 1 ? @"" : @"s"];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
-                                                                  message:message
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Delete"
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(__unused UIAlertAction *action) {
+    [SCIIGAlertPresenter presentAlertFromViewController:self
+                                                  title:title
+                                                message:message
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+        [SCIIGAlertAction actionWithTitle:@"Delete" style:SCIIGAlertActionStyleDestructive handler:^{
         NSFileManager *fm = [NSFileManager defaultManager];
         for (SCIGalleryFile *file in files) {
             NSString *filePath = file.filePath;
@@ -297,8 +297,8 @@ typedef NS_ENUM(NSInteger, SCIGalleryDeleteSection) {
                               subtitle:nil
                           iconResource:@"circle_check_filled"
                                   tone:SCIFeedbackPillToneSuccess];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }],
+    ]];
 }
 
 @end

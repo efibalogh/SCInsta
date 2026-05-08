@@ -1,4 +1,5 @@
 #import "../../Utils.h"
+#import "../../Shared/UI/SCIIGAlertPresenter.h"
 
 static char targetStaticRef[] = "target";
 
@@ -132,27 +133,21 @@ static char targetStaticRef[] = "target";
         [rightButton sizeToFit];
 
         [rightButton addAction:[UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Enter Emoji Text"
-                                                                           message:@"Click the Apply button after this to see the emoji"
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-                textField.placeholder = @"Type emoji...";
-            }];
-            
-            [alert addAction:[UIAlertAction actionWithTitle:@"OK"
-                                                      style:UIAlertActionStyleDefault
-                                                    handler:^(UIAlertAction *action) {
-                self.emojiText = alert.textFields[0].text;
-                [self applySCICustomTheme:@"Emoji"];
-            }]];
-            
-            [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
-                                                      style:UIAlertActionStyleCancel
-                                                    handler:nil]];
-            
             UIViewController *vc = [SCIUtils nearestViewControllerForView:self];
-            [vc presentViewController:alert animated:YES completion:nil];
+            [SCIIGAlertPresenter presentTextInputAlertFromViewController:vc
+                                                                   title:@"Enter Emoji Text"
+                                                                 message:@"Click the Apply button after this to see the emoji"
+                                                             placeholder:@"Type emoji..."
+                                                             initialText:nil
+                                                        autocapitalized:NO
+                                                            confirmTitle:@"OK"
+                                                             cancelTitle:@"Cancel"
+                                                            confirmStyle:SCIIGAlertActionStyleDefault
+                                                            confirmBlock:^(NSString *text) {
+                self.emojiText = text;
+                [self applySCICustomTheme:@"Emoji"];
+            }
+                                                             cancelBlock:nil];
         }] forControlEvents:UIControlEventTouchUpInside];
 
 

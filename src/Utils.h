@@ -101,7 +101,9 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 
 // Alerts
 + (BOOL)showConfirmation:(void(^)(void))okHandler title:(NSString *)title;
++ (BOOL)showConfirmation:(void(^)(void))okHandler title:(NSString *)title message:(NSString *)message;
 + (BOOL)showConfirmation:(void(^)(void))okHandler cancelHandler:(void(^)(void))cancelHandler title:(NSString *)title;
++ (BOOL)showConfirmation:(void(^)(void))okHandler cancelHandler:(void(^)(void))cancelHandler title:(NSString *)title message:(NSString *)message;
 + (BOOL)showConfirmation:(void(^)(void))okHandler;
 + (BOOL)showConfirmation:(void(^)(void))okHandler cancelHandler:(void(^)(void))cancelHandler;
 + (void)showRestartConfirmation;

@@ -47,7 +47,8 @@
                          IGRefreshControl *_refreshControl = MSHookIvar<IGRefreshControl *>(self, "_refreshControl");
                          [self refreshControlDidEndFinishLoadingAnimation:_refreshControl];
                      }
-                             title:@"Refresh Reels"];
+                             title:@"Confirm Reels Refresh"
+                           message:@"Are you sure you want to refresh the reels feed?"];
     } else {
         return %orig(arg1, arg2);
     }

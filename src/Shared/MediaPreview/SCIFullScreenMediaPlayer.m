@@ -9,6 +9,7 @@
 #import "SCIFullScreenVideoViewController.h"
 #import "../../Utils.h"
 #import "../UI/SCIMediaChrome.h"
+#import "../UI/SCIIGAlertPresenter.h"
 #import "../Gallery/SCIGalleryFile.h"
 #import "../Gallery/SCIGalleryManager.h"
 #import "../Gallery/SCIGalleryOriginController.h"
@@ -1461,14 +1462,15 @@ fromViewController:(UIViewController *)presenter {
     if (!item.galleryFile) return;
 
     __weak typeof(self) weakSelf = self;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete from Gallery?"
-                                                                  message:@"This will permanently remove this file."
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
+    [SCIIGAlertPresenter presentAlertFromViewController:self
+                                                  title:@"Delete from Gallery"
+                                                message:@"This will permanently remove this file."
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+        [SCIIGAlertAction actionWithTitle:@"Delete" style:SCIIGAlertActionStyleDestructive handler:^{
         [weakSelf performDeleteCurrentItem];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }],
+    ]];
 }
 
 - (void)performDeleteCurrentItem {

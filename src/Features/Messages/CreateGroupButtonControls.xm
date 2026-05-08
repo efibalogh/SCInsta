@@ -197,7 +197,8 @@ static void SCIApplyBottomButtonsCollapse(UIView *view) {
 
         objc_setAssociatedObject(strongSelf, kSCIGroupButtonPendingActionAssocKey, nil, OBJC_ASSOCIATION_COPY_NONATOMIC);
         objc_setAssociatedObject(strongSelf, kSCIGroupButtonPendingTargetAssocKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    } title:@"Create group"];
+    } title:@"Confirm Group Creation"
+      message:@"Are you sure you want to create or send to a group with the selected recipients?"];
 }
 
 %end

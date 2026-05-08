@@ -4,6 +4,7 @@
 
 #import "TweakSettings.h"
 #import "../Utils.h"
+#import "../Shared/UI/SCIIGAlertPresenter.h"
 #import "../Shared/Gallery/SCIGalleryCoreDataStack.h"
 #import "../Shared/Gallery/SCIGalleryManager.h"
 #import "../Shared/Gallery/SCIGalleryPaths.h"
@@ -541,47 +542,41 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
 }
 
 - (void)presentExportOptionsFromController:(UIViewController *)controller {
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Export Backup"
-                                                                   message:@"Choose what to include in the export."
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
     __weak typeof(self) weakSelf = self;
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Export Settings Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    [SCIIGAlertPresenter presentActionSheetFromViewController:controller
+                                                        title:@"Export Backup"
+                                                      message:@"Choose what to include in the export."
+                                                      actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Export Settings Only" style:SCIIGAlertActionStyleDefault handler:^{
         [weakSelf exportFromController:controller includeSettings:YES includeGallery:NO];
-    }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Export Gallery Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Export Gallery Only" style:SCIIGAlertActionStyleDefault handler:^{
         [weakSelf exportFromController:controller includeSettings:NO includeGallery:YES];
-    }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Export Settings + Gallery" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Export Settings + Gallery" style:SCIIGAlertActionStyleDefault handler:^{
         [weakSelf exportFromController:controller includeSettings:YES includeGallery:YES];
-    }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    if (sheet.popoverPresentationController) {
-        sheet.popoverPresentationController.sourceView = controller.view;
-        sheet.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(controller.view.bounds), CGRectGetMidY(controller.view.bounds), 1.0, 1.0);
-    }
-    [controller presentViewController:sheet animated:YES completion:nil];
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+    ]];
 }
 
 - (void)presentImportOptionsFromController:(UIViewController *)controller {
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Import Backup"
-                                                                   message:@"Choose what to restore from the backup."
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
     __weak typeof(self) weakSelf = self;
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Import Settings Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    [SCIIGAlertPresenter presentActionSheetFromViewController:controller
+                                                        title:@"Import Backup"
+                                                      message:@"Choose what to restore from the backup."
+                                                      actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Import Settings Only" style:SCIIGAlertActionStyleDefault handler:^{
         [weakSelf importFromController:controller includeSettings:YES includeGallery:NO];
-    }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Import Gallery Only" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Import Gallery Only" style:SCIIGAlertActionStyleDefault handler:^{
         [weakSelf importFromController:controller includeSettings:NO includeGallery:YES];
-    }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Import Settings + Gallery" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Import Settings + Gallery" style:SCIIGAlertActionStyleDefault handler:^{
         [weakSelf importFromController:controller includeSettings:YES includeGallery:YES];
-    }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    if (sheet.popoverPresentationController) {
-        sheet.popoverPresentationController.sourceView = controller.view;
-        sheet.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(controller.view.bounds), CGRectGetMidY(controller.view.bounds), 1.0, 1.0);
-    }
-    [controller presentViewController:sheet animated:YES completion:nil];
+    }],
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+    ]];
 }
 
 - (void)exportFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeGallery:(BOOL)includeGallery {

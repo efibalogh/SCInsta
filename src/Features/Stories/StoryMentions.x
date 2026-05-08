@@ -501,9 +501,13 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     };
 
     if (!currentlyFollowing && [SCIUtils getBoolPref:@"follow_confirm"]) {
-        [SCIUtils showConfirmation:doIt];
+        [SCIUtils showConfirmation:doIt
+                             title:@"Confirm Follow"
+                           message:@"Are you sure you want to follow this account?"];
     } else if (currentlyFollowing && [SCIUtils getBoolPref:@"unfollow_confirm"]) {
-        [SCIUtils showConfirmation:doIt title:@"Unfollow?"];
+        [SCIUtils showConfirmation:doIt
+                             title:@"Confirm Unfollow"
+                           message:@"Are you sure you want to unfollow this account?"];
     } else {
         doIt();
     }

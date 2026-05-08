@@ -47,7 +47,9 @@ static void SCIStoryReplySideEffects(void) {
     if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {      \
         NSLog(@"[SCInsta] Confirm feed like triggered");  \
                                                           \
-        [SCIUtils showConfirmation:^(void) { orig; }];    \
+        [SCIUtils showConfirmation:^(void) { orig; }      \
+                                 title:@"Confirm Post Like"     \
+                               message:@"Are you sure you want to like this post or comment?"]; \
     }                                                     \
     else {                                                \
         return orig;                                      \
@@ -57,7 +59,9 @@ static void SCIStoryReplySideEffects(void) {
     if ([SCIUtils getBoolPref:@"like_confirm_reels"]) {     \
         NSLog(@"[SCInsta] Confirm reels like triggered"); \
                                                           \
-        [SCIUtils showConfirmation:^(void) { orig; }];    \
+        [SCIUtils showConfirmation:^(void) { orig; }      \
+                                 title:@"Confirm Reel Like"     \
+                               message:@"Are you sure you want to like this reel?"]; \
     }                                                     \
     else {                                                \
         return orig;                                      \
@@ -168,7 +172,8 @@ static void new_sciStoryLikeTap(id self, SEL _cmd, id button) {
         if (SCIStoryMarkSeenOnLikeEnabled() && [button isKindOfClass:[UIView class]]) {
             SCIStoryMarkSeenForInteractionView((UIView *)button, @"advance_story_when_like_marked_seen");
         }
-    }];
+    } title:@"Confirm Story Like"
+      message:@"Are you sure you want to like this story?"];
 
     if (btn) {
         [UIView performWithoutAnimation:^{

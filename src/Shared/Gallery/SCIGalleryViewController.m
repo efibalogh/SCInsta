@@ -13,6 +13,7 @@
 #import "SCIGalleryOriginController.h"
 #import "../MediaPreview/SCIFullScreenMediaPlayer.h"
 #import "../UI/SCIMediaChrome.h"
+#import "../UI/SCIIGAlertPresenter.h"
 #import "../../InstagramHeaders.h"
 #import "../../AssetUtils.h"
 #import "../../Utils.h"
@@ -946,13 +947,12 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     }
 
     NSString *message = [NSString stringWithFormat:@"This will permanently remove %ld file%@ from the gallery.", (long)files.count, files.count == 1 ? @"" : @"s"];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete Selected Files?"
-                                                                  message:message
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Delete"
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(__unused UIAlertAction *action) {
+    [SCIIGAlertPresenter presentAlertFromViewController:self
+                                                  title:@"Delete Selected Files?"
+                                                message:message
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+        [SCIIGAlertAction actionWithTitle:@"Delete" style:SCIIGAlertActionStyleDestructive handler:^{
         NSError *firstError = nil;
         for (SCIGalleryFile *file in files) {
             NSError *removeError = nil;
@@ -975,8 +975,8 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
                                   iconResource:@"circle_check_filled"
                                           tone:SCIFeedbackPillToneSuccess];
         [self exitSelectionMode];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }],
+    ]];
 }
 
 - (UIContextMenuConfiguration *)collectionView:(UICollectionView *)cv
@@ -1058,11 +1058,12 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
                                                  image:deleteImg
                                             identifier:nil
                                                handler:^(UIAction *a) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete from Gallery?"
-                                                                      message:@"This will permanently remove this file from the gallery."
-                                                               preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *x) {
+        [SCIIGAlertPresenter presentAlertFromViewController:weakSelf
+                                                      title:@"Delete from Gallery"
+                                                    message:@"This will permanently remove this file from the gallery."
+                                                    actions:@[
+            [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+            [SCIIGAlertAction actionWithTitle:@"Delete" style:SCIIGAlertActionStyleDestructive handler:^{
             NSError *err;
             [file removeWithError:&err];
             if (err) {
@@ -1078,8 +1079,8 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
                                           iconResource:@"circle_check_filled"
                                                   tone:SCIFeedbackPillToneSuccess];
             }
-        }]];
-        [weakSelf presentViewController:alert animated:YES completion:nil];
+        }],
+        ]];
     }];
     deleteAction.attributes = UIMenuElementAttributesDestructive;
 
@@ -1139,23 +1140,21 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 #pragma mark - Folder CRUD
 
 - (void)presentCreateFolder {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"New Folder"
-                                                                  message:nil
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-        tf.placeholder = @"Folder name";
-        tf.autocapitalizationType = UITextAutocapitalizationTypeWords;
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Create"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *a) {
-        NSString *name = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:
-                          [NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (name.length == 0) return;
-        [self createFolderNamed:name];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    [SCIIGAlertPresenter presentTextInputAlertFromViewController:self
+                                                           title:@"New Folder"
+                                                         message:@""
+                                                     placeholder:@"Folder name"
+                                                     initialText:nil
+                                                 autocapitalized:YES
+                                                    confirmTitle:@"Create"
+                                                     cancelTitle:@"Cancel"
+                                                    confirmStyle:SCIIGAlertActionStyleDefault
+                                                    confirmBlock:^(NSString *text) {
+                                                        NSString *name = [text stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                                                        if (name.length == 0) return;
+                                                        [self createFolderNamed:name];
+                                                    }
+                                                     cancelBlock:nil];
 }
 
 - (void)createFolderNamed:(NSString *)name {
@@ -1198,23 +1197,22 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 }
 
 - (void)renameFolder:(NSString *)folderPath {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Rename Folder"
-                                                                  message:nil
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-        tf.text = [folderPath lastPathComponent];
-        tf.autocapitalizationType = UITextAutocapitalizationTypeWords;
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Rename"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *a) {
-        NSString *newName = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:
+    [SCIIGAlertPresenter presentTextInputAlertFromViewController:self
+                                                           title:@"Rename Folder"
+                                                         message:@"Enter a new name for this folder."
+                                                     placeholder:nil
+                                                     initialText:[folderPath lastPathComponent]
+                                                autocapitalized:YES
+                                                    confirmTitle:@"Rename"
+                                                     cancelTitle:@"Cancel"
+                                                    confirmStyle:SCIIGAlertActionStyleDefault
+                                                    confirmBlock:^(NSString *text) {
+        NSString *newName = [text stringByTrimmingCharactersInSet:
                              [NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (newName.length == 0) return;
         [self performRenameOfFolder:folderPath toName:newName];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }
+                                                     cancelBlock:nil];
 }
 
 - (void)performRenameOfFolder:(NSString *)oldPath toName:(NSString *)newName {
@@ -1270,16 +1268,15 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
         ? @"This folder is empty."
         : [NSString stringWithFormat:@"This folder contains %ld file(s). They will be moved to the parent folder.", (long)count];
 
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete Folder?"
-                                                                  message:msg
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Delete"
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(UIAlertAction *a) {
+    [SCIIGAlertPresenter presentAlertFromViewController:self
+                                                  title:@"Delete Folder?"
+                                                message:msg
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+        [SCIIGAlertAction actionWithTitle:@"Delete" style:SCIIGAlertActionStyleDestructive handler:^{
         [self performDeleteFolder:folderPath];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }],
+    ]];
 }
 
 - (void)performDeleteFolder:(NSString *)folderPath {
@@ -1313,23 +1310,23 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 #pragma mark - File rename / move
 
 - (void)renameFile:(SCIGalleryFile *)file {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Rename"
-                                                                  message:nil
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-        tf.text = [file displayName];
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Save"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *a) {
-        NSString *newName = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:
+    [SCIIGAlertPresenter presentTextInputAlertFromViewController:self
+                                                           title:@"Rename"
+                                                         message:@"Enter a custom display name for this file."
+                                                     placeholder:nil
+                                                     initialText:[file displayName]
+                                                autocapitalized:NO
+                                                    confirmTitle:@"Save"
+                                                     cancelTitle:@"Cancel"
+                                                    confirmStyle:SCIIGAlertActionStyleDefault
+                                                    confirmBlock:^(NSString *text) {
+        NSString *newName = [text stringByTrimmingCharactersInSet:
                              [NSCharacterSet whitespaceAndNewlineCharacterSet]];
         file.customName = newName.length > 0 ? newName : nil;
         [[SCIGalleryCoreDataStack shared] saveContext];
         [self.collectionView reloadData];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    }
+                                                     cancelBlock:nil];
 }
 
 - (void)assignFolderPath:(nullable NSString *)folderPath toFiles:(NSArray<SCIGalleryFile *> *)files {
@@ -1342,46 +1339,49 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 
 - (void)presentMoveSheetForFiles:(NSArray<SCIGalleryFile *> *)files {
     NSArray<NSString *> *allFolders = [self allFolderPaths];
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Move to Folder"
-                                                                  message:nil
-                                                           preferredStyle:UIAlertControllerStyleActionSheet];
+    NSMutableArray<SCIIGAlertAction *> *actions = [NSMutableArray array];
 
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Root"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *a) {
+    [actions addObject:[SCIIGAlertAction actionWithTitle:@"Root"
+                                                   style:SCIIGAlertActionStyleDefault
+                                                 handler:^{
         [self assignFolderPath:nil toFiles:files];
     }]];
 
     for (NSString *folder in allFolders) {
-        [sheet addAction:[UIAlertAction actionWithTitle:folder
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(UIAlertAction *a) {
+        [actions addObject:[SCIIGAlertAction actionWithTitle:folder
+                                                       style:SCIIGAlertActionStyleDefault
+                                                     handler:^{
             [self assignFolderPath:folder toFiles:files];
         }]];
     }
 
-    [sheet addAction:[UIAlertAction actionWithTitle:@"New folder…"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *a) {
-        UIAlertController *createAlert = [UIAlertController alertControllerWithTitle:@"New Folder"
-                                                                             message:nil
-                                                                      preferredStyle:UIAlertControllerStyleAlert];
-        [createAlert addTextFieldWithConfigurationHandler:^(UITextField *tf) { tf.placeholder = @"Folder name"; }];
-        [createAlert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-        [createAlert addAction:[UIAlertAction actionWithTitle:@"Create & Move"
-                                                        style:UIAlertActionStyleDefault
-                                                      handler:^(UIAlertAction *x) {
-            NSString *name = [createAlert.textFields.firstObject.text stringByTrimmingCharactersInSet:
+    [actions addObject:[SCIIGAlertAction actionWithTitle:@"New folder…"
+                                                   style:SCIIGAlertActionStyleDefault
+                                                 handler:^{
+        [SCIIGAlertPresenter presentTextInputAlertFromViewController:self
+                                                               title:@"New Folder"
+                                                             message:@"Enter a new folder name, then move the selected files there."
+                                                         placeholder:@"Folder name"
+                                                         initialText:nil
+                                                    autocapitalized:NO
+                                                        confirmTitle:@"Create & Move"
+                                                         cancelTitle:@"Cancel"
+                                                        confirmStyle:SCIIGAlertActionStyleDefault
+                                                        confirmBlock:^(NSString *text) {
+            NSString *name = [text stringByTrimmingCharactersInSet:
                               [NSCharacterSet whitespaceAndNewlineCharacterSet]];
             if (name.length == 0) return;
             NSString *newPath = [self folderPathByAppendingComponent:name toBase:self.currentFolderPath];
             [self assignFolderPath:newPath toFiles:files];
-        }]];
-        [self presentViewController:createAlert animated:YES completion:nil];
+        }
+                                                         cancelBlock:nil];
     }]];
 
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [self presentViewController:sheet animated:YES completion:nil];
+    [actions addObject:[SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil]];
+    [SCIIGAlertPresenter presentActionSheetFromViewController:self
+                                                        title:@"Move to Folder"
+                                                      message:@"Choose where to move the selected file(s)."
+                                                      actions:actions];
 }
 
 - (void)moveFile:(SCIGalleryFile *)file {

@@ -8,7 +8,9 @@
     if ([SCIUtils getBoolPref:@"change_direct_theme_confirm"]) {
         NSLog(@"[SCInsta] Confirm change direct theme triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Change Chat Theme"
+                               message:@"Are you sure you want to apply this theme to the chat?"];
     } else {
         return %orig;
     }
@@ -17,7 +19,9 @@
     if ([SCIUtils getBoolPref:@"change_direct_theme_confirm"]) {
         NSLog(@"[SCInsta] Confirm change direct theme triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Change Chat Theme"
+                               message:@"Are you sure you want to apply this theme to the chat?"];
     } else {
         return %orig;
     }
@@ -29,7 +33,9 @@
     if ([SCIUtils getBoolPref:@"change_direct_theme_confirm"]) {
         NSLog(@"[SCInsta] Confirm change direct theme triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Change Chat Theme"
+                               message:@"Are you sure you want to apply this theme to the chat?"];
     } else {
         return %orig;
     }

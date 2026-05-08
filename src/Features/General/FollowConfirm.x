@@ -7,7 +7,9 @@
     if ([SCIUtils getBoolPref:@"follow_confirm"]) {             \
         NSLog(@"[SCInsta] Confirm follow triggered");  \
                                                        \
-        [SCIUtils showConfirmation:^(void) { orig; }]; \
+        [SCIUtils showConfirmation:^(void) { orig; }   \
+                                 title:@"Confirm Follow"     \
+                               message:@"Are you sure you want to follow this account?"]; \
     }                                                  \
     else {                                             \
         return orig;                                   \
@@ -35,7 +37,9 @@
 // Unfollow from profile action sheet
 - (void)_performUnfollow {
     if ([SCIUtils getBoolPref:@"unfollow_confirm"]) {
-        [SCIUtils showConfirmation:^(void) { %orig; } title:@"Unfollow?"];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Unfollow"
+                               message:@"Are you sure you want to unfollow this account?"];
     } else {
         %orig;
     }
@@ -93,7 +97,8 @@ static void hooked_listSectionController(id self, SEL _cmd, id arg1, id arg2) {
 
         [SCIUtils showConfirmation:^{
             orig_listSectionController(self, _cmd, arg1, arg2);
-        }];
+        } title:@"Confirm Follow All"
+          message:@"Are you sure you want to follow everyone in this list?"];
 
         return;
     }

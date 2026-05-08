@@ -602,7 +602,9 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {
         NSLog(@"[SCInsta] Confirm post like triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Post Like"
+                               message:@"Are you sure you want to like this post?"];
     }
     else {
         return %orig;
@@ -618,7 +620,8 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceFeed);
         } cancelHandler:^{
             SCIConsumePendingRepostFeedback(SCIActionButtonSourceFeed);
-        }];
+        } title:@"Confirm Repost"
+          message:@"Are you sure you want to repost this post?"];
     }
     else {
         %orig;
@@ -654,7 +657,9 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     if ([SCIUtils getBoolPref:@"like_confirm_reels"]) {
         NSLog(@"[SCInsta] Confirm reels like triggered");
 
-        [SCIUtils showConfirmation:^(void) { %orig; }];
+        [SCIUtils showConfirmation:^(void) { %orig; }
+                                 title:@"Confirm Reel Like"
+                               message:@"Are you sure you want to like this reel?"];
     }
     else {
         return %orig;
@@ -679,7 +684,8 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceReels);
         } cancelHandler:^{
             SCIConsumePendingRepostFeedback(SCIActionButtonSourceReels);
-        }];
+        } title:@"Confirm Reel Repost"
+          message:@"Are you sure you want to repost this reel?"];
     }
     else {
         %orig;
@@ -697,7 +703,8 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSourceReels);
         } cancelHandler:^{
             SCIConsumePendingRepostFeedback(SCIActionButtonSourceReels);
-        }];
+        } title:@"Confirm Reel Repost"
+          message:@"Are you sure you want to repost this reel?"];
     }
     else {
         %orig;
