@@ -17,8 +17,12 @@ static NSString * const kSCIStoriesActionButtonDefaultActionKey = @"action_butto
         ], nil),
         SCITopicSection(@"Privacy & Visibility", @[
             [SCISetting switchCellWithTitle:@"Manually Mark Stories as Seen" subtitle:@"Prevents automatic seen receipts and adds an eye button to mark the current story as seen manually" defaultsKey:@"no_seen_receipt"],
+            [SCISetting switchCellWithTitle:@"Mark Seen on Like" subtitle:@"Marks the current story as viewed when you like it" defaultsKey:@"story_mark_seen_on_like"],
+            [SCISetting switchCellWithTitle:@"Mark Seen on Reply" subtitle:@"Marks the current story as viewed when you reply or react" defaultsKey:@"story_mark_seen_on_reply"],
             [SCISetting switchCellWithTitle:@"Stop Story Auto Advance" subtitle:@"Prevents stories from automatically moving to the next item after playback ends" defaultsKey:@"stop_story_auto_advance"],
-            [SCISetting switchCellWithTitle:@"Advance When Marked as Seen" subtitle:@"After manually marking a story as seen with the eye button, advance to the next story" defaultsKey:@"advance_story_when_marking_seen"],
+            [SCISetting switchCellWithTitle:@"Advance on Eye Button" subtitle:@"After marking a story as seen with the eye button, advance to the next story" defaultsKey:@"advance_story_when_marking_seen"],
+            [SCISetting switchCellWithTitle:@"Advance on Story Like" subtitle:@"After liking and marking a story as seen, advance to the next story" defaultsKey:@"advance_story_when_like_marked_seen"],
+            [SCISetting switchCellWithTitle:@"Advance on Story Reply" subtitle:@"After replying and marking a story as seen, advance to the next story" defaultsKey:@"advance_story_when_reply_marked_seen"],
             [SCISetting switchCellWithTitle:@"Story Mentions Button" subtitle:@"Shows the mentions button in story overlays when a story has mentions" defaultsKey:@"story_mentions_button"],
             [SCISetting switchCellWithTitle:@"Show Poll Vote Counts" subtitle:@"Adds the current vote count next to each poll option while viewing stories" defaultsKey:@"story_poll_vote_counts"]
         ], nil),

@@ -28,8 +28,11 @@ static const void *kSCIDirectVisualHasInputObserverAssocKey = &kSCIDirectVisualH
 static void *kSCIStoryOverlayAlphaObserverContext = &kSCIStoryOverlayAlphaObserverContext;
 static void *kSCIDirectVisualInputAlphaObserverContext = &kSCIDirectVisualInputAlphaObserverContext;
 static NSInteger kSCISeenAutoBypassCount = 0;
+static __weak UIView *SCIActiveStoryOverlayView = nil;
 static void (*orig_setHasSentAMessageOrUpdate)(id, SEL, BOOL) = NULL;
 static void (*orig_setHasSentAMessage)(id, SEL, BOOL) = NULL;
+
+void SCIMarkStoryAsSeenForViewWithAdvancePref(UIView *view, NSString *advancePrefKey);
 
 static inline BOOL SCIManualMessageSeenEnabled(void) {
     return [SCIUtils getBoolPref:@"remove_lastseen"];
@@ -404,8 +407,8 @@ static NSArray<NSDictionary *> *SCIStoryMentionsForOverlay(UIView *overlayView) 
     return userInfos;
 }
 
-static void SCIAdvanceStoryAfterManualSeenIfNeeded(UIView *overlayView) {
-    if (![SCIUtils getBoolPref:@"advance_story_when_marking_seen"]) return;
+static void SCIAdvanceStoryAfterManualSeenIfNeeded(UIView *overlayView, NSString *advancePrefKey) {
+    if (advancePrefKey.length == 0 || ![SCIUtils getBoolPref:advancePrefKey]) return;
 
     id sectionController = SCIStorySectionControllerFromOverlayView(overlayView);
     SEL advanceSelector = NSSelectorFromString(@"storyPlayerMediaViewDidPlayToEnd:");
@@ -424,7 +427,7 @@ static void SCIAdvanceStoryAfterManualSeenIfNeeded(UIView *overlayView) {
 // Forward declaration — implemented in StoryMentions.x
 extern void SCIPresentStoryMentionsSheet(UIView *overlayView);
 
-static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
+static void SCIMarkCurrentStoryAsSeenFromOverlayWithAdvancePref(UIView *overlayView, NSString *advancePrefKey) {
     if (!overlayView) return;
 
     id markTarget = nil;
@@ -446,7 +449,7 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
     SCIForceMarkStoryAsSeen = NO;
 
     if (resolved) {
-        SCIAdvanceStoryAfterManualSeenIfNeeded(overlayView);
+        SCIAdvanceStoryAfterManualSeenIfNeeded(overlayView, advancePrefKey);
     }
 
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionStoryMarkSeen duration:1.5
@@ -454,6 +457,28 @@ static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
                           subtitle:nil
                       iconResource:@"circle_check_filled"
                               tone:SCIFeedbackPillToneSuccess];
+}
+
+static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
+    SCIMarkCurrentStoryAsSeenFromOverlayWithAdvancePref(overlayView, @"advance_story_when_marking_seen");
+}
+
+void SCIMarkStoryAsSeenForView(UIView *view) {
+    SCIMarkStoryAsSeenForViewWithAdvancePref(view, nil);
+}
+
+void SCIMarkStoryAsSeenForViewWithAdvancePref(UIView *view, NSString *advancePrefKey) {
+    UIView *walker = view;
+    for (NSInteger depth = 0; walker && depth < 24; depth++, walker = walker.superview) {
+        if ([walker isKindOfClass:%c(IGStoryFullscreenOverlayView)]) {
+            SCIMarkCurrentStoryAsSeenFromOverlayWithAdvancePref(walker, advancePrefKey);
+            return;
+        }
+    }
+}
+
+UIView *SCIActiveStoryOverlayForInteractions(void) {
+    return SCIActiveStoryOverlayView;
 }
 
 static UIView *SCIDirectOverlayViewFromController(UIViewController *controller) {
@@ -477,6 +502,27 @@ static id SCIDirectCurrentMessageFromController(UIViewController *controller) {
     id message = [SCIUtils getIvarForObj:dataSource name:"_currentMessage"];
     if (!message) message = SCIKVCObject(dataSource, @"currentMessage");
     return message;
+}
+
+static NSInteger SCIDirectCurrentIndexFromController(UIViewController *controller) {
+    if (!controller) return 0;
+
+    id dataSource = [SCIUtils getIvarForObj:controller name:"_dataSource"];
+    if (!dataSource) dataSource = SCIKVCObject(controller, @"dataSource");
+
+    for (NSString *selectorName in @[@"currentItemIndex", @"currentIndex", @"itemIndex"]) {
+        NSNumber *index = [SCIUtils numericValueForObj:dataSource selectorName:selectorName];
+        if (index && index.integerValue >= 0) return index.integerValue;
+    }
+
+    for (NSString *key in @[@"currentItemIndex", @"currentIndex", @"itemIndex"]) {
+        id value = SCIKVCObject(dataSource, key);
+        if ([value respondsToSelector:@selector(integerValue)] && [value integerValue] >= 0) {
+            return [value integerValue];
+        }
+    }
+
+    return 0;
 }
 
 static CGFloat SCIHeightFromFrameLikeObject(id object) {
@@ -575,6 +621,72 @@ static inline BOOL SCIShouldShowDirectVisualSeenButton(void) {
     return [SCIUtils getBoolPref:@"remove_lastseen"] || [SCIUtils getBoolPref:@"unlimited_replay"];
 }
 
+static BOOL SCIDirectInvokeNoArgSelector(id object, SEL selector) {
+    if (!object || !selector || ![object respondsToSelector:selector]) return NO;
+    ((void (*)(id, SEL))objc_msgSend)(object, selector);
+    return YES;
+}
+
+static BOOL SCIDirectInvokeObjectArgSelector(id object, SEL selector, id argument) {
+    if (!object || !selector || ![object respondsToSelector:selector]) return NO;
+    ((void (*)(id, SEL, id))objc_msgSend)(object, selector, argument);
+    return YES;
+}
+
+static BOOL SCIDirectInvokeIntegerArgSelector(id object, SEL selector, NSInteger argument) {
+    if (!object || !selector || ![object respondsToSelector:selector]) return NO;
+    ((void (*)(id, SEL, NSInteger))objc_msgSend)(object, selector, argument);
+    return YES;
+}
+
+static BOOL SCIDirectAdvanceVisualViewer(UIViewController *controller) {
+    if (!controller) return NO;
+
+    NSMutableArray *targets = [NSMutableArray arrayWithObject:controller];
+    for (NSString *key in @[@"_dataSource", @"dataSource", @"_viewerContainerView", @"viewerContainerView", @"_viewerContainer", @"viewerContainer"]) {
+        id target = [key hasPrefix:@"_"] ? [SCIUtils getIvarForObj:controller name:key.UTF8String] : SCIKVCObject(controller, key);
+        if (target && ![targets containsObject:target]) {
+            [targets addObject:target];
+        }
+    }
+
+    NSArray<NSString *> *integerSelectors = @[
+        @"advanceToNextItemWithNavigationAction:",
+        @"advanceToNextItemWithNavigationType:",
+        @"advanceToNextItemForNavigationAction:",
+        @"moveToNextItemWithNavigationAction:",
+        @"navigateToNextItemWithNavigationAction:"
+    ];
+    for (id target in targets) {
+        for (NSString *selectorName in integerSelectors) {
+            if (SCIDirectInvokeIntegerArgSelector(target, NSSelectorFromString(selectorName), 1)) return YES;
+        }
+    }
+
+    NSArray<NSString *> *noArgSelectors = @[
+        @"_advanceToNextItem",
+        @"advanceToNextItem",
+        @"moveToNextItem",
+        @"navigateToNextItem",
+        @"displayNextItem",
+        @"showNextItem",
+        @"goToNextItem"
+    ];
+    for (id target in targets) {
+        for (NSString *selectorName in noArgSelectors) {
+            if (SCIDirectInvokeNoArgSelector(target, NSSelectorFromString(selectorName))) return YES;
+        }
+    }
+
+    SEL overlayTapSelector = NSSelectorFromString(@"expandOverlay:didTapInRegion:");
+    if ([controller respondsToSelector:overlayTapSelector]) {
+        ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
+        return YES;
+    }
+
+    return SCIDirectInvokeObjectArgSelector(controller, NSSelectorFromString(@"_didTapHeaderViewDismissButton:"), nil);
+}
+
 static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
     if (!controller) return;
 
@@ -591,15 +703,20 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
     id responders = [SCIUtils getIvarForObj:controller name:"_eventResponders"];
     if (!responders) responders = SCIKVCObject(controller, @"eventResponders");
 
+    NSInteger currentIndex = SCIDirectCurrentIndexFromController(controller);
     SEL beginPlaybackSelector = NSSelectorFromString(@"visualMessageViewerController:didBeginPlaybackForVisualMessage:atIndex:");
+    SEL endPlaybackSelector = NSSelectorFromString(@"visualMessageViewerController:didEndPlaybackForVisualMessage:atIndex:mediaCurrentTime:forNavType:");
     SCIPendingDirectVisualMessageToMarkSeen = message;
     BOOL dispatched = NO;
 
     for (id responder in SCIArrayFromCollection(responders) ?: @[]) {
         if ([responder respondsToSelector:beginPlaybackSelector]) {
             dispatched = YES;
-            ((void (*)(id, SEL, id, id, NSInteger))objc_msgSend)(responder, beginPlaybackSelector, controller, message, 0);
-            break;
+            ((void (*)(id, SEL, id, id, NSInteger))objc_msgSend)(responder, beginPlaybackSelector, controller, message, currentIndex);
+        }
+        if ([responder respondsToSelector:endPlaybackSelector]) {
+            dispatched = YES;
+            ((void (*)(id, SEL, id, id, NSInteger, CGFloat, NSInteger))objc_msgSend)(responder, endPlaybackSelector, controller, message, currentIndex, 0.0, 0);
         }
     }
 
@@ -613,9 +730,11 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
         return;
     }
 
-    SEL overlayTapSelector = NSSelectorFromString(@"expandOverlay:didTapInRegion:");
-    if ([controller respondsToSelector:overlayTapSelector]) {
-        ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
+    if ([SCIUtils getBoolPref:@"advance_direct_visual_when_marking_seen"]) {
+        __weak UIViewController *weakController = controller;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            SCIDirectAdvanceVisualViewer(weakController);
+        });
     }
 
     [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
@@ -792,6 +911,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     %orig;
 
     UIView *overlayView = (UIView *)self;
+    SCIActiveStoryOverlayView = overlayView;
     SCIEnsureStoryOverlayAlphaObserver(overlayView);
 
     UIButton *seenButton = (UIButton *)[(UIView *)self viewWithTag:kSCIStorySeenButtonTag];
@@ -985,7 +1105,11 @@ void SCIInstallSeenButtonHooksIfNeeded(void) {
     if (![SCIUtils getBoolPref:@"remove_lastseen"] &&
         ![SCIUtils getBoolPref:@"no_seen_receipt"] &&
         ![SCIUtils getBoolPref:@"unlimited_replay"] &&
-        ![SCIUtils getBoolPref:@"hide_reels_blend"]) {
+        ![SCIUtils getBoolPref:@"advance_direct_visual_when_marking_seen"] &&
+        ![SCIUtils getBoolPref:@"hide_reels_blend"] &&
+        ![SCIUtils getBoolPref:@"story_mark_seen_on_reply"] &&
+        ![SCIUtils getBoolPref:@"story_mark_seen_on_interaction"] &&
+        ![SCIUtils getBoolPref:@"advance_story_when_reply_marked_seen"]) {
         return;
     }
 

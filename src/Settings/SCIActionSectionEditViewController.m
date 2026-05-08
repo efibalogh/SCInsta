@@ -1,5 +1,6 @@
 #import "SCIActionSectionEditViewController.h"
 #import "SCIActionSectionIconPickerViewController.h"
+#import "SCIBulkActionMenuEditViewController.h"
 #import "../Shared/UI/SCISwitch.h"
 
 #import "../AssetUtils.h"
@@ -66,6 +67,43 @@ static char kSCISectionEditSwitchAssocKey;
     return [self.configuration sectionWithIdentifier:self.sectionIdentifier];
 }
 
+- (NSString *)bulkEditorKindForCurrentSection {
+    SCIActionMenuSection *section = [self currentSection];
+    if ([section.identifier isEqualToString:@"download"] &&
+        SCIActionButtonBulkDownloadSupportedActionsForSource(self.configuration.source).count > 0) {
+        return @"download";
+    }
+    if ([section.identifier isEqualToString:@"copy"] &&
+        SCIActionButtonBulkCopySupportedActionsForSource(self.configuration.source).count > 0) {
+        return @"copy";
+    }
+    return nil;
+}
+
+- (SCIBulkActionMenuEditViewController *)bulkEditorControllerForKind:(NSString *)kind {
+    if ([kind isEqualToString:@"download"]) {
+        return [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Download All Menu"
+                                                                   source:self.configuration.source
+                                                         supportedActions:SCIActionButtonBulkDownloadSupportedActionsForSource(self.configuration.source)
+                                                        configuredActions:SCIActionButtonConfiguredBulkDownloadActionsForSource(self.configuration.source)
+                                                                   onSave:^(NSArray<NSString *> *actions) {
+            SCIActionButtonSetConfiguredBulkDownloadActionsForSource(self.configuration.source, actions);
+            if (self.onChange) self.onChange();
+        }];
+    }
+    if ([kind isEqualToString:@"copy"]) {
+        return [[SCIBulkActionMenuEditViewController alloc] initWithTitle:@"Copy All Menu"
+                                                                   source:self.configuration.source
+                                                         supportedActions:SCIActionButtonBulkCopySupportedActionsForSource(self.configuration.source)
+                                                        configuredActions:SCIActionButtonConfiguredBulkCopyActionsForSource(self.configuration.source)
+                                                                   onSave:^(NSArray<NSString *> *actions) {
+            SCIActionButtonSetConfiguredBulkCopyActionsForSource(self.configuration.source, actions);
+            if (self.onChange) self.onChange();
+        }];
+    }
+    return nil;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.navigationController.navigationBar.prefersLargeTitles = NO;
@@ -88,7 +126,7 @@ static char kSCISectionEditSwitchAssocKey;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 3;
+    if (section == 0) return [self bulkEditorKindForCurrentSection] ? 4 : 3;
     if (section == 1) return [self currentSection].actions.count;
     return self.configuration.supportedActions.count;
 }
@@ -134,7 +172,7 @@ static char kSCISectionEditSwitchAssocKey;
             config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-        } else {
+        } else if (indexPath.row == 2) {
             config.text = @"Collapsible";
             SCISwitch *toggle = [[SCISwitch alloc] init];
             toggle.on = section.collapsible;
@@ -142,6 +180,13 @@ static char kSCISectionEditSwitchAssocKey;
             [toggle addTarget:self action:@selector(collapsibleSwitchChanged:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = toggle;
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        } else {
+            NSString *kind = [self bulkEditorKindForCurrentSection];
+            config.text = [kind isEqualToString:@"copy"] ? @"Configure Copy All Menu" : @"Configure Download All Menu";
+            config.image = [SCIAssetUtils instagramIconNamed:([kind isEqualToString:@"copy"] ? @"copy" : @"download") pointSize:22.0];
+            config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         }
     } else if (indexPath.section == 1) {
         NSString *identifier = section.actions[indexPath.row];
@@ -221,6 +266,11 @@ static char kSCISectionEditSwitchAssocKey;
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.section == 0 && indexPath.row == 1) {
         [self showIconPicker];
+    } else if (indexPath.section == 0 && indexPath.row == 3) {
+        SCIBulkActionMenuEditViewController *controller = [self bulkEditorControllerForKind:[self bulkEditorKindForCurrentSection]];
+        if (controller) {
+            [self.navigationController pushViewController:controller animated:YES];
+        }
     } else if (indexPath.section == 1) {
         NSString *identifier = [self currentSection].actions[indexPath.row];
         [self.configuration setAction:identifier assignedToSectionIdentifier:nil];

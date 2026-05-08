@@ -36,6 +36,23 @@ static UIImage *SCIGalleryMenuActionIcon(NSString *resourceName) {
                                    pointSize:kGalleryMenuIconPointSize];
 }
 
+static UIBarButtonItem *SCIGalleryFixedTextBarButtonItem(NSString *title, id target, SEL action, CGFloat width) {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.frame = CGRectMake(0, 0, width, 34.0);
+    button.titleLabel.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightRegular];
+    button.titleLabel.adjustsFontSizeToFitWidth = YES;
+    button.titleLabel.minimumScaleFactor = 0.82;
+    button.contentEdgeInsets = UIEdgeInsetsZero;
+    button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
+    button.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    [button addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
+    [button.widthAnchor constraintEqualToConstant:width].active = YES;
+    [button.heightAnchor constraintEqualToConstant:34.0].active = YES;
+    return [[UIBarButtonItem alloc] initWithCustomView:button];
+}
+
 static NSInteger SCIGalleryItemCountForFolderPath(NSManagedObjectContext *context, NSString *folderPath) {
     if (folderPath.length == 0) return 0;
     NSFetchRequest *request = [[NSFetchRequest alloc] initWithEntityName:@"SCIGalleryFile"];
@@ -80,6 +97,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *filterTypes;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *filterSources;
 @property (nonatomic, assign) BOOL filterFavoritesOnly;
+@property (nonatomic, strong) NSMutableSet<NSString *> *filterUsernames;
 @property (nonatomic, assign) BOOL selectionMode;
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedFileIDs;
 @property (nonatomic, strong) UISearchController *searchController;
@@ -126,6 +144,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
         _currentFolderPath = [folderPath copy];
         _filterTypes = [NSMutableSet set];
         _filterSources = [NSMutableSet set];
+        _filterUsernames = [NSMutableSet set];
         _filterFavoritesOnly = NO;
         _selectedFileIDs = [NSMutableSet set];
 
@@ -211,7 +230,14 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 }
 
 - (void)setupCenteredTitle {
-    NSString *text = self.currentFolderPath.length > 0 ? [self.currentFolderPath lastPathComponent] : @"Gallery";
+    NSString *text = nil;
+    if (self.selectionMode) {
+        text = self.selectedFileIDs.count > 0
+            ? [NSString stringWithFormat:@"%lu Selected", (unsigned long)self.selectedFileIDs.count]
+            : @"Select Files";
+    } else {
+        text = self.currentFolderPath.length > 0 ? [self.currentFolderPath lastPathComponent] : @"Gallery";
+    }
     self.navigationItem.titleView = nil;
     self.title = text;
 }
@@ -243,14 +269,11 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
         NSArray<SCIGalleryFile *> *files = [self visibleGalleryFiles];
         BOOL allSelected = files.count > 0 && self.selectedFileIDs.count == files.count;
         self.navigationItem.rightBarButtonItems = nil;
-        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Cancel"
-                                                                                  style:UIBarButtonItemStylePlain
-                                                                                 target:self
-                                                                                 action:@selector(exitSelectionMode)];
-        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:(allSelected ? @"Deselect All" : @"Select All")
-                                                                                  style:UIBarButtonItemStylePlain
-                                                                                 target:self
-                                                                                 action:@selector(selectAllVisibleFiles)];
+        self.navigationItem.leftBarButtonItem = SCIGalleryFixedTextBarButtonItem(@"Cancel", self, @selector(exitSelectionMode), 82.0);
+        self.navigationItem.rightBarButtonItem = SCIGalleryFixedTextBarButtonItem((allSelected ? @"Deselect All" : @"Select All"),
+                                                                                 self,
+                                                                                 @selector(selectAllVisibleFiles),
+                                                                                 116.0);
         return;
     }
 
@@ -507,6 +530,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     NSPredicate *basePredicate = [SCIGalleryFilterViewController predicateForTypes:self.filterTypes
                                                                          sources:self.filterSources
                                                                    favoritesOnly:self.filterFavoritesOnly
+                                                                       usernames:self.filterUsernames
                                                                       folderPath:self.currentFolderPath];
     NSString *query = [self.searchQuery stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (query.length == 0) {
@@ -535,6 +559,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     [self reloadSubfolders];
     [self.collectionView reloadData];
     [self updateEmptyState];
+    [self setupCenteredTitle];
     [self refreshNavigationItems];
 }
 
@@ -802,6 +827,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 - (void)enterSelectionMode {
     self.selectionMode = YES;
     [self.selectedFileIDs removeAllObjects];
+    [self setupCenteredTitle];
     [self refreshNavigationItems];
     [self refreshBottomToolbarItems];
     [self animateSelectionModeTransition];
@@ -810,6 +836,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 - (void)exitSelectionMode {
     self.selectionMode = NO;
     [self.selectedFileIDs removeAllObjects];
+    [self setupCenteredTitle];
     [self refreshNavigationItems];
     [self refreshBottomToolbarItems];
     [self animateSelectionModeTransition];
@@ -824,6 +851,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     } else {
         [self.selectedFileIDs addObject:file.identifier];
     }
+    [self setupCenteredTitle];
     [self refreshNavigationItems];
     [self.collectionView reloadData];
 }
@@ -840,7 +868,8 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
             }
         }
     }
-    self.navigationItem.rightBarButtonItem.title = (self.selectedFileIDs.count == files.count && files.count > 0) ? @"Deselect All" : @"Select All";
+    [self setupCenteredTitle];
+    [self refreshNavigationItems];
     [self.collectionView reloadData];
 }
 
@@ -1059,6 +1088,17 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     if (openProfileAction) [children addObject:openProfileAction];
     if (children.count > 0) {
         [children addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[]]];
+    }
+    if (file.sourceUsername.length > 0) {
+        NSString *username = [file.sourceUsername copy];
+        BOOL isCurrentUsernameFilter = [self usernameFilterContainsUsername:username];
+        UIAction *usernameAction = [UIAction actionWithTitle:[NSString stringWithFormat:@"%@ %@", (isCurrentUsernameFilter ? @"Undo View All from" : @"View All from"), username]
+                                                       image:SCIGalleryMenuActionIcon(@"mention")
+                                                  identifier:nil
+                                                     handler:^(__unused UIAction *a) {
+            [weakSelf toggleUsernameFilter:username];
+        }];
+        [children addObject:usernameAction];
     }
     [children addObjectsFromArray:@[favoriteAction, renameAction, moveAction, shareAction, deleteAction]];
     return [UIMenu menuWithTitle:@"" children:children];
@@ -1368,6 +1408,70 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     return [[set allObjects] sortedArrayUsingSelector:@selector(localizedStandardCompare:)];
 }
 
+- (NSArray<NSString *> *)availableSourceUsernamesForCurrentFilterContext {
+    NSManagedObjectContext *ctx = [SCIGalleryCoreDataStack shared].viewContext;
+    NSFetchRequest *req = [[NSFetchRequest alloc] initWithEntityName:@"SCIGalleryFile"];
+    req.resultType = NSDictionaryResultType;
+    req.propertiesToFetch = @[@"sourceUsername"];
+    req.returnsDistinctResults = YES;
+
+    NSMutableArray<NSPredicate *> *predicates = [NSMutableArray array];
+    NSPredicate *contextPredicate = [SCIGalleryFilterViewController predicateForTypes:self.filterTypes
+                                                                             sources:self.filterSources
+                                                                       favoritesOnly:self.filterFavoritesOnly
+                                                                           usernames:[NSSet set]
+                                                                          folderPath:self.currentFolderPath];
+    if (contextPredicate) [predicates addObject:contextPredicate];
+    NSString *query = [self.searchQuery stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (query.length > 0) {
+        [predicates addObject:[NSPredicate predicateWithFormat:@"(sourceUsername CONTAINS[cd] %@) OR (customName CONTAINS[cd] %@) OR (relativePath CONTAINS[cd] %@)",
+                               query, query, query]];
+    }
+    [predicates addObject:[NSPredicate predicateWithFormat:@"sourceUsername != nil AND sourceUsername != ''"]];
+    req.predicate = [NSCompoundPredicate andPredicateWithSubpredicates:predicates];
+
+    NSArray<NSDictionary *> *results = [ctx executeFetchRequest:req error:nil];
+
+    NSMutableSet<NSString *> *set = [NSMutableSet set];
+    for (NSDictionary *row in results) {
+        NSString *username = [row[@"sourceUsername"] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (username.length > 0) [set addObject:username];
+    }
+    return [[set allObjects] sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+}
+
+- (NSArray<NSString *> *)usernamesForFilterDisplayFromUsernames:(NSArray<NSString *> *)usernames {
+    return [usernames sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+        BOOL aSelected = [self usernameFilterContainsUsername:a];
+        BOOL bSelected = [self usernameFilterContainsUsername:b];
+        if (aSelected && !bSelected) return NSOrderedAscending;
+        if (!aSelected && bSelected) return NSOrderedDescending;
+        return [a localizedCaseInsensitiveCompare:b];
+    }];
+}
+
+- (NSString *)matchingSelectedUsernameForUsername:(NSString *)username {
+    if (username.length == 0) return nil;
+    for (NSString *selectedUsername in self.filterUsernames) {
+        if ([selectedUsername caseInsensitiveCompare:username] == NSOrderedSame) return selectedUsername;
+    }
+    return nil;
+}
+
+- (BOOL)usernameFilterContainsUsername:(NSString *)username {
+    return [self matchingSelectedUsernameForUsername:username].length > 0;
+}
+
+- (void)toggleUsernameFilter:(NSString *)username {
+    NSString *existing = [self matchingSelectedUsernameForUsername:username];
+    if (existing.length > 0) {
+        [self.filterUsernames removeObject:existing];
+    } else if (username.length > 0) {
+        [self.filterUsernames addObject:username];
+    }
+    [self refetch];
+}
+
 #pragma mark - Sort / Filter
 
 - (void)configureGallerySheetForNavigation:(UINavigationController *)nav {
@@ -1395,10 +1499,10 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
             UISheetPresentationControllerDetent *compact = [UISheetPresentationControllerDetent
                 customDetentWithIdentifier:@"scinsta.gallery.sort.compact"
                                    resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
-                CGFloat target = MIN(430.0, context.maximumDetentValue * 0.58);
-                return MAX(330.0, target);
+                CGFloat target = MIN(335.0, context.maximumDetentValue * 0.46);
+                return MAX(305.0, target);
             }];
-            sheet.detents = @[compact, UISheetPresentationControllerDetent.mediumDetent];
+            sheet.detents = @[compact];
             sheet.selectedDetentIdentifier = compact.identifier;
         } else {
             sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
@@ -1415,20 +1519,27 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     vc.filterTypes = self.filterTypes;
     vc.filterSources = self.filterSources;
     vc.filterFavoritesOnly = self.filterFavoritesOnly;
+    vc.filterUsernames = [self.filterUsernames mutableCopy];
+    NSArray<NSString *> *availableUsernames = [self availableSourceUsernamesForCurrentFilterContext];
+    BOOL showsUsernameSection = availableUsernames.count > 1;
+    vc.availableUsernames = showsUsernameSection ? [self usernamesForFilterDisplayFromUsernames:availableUsernames] : @[];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
     [self configureGallerySheetForNavigation:nav];
 
     UISheetPresentationController *sheet = nav.sheetPresentationController;
     if (sheet) {
         if (@available(iOS 16.0, *)) {
-            UISheetPresentationControllerDetent *compact = [UISheetPresentationControllerDetent
-                customDetentWithIdentifier:@"scinsta.gallery.filter.compact"
+            UISheetPresentationControllerDetent *expanded = [UISheetPresentationControllerDetent
+                customDetentWithIdentifier:@"scinsta.gallery.filter.expanded"
                                    resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
-                CGFloat target = MIN(430.0, context.maximumDetentValue * 0.58);
-                return MAX(330.0, target);
+                CGFloat maximum = showsUsernameSection ? 515.0 : 445.0;
+                CGFloat minimum = showsUsernameSection ? 470.0 : 405.0;
+                CGFloat fraction = showsUsernameSection ? 0.72 : 0.62;
+                CGFloat target = MIN(maximum, context.maximumDetentValue * fraction);
+                return MAX(minimum, target);
             }];
-            sheet.detents = @[compact, UISheetPresentationControllerDetent.mediumDetent];
-            sheet.selectedDetentIdentifier = compact.identifier;
+            sheet.detents = @[expanded];
+            sheet.selectedDetentIdentifier = expanded.identifier;
         } else {
             sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
         }
@@ -1447,10 +1558,12 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 - (void)filterController:(SCIGalleryFilterViewController *)controller
            didApplyTypes:(NSSet<NSNumber *> *)types
                  sources:(NSSet<NSNumber *> *)sources
-           favoritesOnly:(BOOL)favoritesOnly {
+           favoritesOnly:(BOOL)favoritesOnly
+               usernames:(NSSet<NSString *> *)usernames {
     self.filterTypes = [types mutableCopy];
     self.filterSources = [sources mutableCopy];
     self.filterFavoritesOnly = favoritesOnly;
+    self.filterUsernames = [usernames mutableCopy] ?: [NSMutableSet set];
     [self refetch];
 }
 
@@ -1458,6 +1571,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     [self.filterTypes removeAllObjects];
     [self.filterSources removeAllObjects];
     self.filterFavoritesOnly = NO;
+    [self.filterUsernames removeAllObjects];
     [self refetch];
 }
 

@@ -9,6 +9,22 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 
+static NSMutableDictionary<NSString *, NSArray<NSDictionary *> *> *SCIStoryMentionsSessionCache;
+
+static NSString *SCIStoryMentionsCacheKeyForMedia(id media) {
+    if (!media) return nil;
+    for (NSString *selectorName in @[@"pk", @"id", @"mediaID", @"mediaId", @"code", @"shortCode", @"shortcode"]) {
+        id value = nil;
+        @try {
+            SEL selector = NSSelectorFromString(selectorName);
+            if ([media respondsToSelector:selector]) value = ((id (*)(id, SEL))objc_msgSend)(media, selector);
+        } @catch (__unused id e) {}
+        NSString *string = value ? [NSString stringWithFormat:@"%@", value] : nil;
+        if (string.length > 0) return [NSString stringWithFormat:@"%@:%@", selectorName, string];
+    }
+    return [NSString stringWithFormat:@"ptr:%p", media];
+}
+
 // ============ User PK extraction ============
 
 // IGUser stores fields in a Pando-backed dictionary (_fieldCache).
@@ -51,6 +67,8 @@ static void SCIMentionStyleFollowButton(UIButton *btn, BOOL following) {
         ? [UIColor greenColor]
         : [SCIUtils SCIColor_InstagramPrimaryText];
     [btn setTitleColor:titleColor forState:UIControlStateNormal];
+    btn.layer.cornerRadius = 8.0;
+    btn.clipsToBounds = YES;
 }
 
 // ============ Enhanced mention extraction ============
@@ -109,6 +127,14 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
     if (!media) return @[];
 
+    static dispatch_once_t cacheOnce;
+    dispatch_once(&cacheOnce, ^{
+        SCIStoryMentionsSessionCache = [NSMutableDictionary dictionary];
+    });
+    NSString *cacheKey = SCIStoryMentionsCacheKeyForMedia(media);
+    NSArray<NSDictionary *> *cached = cacheKey.length > 0 ? SCIStoryMentionsSessionCache[cacheKey] : nil;
+    if (cached) return cached;
+
     SEL mentionsSel = NSSelectorFromString(@"reelMentions");
     if (![media respondsToSelector:mentionsSel]) return @[];
     id mentionsCollection = ((id(*)(id,SEL))objc_msgSend)(media, mentionsSel);
@@ -146,7 +172,9 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
         if (info.count > 1) [userInfos addObject:info]; // must have userObj + at least one other field
     }
-    return userInfos;
+    NSArray<NSDictionary *> *result = [userInfos copy];
+    if (cacheKey.length > 0) SCIStoryMentionsSessionCache[cacheKey] = result;
+    return result;
 }
 
 // ============ Bottom sheet VC ============

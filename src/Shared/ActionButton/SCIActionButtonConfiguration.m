@@ -1,31 +1,6 @@
 #import "SCIActionButtonConfiguration.h"
 #import "SCIActionDescriptor.h"
 
-static NSArray<NSString *> *SCIBulkActionIdentifiers(void) {
-    return @[
-        kSCIActionDownloadAllLibrary,
-        kSCIActionDownloadAllShare,
-        kSCIActionDownloadAllGallery,
-        kSCIActionDownloadAllClipboard,
-        kSCIActionDownloadAllLinks
-    ];
-}
-
-static BOOL SCIIsBulkDownloadSectionAction(NSString *identifier) {
-    return [@[
-        kSCIActionDownloadAllLibrary,
-        kSCIActionDownloadAllShare,
-        kSCIActionDownloadAllGallery
-    ] containsObject:identifier];
-}
-
-static BOOL SCIIsBulkCopySectionAction(NSString *identifier) {
-    return [@[
-        kSCIActionDownloadAllClipboard,
-        kSCIActionDownloadAllLinks
-    ] containsObject:identifier];
-}
-
 static NSString *SCIBulkDownloadDefaultsKeyForSource(SCIActionButtonSource source) {
     return [NSString stringWithFormat:@"action_button_%@_bulk_download_actions", SCIActionButtonTopicKeyForSource(source)];
 }
@@ -262,6 +237,7 @@ NSArray<SCIActionMenuSection *> *SCIActionButtonDefaultSectionsForSource(SCIActi
 - (void)save {
     [self normalize];
     [[NSUserDefaults standardUserDefaults] setObject:[self dictionaryRepresentation] forKey:[self configDefaultsKey]];
+    [[NSNotificationCenter defaultCenter] postNotificationName:SCIActionButtonConfigurationDidChangeNotification object:nil];
 }
 
 - (NSArray<NSString *> *)assignedActions {

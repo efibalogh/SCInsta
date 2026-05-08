@@ -16,16 +16,24 @@ static NSDictionary *SCIBootstrapDefaults(void) {
         @"search_bar_open_clipboard_link": @(YES),
         @"settings_shortcut": @(NO),
         @"header_long_press_gallery": @(NO),
+        @"gallery_long_press_tab": @"direct-inbox-tab",
         @"tweak_settings_app_launch": @(NO),
     };
 }
 
 static NSDictionary *SCIFeatureDefaults(void) {
-    return @{
+    NSMutableDictionary *defaults = [@{
         @"hide_ads": @(YES),
         @"copy_description": @(YES),
         @"detailed_color_picker": @(YES),
         @"remove_screenshot_alert": @(YES),
+        @"share_button_long_press_copy_link": @(YES),
+        @"story_mark_seen_on_like": @(YES),
+        @"story_mark_seen_on_reply": @(YES),
+        @"advance_story_when_like_marked_seen": @(NO),
+        @"advance_story_when_reply_marked_seen": @(NO),
+        @"dm_refresh_confirm": @(YES),
+        @"advance_direct_visual_when_marking_seen": @(NO),
         @"like_confirm_feed": @(NO),
         @"like_confirm_stories": @(NO),
         @"call_confirm": @(YES),
@@ -133,7 +141,16 @@ static NSDictionary *SCIFeatureDefaults(void) {
         @"show_favorites_at_top": @(NO),
         @"remove_user_from_copied_share_link": @(YES),
         @"hide_create_group_button": @(NO)
-    };
+    } mutableCopy];
+
+    id legacyStoryInteraction = [[NSUserDefaults standardUserDefaults] objectForKey:@"story_mark_seen_on_interaction"];
+    if ([legacyStoryInteraction respondsToSelector:@selector(boolValue)]) {
+        NSNumber *legacyValue = @([legacyStoryInteraction boolValue]);
+        defaults[@"story_mark_seen_on_like"] = legacyValue;
+        defaults[@"story_mark_seen_on_reply"] = legacyValue;
+    }
+
+    return defaults;
 }
 
 void SCICoreRegisterBootstrapDefaults(void) {

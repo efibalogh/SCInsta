@@ -28,6 +28,7 @@ FOUNDATION_EXPORT NSString * const kSCIActionViewThumbnail;
 FOUNDATION_EXPORT NSString * const kSCIActionCopyCaption;
 FOUNDATION_EXPORT NSString * const kSCIActionOpenTopicSettings;
 FOUNDATION_EXPORT NSString * const kSCIActionRepost;
+FOUNDATION_EXPORT NSString * const SCIActionButtonConfigurationDidChangeNotification;
 
 typedef id _Nullable (^SCIActionButtonMediaResolver)(id context);
 typedef NSInteger (^SCIActionButtonIndexResolver)(id context);

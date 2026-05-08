@@ -21,7 +21,7 @@ static NSString * const kSCIReelsActionButtonDefaultActionKey = @"action_button_
             [SCISetting switchCellWithTitle:@"Disable Auto-Unmuting Reels" subtitle:@"Prevents reels from unmuting when the volume or silent button is pressed" defaultsKey:@"disable_auto_unmuting_reels" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Confirm Reel Refresh" subtitle:@"Shows an alert when you trigger a reels refresh" defaultsKey:@"refresh_reel_confirm"],
             [SCISetting switchCellWithTitle:@"Disable Reels Tab Tap Refresh" subtitle:@"Prevents reels refresh when re-tapping the reels tab button" defaultsKey:@"disable_reels_tab_refresh"],
-            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"Removes the repost button from reels" defaultsKey:@"hide_repost_button_reels"]
+            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"Removes the repost button from reels" defaultsKey:@"hide_repost_button_reels" requiresRestart:YES]
         ], nil),
         SCITopicSection(@"Layout", @[
             [SCISetting switchCellWithTitle:@"Hide Reels Header" subtitle:@"Hides the top navigation bar when watching reels" defaultsKey:@"hide_reels_header"]

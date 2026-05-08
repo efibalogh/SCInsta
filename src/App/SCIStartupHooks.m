@@ -14,6 +14,7 @@ FOUNDATION_EXPORT void SCIInstallSeenButtonHooksIfNeeded(void);
 FOUNDATION_EXPORT void SCIInstallFollowConfirmHooksIfNeeded(void);
 FOUNDATION_EXPORT void SCIInstallCreateGroupButtonControlHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallSharedLinkCleanupHooksIfEnabled(void);
+FOUNDATION_EXPORT void SCIInstallShareLongPressCopyHooksIfNeeded(void);
 FOUNDATION_EXPORT void SCIInstallHideMetaAIHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallAdBlockingEarlyHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallFeedFilteringHooksIfEnabled(void);
@@ -64,6 +65,7 @@ FOUNDATION_EXPORT void SCIInstallKeepDeletedMessagesHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallCallConfirmHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallDMAudioMsgConfirmHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallNotesCustomizationHooksIfNeeded(void);
+FOUNDATION_EXPORT void SCIInstallDMRefreshConfirmHooksIfEnabled(void);
 
 void SCIInstallLaunchCriticalHooks(void) {
     SCIInstallTweakLaunchCriticalHooks();
@@ -133,6 +135,7 @@ void SCIInstallMessagesSurfaceHooksIfNeeded(void) {
     SCIInstallCallConfirmHooksIfEnabled();
     SCIInstallDMAudioMsgConfirmHooksIfEnabled();
     SCIInstallNotesCustomizationHooksIfNeeded();
+    SCIInstallDMRefreshConfirmHooksIfEnabled();
     SCIInstallNoRecentSearchesHooksIfEnabled();
     SCIInstallDetailedColorPickerHooksIfEnabled();
 }
@@ -150,6 +153,7 @@ void SCIInstallGeneralUIHooksIfNeeded(void) {
     SCIInstallTweakGeneralUIHooksIfNeeded();
     SCIInstallLiquidGlassHooksIfEnabled();
     SCIInstallSharedLinkCleanupHooksIfEnabled();
+    SCIInstallShareLongPressCopyHooksIfNeeded();
     SCIInstallHideMetaAIHooksIfEnabled();
     SCIInstallNoSuggestedUsersHooksIfEnabled();
     SCIInstallOpenLinkFromClipboardHooksIfEnabled();

@@ -49,6 +49,8 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
 
 @property (nonatomic, strong) NSMutableArray<SCIGalleryFilterChip *> *typeChips;
 @property (nonatomic, strong) NSMutableArray<SCIGalleryFilterChip *> *sourceChips;
+@property (nonatomic, strong) NSMutableArray<SCIGalleryFilterChip *> *usernameChips;
+@property (nonatomic, strong) UILabel *usernameSectionTitle;
 @property (nonatomic, strong) UIControl *favoritesRow;
 @property (nonatomic, strong) UIImageView *favoritesLeadingIcon;
 @property (nonatomic, strong) UILabel *favoritesLabel;
@@ -63,6 +65,7 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
 + (NSPredicate *)predicateForTypes:(NSSet<NSNumber *> *)types
                            sources:(NSSet<NSNumber *> *)sources
                      favoritesOnly:(BOOL)favoritesOnly
+                           usernames:(NSSet<NSString *> *)usernames
                         folderPath:(NSString *)folderPath {
     NSMutableArray<NSPredicate *> *parts = [NSMutableArray new];
     if (types.count > 0) {
@@ -75,6 +78,16 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
     }
     if (favoritesOnly) {
         [parts addObject:[NSPredicate predicateWithFormat:@"isFavorite == %@", @(YES)]];
+    }
+    if (usernames.count > 0) {
+        NSMutableArray<NSPredicate *> *usernameParts = [NSMutableArray array];
+        for (NSString *username in usernames) {
+            if (username.length == 0) continue;
+            [usernameParts addObject:[NSPredicate predicateWithFormat:@"sourceUsername ==[c] %@", username]];
+        }
+        if (usernameParts.count > 0) {
+            [parts addObject:[NSCompoundPredicate orPredicateWithSubpredicates:usernameParts]];
+        }
     }
     if (folderPath.length > 0) {
         [parts addObject:[NSPredicate predicateWithFormat:@"folderPath == %@", folderPath]];
@@ -92,6 +105,9 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
         _filterSources = [NSMutableSet new];
         _typeChips = [NSMutableArray new];
         _sourceChips = [NSMutableArray new];
+        _usernameChips = [NSMutableArray new];
+        _filterUsernames = [NSMutableSet new];
+        _availableUsernames = @[];
     }
     return self;
 }
@@ -130,6 +146,12 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
     [self.contentStack addArrangedSubview:[self createTypeRow]];
     [self.contentStack addArrangedSubview:[self sectionTitle:@"Source"]];
     [self.contentStack addArrangedSubview:[self createSourceGrid]];
+    if (self.availableUsernames.count > 0) {
+        self.usernameSectionTitle = [self sectionTitle:@"Username"];
+        [self updateUsernameSectionTitle];
+        [self.contentStack addArrangedSubview:self.usernameSectionTitle];
+        [self.contentStack addArrangedSubview:[self createUsernameRow]];
+    }
     [self.contentStack addArrangedSubview:[self sectionTitle:@"Options"]];
     [self.contentStack addArrangedSubview:[self createClearRow]];
 }
@@ -207,6 +229,44 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
         [currentRow addArrangedSubview:spacer];
     }
     return grid;
+}
+
+- (UIView *)createUsernameRow {
+    UIScrollView *scrollView = [[UIScrollView alloc] init];
+    scrollView.showsHorizontalScrollIndicator = NO;
+    scrollView.delaysContentTouches = YES;
+    scrollView.canCancelContentTouches = YES;
+    scrollView.directionalLockEnabled = YES;
+    scrollView.alwaysBounceHorizontal = YES;
+    [scrollView.heightAnchor constraintEqualToConstant:44].active = YES;
+
+    UIStackView *row = [[UIStackView alloc] init];
+    row.axis = UILayoutConstraintAxisHorizontal;
+    row.spacing = 8;
+    row.translatesAutoresizingMaskIntoConstraints = NO;
+    [scrollView addSubview:row];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [row.leadingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.leadingAnchor],
+        [row.trailingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.trailingAnchor],
+        [row.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor],
+        [row.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor],
+        [row.heightAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.heightAnchor],
+    ]];
+
+    for (NSString *username in self.availableUsernames) {
+        SCIGalleryFilterChip *chip = [[SCIGalleryFilterChip alloc] initWithTag:self.usernameChips.count];
+        [chip setTitle:username forState:UIControlStateNormal];
+        UIImage *icon = [SCIAssetUtils instagramIconNamed:@"mention" pointSize:kSCIGalleryFilterChipIconPointSize];
+        [chip setImage:icon forState:UIControlStateNormal];
+        chip.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
+        chip.selectedChip = [self usernameFilterContainsUsername:username];
+        [chip addTarget:self action:@selector(usernameChipTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [chip.heightAnchor constraintEqualToConstant:44].active = YES;
+        [row addArrangedSubview:chip];
+        [self.usernameChips addObject:chip];
+    }
+    return scrollView;
 }
 
 - (UIView *)createFavoritesRow {
@@ -307,6 +367,43 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
     [self notifyFilterStateChanged];
 }
 
+- (void)usernameChipTapped:(SCIGalleryFilterChip *)chip {
+    NSInteger index = chip.itemTag;
+    if (index < 0 || index >= (NSInteger)self.availableUsernames.count) return;
+    NSString *username = self.availableUsernames[index];
+    NSString *existing = [self matchingSelectedUsernameForUsername:username];
+    if (existing.length > 0) {
+        [self.filterUsernames removeObject:existing];
+    } else {
+        [self.filterUsernames addObject:username];
+    }
+    for (SCIGalleryFilterChip *candidate in self.usernameChips) {
+        NSInteger candidateIndex = candidate.itemTag;
+        NSString *candidateUsername = candidateIndex >= 0 && candidateIndex < (NSInteger)self.availableUsernames.count ? self.availableUsernames[candidateIndex] : nil;
+        candidate.selectedChip = [self usernameFilterContainsUsername:candidateUsername];
+    }
+    [self updateUsernameSectionTitle];
+    [self notifyFilterStateChanged];
+}
+
+- (NSString *)matchingSelectedUsernameForUsername:(NSString *)username {
+    if (username.length == 0) return nil;
+    for (NSString *selectedUsername in self.filterUsernames) {
+        if ([selectedUsername caseInsensitiveCompare:username] == NSOrderedSame) return selectedUsername;
+    }
+    return nil;
+}
+
+- (BOOL)usernameFilterContainsUsername:(NSString *)username {
+    return [self matchingSelectedUsernameForUsername:username].length > 0;
+}
+
+- (void)updateUsernameSectionTitle {
+    if (!self.usernameSectionTitle) return;
+    NSUInteger count = self.filterUsernames.count;
+    self.usernameSectionTitle.text = count > 0 ? [NSString stringWithFormat:@"Username (%lu selected)", (unsigned long)count] : @"Username";
+}
+
 - (void)favoritesRowTapped {
     self.filterFavoritesOnly = !self.filterFavoritesOnly;
     [self updateFavoritesRowAppearance];
@@ -343,16 +440,17 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
 }
 
 - (BOOL)hasActiveFilters {
-    return self.filterTypes.count > 0 || self.filterSources.count > 0 || self.filterFavoritesOnly;
+    return self.filterTypes.count > 0 || self.filterSources.count > 0 || self.filterFavoritesOnly || self.filterUsernames.count > 0;
 }
 
 - (void)notifyFilterStateChanged {
     [self updateClearRowState];
-    if ([self.delegate respondsToSelector:@selector(filterController:didApplyTypes:sources:favoritesOnly:)]) {
+    if ([self.delegate respondsToSelector:@selector(filterController:didApplyTypes:sources:favoritesOnly:usernames:)]) {
         [self.delegate filterController:self
                           didApplyTypes:[self.filterTypes copy]
                                 sources:[self.filterSources copy]
-                          favoritesOnly:self.filterFavoritesOnly];
+                          favoritesOnly:self.filterFavoritesOnly
+                              usernames:[self.filterUsernames copy]];
     }
 }
 
@@ -361,9 +459,12 @@ static CGFloat const kSCIGalleryFilterChipIconPointSize = 14.0;
     [self.filterTypes removeAllObjects];
     [self.filterSources removeAllObjects];
     self.filterFavoritesOnly = NO;
+    [self.filterUsernames removeAllObjects];
     [self updateFavoritesRowAppearance];
     for (SCIGalleryFilterChip *c in self.typeChips) c.selectedChip = NO;
     for (SCIGalleryFilterChip *c in self.sourceChips) c.selectedChip = NO;
+    for (SCIGalleryFilterChip *c in self.usernameChips) c.selectedChip = NO;
+    [self updateUsernameSectionTitle];
     if ([self.delegate respondsToSelector:@selector(filterControllerDidClear:)]) {
         [self.delegate filterControllerDidClear:self];
     } else {

@@ -23,7 +23,7 @@ static NSString * const kSCIFeedActionButtonDefaultActionKey = @"action_button_f
             [SCISetting switchCellWithTitle:@"No Suggested Reels" subtitle:@"Hides suggested reels to watch in the feed" defaultsKey:@"no_suggested_reels"],
             [SCISetting switchCellWithTitle:@"No Suggested Threads Posts" subtitle:@"Hides suggested Threads posts in the feed" defaultsKey:@"no_suggested_threads"],
             [SCISetting switchCellWithTitle:@"Disable Video Autoplay" subtitle:@"Prevents videos in your feed from playing automatically" defaultsKey:@"disable_feed_autoplay"],
-            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"Removes the repost button from feed posts" defaultsKey:@"hide_repost_button_feed"],
+            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"Removes the repost button from feed posts" defaultsKey:@"hide_repost_button_feed" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Hide Metrics" subtitle:@"Hides the metrics numbers under posts and reels, including likes, comments, reposts, and shares" defaultsKey:@"hide_metrics"],
             [SCISetting switchCellWithTitle:@"Disable Home Tab Tap Refresh" subtitle:@"Prevents feed refresh when re-tapping the home tab button" defaultsKey:@"disable_home_button_refresh"],
             [SCISetting switchCellWithTitle:@"Disable Background Feed Refresh" subtitle:@"Prevents Instagram from refreshing your home feed in the background" defaultsKey:@"disable_bg_refresh"]

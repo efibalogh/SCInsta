@@ -166,6 +166,8 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
             @"media_empty": @{@"candidates": @[@"ig_icon_media_outline_96"]},
             @"mention": @{@"candidates": @[@"ig_icon_story_mention_pano_outline_24"]},
             @"messages": @{@"candidates": @[@"ig_icon_direct_prism_outline_24"]},
+            @"merge_left": @{@"candidates": @[@"merge-left"]},
+            @"merge_right": @{@"candidates": @[@"merge-right"]},
             @"more": @{@"candidates": @[@"ig_icon_more_horizontal_outline_24"]},
             @"photo": @{@"candidates": @[@"ig_icon_photo_outline_24"]},
             @"photo_filled": @{@"candidates": @[@"ig_icon_photo_filled_24"]},

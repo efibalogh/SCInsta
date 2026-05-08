@@ -19,6 +19,8 @@ static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_butt
             [SCISetting switchCellWithTitle:@"Keep Deleted Messages" subtitle:@"Saves deleted messages in chat conversations" defaultsKey:@"keep_deleted_message"],
             [SCISetting switchCellWithTitle:@"Manually Mark Messages as Seen" subtitle:@"Adds a button to DM threads that marks messages as seen" defaultsKey:@"remove_lastseen"],
             [SCISetting switchCellWithTitle:@"Auto-Seen on Send" subtitle:@"Marks messages as seen automatically right after you send a message in the thread" defaultsKey:@"seen_auto_on_send"],
+            [SCISetting switchCellWithTitle:@"Advance After Manual Seen" subtitle:@"After marking a visual message as seen, move to the next viewer item when available" defaultsKey:@"advance_direct_visual_when_marking_seen"],
+            [SCISetting switchCellWithTitle:@"Confirm Inbox Refresh" subtitle:@"Shows an alert before pull-to-refresh reloads the messages list" defaultsKey:@"dm_refresh_confirm"],
             [SCISetting switchCellWithTitle:@"Disable Disappearing Swipe-Up" subtitle:@"Blocks swipe-up gesture paths used to enter or toggle disappearing mode" defaultsKey:@"disable_disappearing_swipe_up"],
             [SCISetting switchCellWithTitle:@"Disable Typing Status" subtitle:@"Prevents the typing indicator from being shown to others when you're typing in DMs" defaultsKey:@"disable_typing_status"],
             [SCISetting switchCellWithTitle:@"No Suggested Chats" subtitle:@"Hides the suggested broadcast channels in direct messages" defaultsKey:@"no_suggested_chats"],

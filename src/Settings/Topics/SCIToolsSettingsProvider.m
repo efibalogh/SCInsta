@@ -3,49 +3,155 @@
 #import "../SCITopicSettingsSupport.h"
 #import "SCIInterfaceSettingsProvider.h"
 #import "../SCISettingsTransferManager.h"
+#import "../../App/SCIFlexLoader.h"
 #import "../../Utils.h"
 
-static NSArray *SCIExportBackupSections(void) {
-    return @[
-        SCITopicSection(@"", @[
-            [SCISetting buttonCellWithTitle:@"Export Settings Only" subtitle:@"Create a backup with SCInsta settings only" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:YES includeGallery:NO];
-            }],
-            [SCISetting buttonCellWithTitle:@"Export Gallery Only" subtitle:@"Create a backup with Gallery media only" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:NO includeGallery:YES];
-            }],
-            [SCISetting buttonCellWithTitle:@"Export Settings + Gallery" subtitle:@"Create a backup with both settings and Gallery media" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] exportFromController:topMostController() includeSettings:YES includeGallery:YES];
-            }]
-        ], nil)
-    ];
+static UIImage *SCIRotatedSettingsIcon(UIImage *image, CGFloat radians) {
+    if (!image) return nil;
+    CGSize size = CGSizeMake(24.0, 24.0);
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.opaque = NO;
+    format.scale = UIScreen.mainScreen.scale;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage *rotated = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        CGContextTranslateCTM(context.CGContext, size.width / 2.0, size.height / 2.0);
+        CGContextRotateCTM(context.CGContext, radians);
+        [[image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] drawInRect:CGRectMake(-12.0, -12.0, 24.0, 24.0)];
+    }];
+    return [rotated imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 }
 
-static NSArray *SCIImportBackupSections(void) {
+static UIImage *SCIImportBackupIcon(void) {
+    UIImage *merge = SCISettingsInstagramIcon(@"merge_right", 24.0);
+    if (!merge) merge = SCISettingsInstagramIcon(@"merge_left", 24.0);
+    if (!merge) merge = SCISettingsSystemIcon(@"arrow.down.doc", 24.0, UIImageSymbolWeightRegular);
+    return SCIRotatedSettingsIcon([merge imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate], (CGFloat)M_PI_2);
+}
+
+@interface SCISettingsTransferSelectionViewController : UITableViewController
+@property (nonatomic, assign) BOOL importMode;
+@property (nonatomic, assign) BOOL includeSettings;
+@property (nonatomic, assign) BOOL includeGallery;
+- (instancetype)initWithImportMode:(BOOL)importMode;
+@end
+
+@implementation SCISettingsTransferSelectionViewController
+
+- (instancetype)initWithImportMode:(BOOL)importMode {
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
+        _importMode = importMode;
+        _includeSettings = YES;
+        _includeGallery = YES;
+        self.title = importMode ? @"Import" : @"Export";
+    }
+    return self;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
+    self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:(self.importMode ? @"Import" : @"Export")
+                                                                              style:UIBarButtonItemStyleDone
+                                                                             target:self
+                                                                             action:@selector(runTransfer)];
+    [self updateActionEnabled];
+}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    (void)tableView; (void)section;
+    return 2;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    (void)tableView; (void)section;
+    return self.importMode ? @"A restart prompt appears after a successful import." : nil;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+    cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
+    cell.selectedBackgroundView = [UIView new];
+    cell.selectedBackgroundView.backgroundColor = [SCIUtils SCIColor_InstagramPressedBackground];
+    UIListContentConfiguration *config = cell.defaultContentConfiguration;
+    config.textProperties.color = [SCIUtils SCIColor_InstagramPrimaryText];
+    config.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
+    BOOL selected = indexPath.row == 0 ? self.includeSettings : self.includeGallery;
+    config.text = indexPath.row == 0 ? @"Settings" : @"Gallery";
+    config.secondaryText = indexPath.row == 0 ? @"SCInsta preferences" : @"Gallery media and metadata";
+    config.image = indexPath.row == 0 ? SCISettingsInstagramIcon(@"settings", 22.0) : SCISettingsInstagramIcon(@"media", 22.0);
+    config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    cell.contentConfiguration = config;
+    cell.accessoryType = selected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.row == 0) {
+        self.includeSettings = !self.includeSettings;
+    } else {
+        self.includeGallery = !self.includeGallery;
+    }
+    [self updateActionEnabled];
+    [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+}
+
+- (void)updateActionEnabled {
+    self.navigationItem.rightBarButtonItem.enabled = self.includeSettings || self.includeGallery;
+}
+
+- (void)runTransfer {
+    if (!(self.includeSettings || self.includeGallery)) return;
+    UIViewController *presenter = self.navigationController ?: self;
+    if (self.importMode) {
+        [[SCISettingsTransferManager sharedManager] importFromController:presenter includeSettings:self.includeSettings includeGallery:self.includeGallery];
+    } else {
+        [[SCISettingsTransferManager sharedManager] exportFromController:presenter includeSettings:self.includeSettings includeGallery:self.includeGallery];
+    }
+}
+
+@end
+
+static NSArray *SCIManageSettingsDataSections(void) {
     return @[
         SCITopicSection(@"", @[
-            [SCISetting buttonCellWithTitle:@"Import Settings Only" subtitle:@"Restore SCInsta settings from a backup file" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:YES includeGallery:NO];
-            }],
-            [SCISetting buttonCellWithTitle:@"Import Gallery Only" subtitle:@"Restore Gallery media from a backup file" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:NO includeGallery:YES];
-            }],
-            [SCISetting buttonCellWithTitle:@"Import Settings + Gallery" subtitle:@"Restore both settings and Gallery media from a backup file" icon:nil action:^(void) {
-                [[SCISettingsTransferManager sharedManager] importFromController:topMostController() includeSettings:YES includeGallery:YES];
-            }]
-        ], @"A restart prompt appears after a successful import.")
+            SCISettingApplyIconTint([SCISetting navigationCellWithTitle:@"Export"
+                                                                subtitle:@"Choose settings, Gallery, or both"
+                                                                    icon:SCISettingsInstagramIcon(@"share", 24.0)
+                                                          viewController:[[SCISettingsTransferSelectionViewController alloc] initWithImportMode:NO]],
+                                  [SCIUtils SCIColor_InstagramPrimaryText]),
+            SCISettingApplyIconTint([SCISetting navigationCellWithTitle:@"Import"
+                                                                subtitle:@"Choose settings, Gallery, or both"
+                                                                    icon:SCIImportBackupIcon()
+                                                          viewController:[[SCISettingsTransferSelectionViewController alloc] initWithImportMode:YES]],
+                                  [SCIUtils SCIColor_InstagramPrimaryText])
+        ], nil)
     ];
 }
 
 @implementation SCIToolsSettingsProvider
 
 + (SCISetting *)rootSetting {
+    BOOL flexInstalled = SCIFlexIsBundled();
+    NSString *flexFooter = flexInstalled
+        ? @"The first time FLEX is opened in a session it can take a moment to initialize (especially with \"Open on App Focus\", which fires immediately at launch). Subsequent opens are instant."
+        : @"FLEX not installed. Rebuild with --with-flex or install libFLEX.dylib to enable these options.";
+    SCISetting *flexGesture = [SCISetting switchCellWithTitle:@"Enable 3-Finger FLEX Gesture" subtitle:@"Hold three fingers anywhere for 1.5 seconds to open the FLEX explorer" defaultsKey:@"flex_instagram"];
+    SCISetting *flexLaunch = [SCISetting switchCellWithTitle:@"Open FLEX on App Launch" subtitle:@"Automatically opens the FLEX explorer when the app launches" defaultsKey:@"flex_app_launch"];
+    SCISetting *flexFocus = [SCISetting switchCellWithTitle:@"Open FLEX on App Focus" subtitle:@"Automatically opens the FLEX explorer when the app is focused" defaultsKey:@"flex_app_start"];
+    if (!flexInstalled) {
+        flexGesture.userInfo = @{@"enabled": @NO};
+        flexLaunch.userInfo = @{@"enabled": @NO};
+        flexFocus.userInfo = @{@"enabled": @NO};
+    }
     NSMutableArray *sections = [NSMutableArray arrayWithArray:@[
-        SCITopicSection(@"FLEX", @[
-            [SCISetting switchCellWithTitle:@"Enable 3-Finger FLEX Gesture" subtitle:@"Hold three fingers anywhere for 1.5 seconds to open the FLEX explorer" defaultsKey:@"flex_instagram"],
-            [SCISetting switchCellWithTitle:@"Open FLEX on App Launch" subtitle:@"Automatically opens the FLEX explorer when the app launches" defaultsKey:@"flex_app_launch"],
-            [SCISetting switchCellWithTitle:@"Open FLEX on App Focus" subtitle:@"Automatically opens the FLEX explorer when the app is focused" defaultsKey:@"flex_app_start"]
-        ], @"The first time FLEX is opened in a session it can take a moment to initialize (especially with \"Open on App Focus\", which fires immediately at launch). Subsequent opens are instant."),
+        SCITopicSection(@"FLEX", @[flexGesture, flexLaunch, flexFocus], flexFooter),
         SCITopicSection(@"SCInsta", @[
             [SCISetting switchCellWithTitle:@"Enable Tweak Settings Quick Access" subtitle:@"Allows you to long-press the home tab to open SCInsta settings" defaultsKey:@"settings_shortcut" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Show Tweak Settings on App Launch" subtitle:@"Automatically opens the SCInsta settings when the app launches" defaultsKey:@"tweak_settings_app_launch"],
@@ -58,8 +164,7 @@ static NSArray *SCIImportBackupSections(void) {
             [SCISetting switchCellWithTitle:@"Disable Safe Mode" subtitle:@"Makes Instagram not reset settings after subsequent crashes, at your own risk" defaultsKey:@"disable_safe_mode"]
         ], nil),
         SCITopicSection(@"Backup & Transfer", @[
-            [SCISetting navigationCellWithTitle:@"Export Backup" subtitle:@"Choose whether to include settings, Gallery media, or both" icon:nil navSections:SCIExportBackupSections()],
-            [SCISetting navigationCellWithTitle:@"Import Backup" subtitle:@"Choose whether to restore settings, Gallery media, or both" icon:nil navSections:SCIImportBackupSections()]
+            [SCISetting navigationCellWithTitle:@"Manage Settings & Data" subtitle:@"Export or import settings, Gallery media, or both" icon:nil navSections:SCIManageSettingsDataSections()]
         ], nil),
         SCITopicSection(@"Liquid Glass", @[
             [SCIInterfaceSettingsProvider experimentalLiquidGlassSetting]

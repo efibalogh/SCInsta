@@ -24,7 +24,6 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     SCIGallerySettingsSectionLock,
     SCIGallerySettingsSectionShortcuts,
     SCIGallerySettingsSectionImport,
-    SCIGallerySettingsSectionMaintenance,
     SCIGallerySettingsSectionDelete,
     SCIGallerySettingsSectionCount
 };
@@ -105,7 +104,6 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionLock: return @"Lock";
         case SCIGallerySettingsSectionShortcuts: return @"Shortcuts";
         case SCIGallerySettingsSectionImport: return @"Import";
-        case SCIGallerySettingsSectionMaintenance: return @"Maintenance";
         case SCIGallerySettingsSectionDelete: return @"Delete";
     }
     return nil;
@@ -118,11 +116,9 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionLock:
             return @"When enabled, the Gallery requires a passcode or biometrics to open.";
         case SCIGallerySettingsSectionShortcuts:
-            return @"Long press Messages tab to open. Requires app restart to take effect.";
+            return @"Choose which tab opens Gallery on long press. Requires app restart to take effect.";
         case SCIGallerySettingsSectionImport:
             return @"Import from the Files app with full metadata (username, shortcode, URLs) so Open profile / Open original behave like saves from Instagram. Batch: set shared fields, Add files, then edit or merge per row.";
-        case SCIGallerySettingsSectionMaintenance:
-            return @"Renames older media files to the current epoch_username_source_posted format. Custom display names and thumbnails are preserved.";
         default:
             return nil;
     }
@@ -137,10 +133,8 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
         case SCIGallerySettingsSectionLock:
             return [SCIGalleryManager sharedManager].isLockEnabled ? 2 : 1;
         case SCIGallerySettingsSectionShortcuts:
-            return 1;
+            return 2;
         case SCIGallerySettingsSectionImport:
-            return 1;
-        case SCIGallerySettingsSectionMaintenance:
             return 1;
         case SCIGallerySettingsSectionDelete:
             return 1;
@@ -210,14 +204,53 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     cell.accessoryView = sw;
 }
 
-- (void)configureImportCell:(UITableViewCell *)cell {
-    cell.textLabel.text = @"Import from Files…";
-    cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
-    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+- (UIMenu *)galleryShortcutTargetMenuForButton:(UIButton *)button {
+    NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:@"gallery_long_press_tab"];
+    if (saved.length == 0) saved = @"direct-inbox-tab";
+    NSArray<NSDictionary *> *items = @[
+        @{@"title": @"Home", @"value": @"mainfeed-tab"},
+        @{@"title": @"Reels", @"value": @"clips-tab"},
+        @{@"title": @"Messages", @"value": @"direct-inbox-tab"},
+        @{@"title": @"Profile", @"value": @"profile-tab"}
+    ];
+    NSMutableArray<UIMenuElement *> *actions = [NSMutableArray array];
+    for (NSDictionary *item in items) {
+        NSString *title = item[@"title"];
+        NSString *value = item[@"value"];
+        UIAction *action = [UIAction actionWithTitle:title image:nil identifier:nil handler:^(__unused UIAction *a) {
+            [[NSUserDefaults standardUserDefaults] setObject:value forKey:@"gallery_long_press_tab"];
+            [button setTitle:title forState:UIControlStateNormal];
+            [SCIUtils showRestartConfirmation];
+        }];
+        action.state = [saved isEqualToString:value] ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
+    }
+    return [UIMenu menuWithChildren:actions];
 }
 
-- (void)configureMaintenanceCell:(UITableViewCell *)cell {
-    cell.textLabel.text = @"Migrate Saved Filenames";
+- (void)configureShortcutTargetCell:(UITableViewCell *)cell {
+    cell.textLabel.text = @"Open from Tab";
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+    NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:@"gallery_long_press_tab"];
+    NSDictionary *titles = @{
+        @"mainfeed-tab": @"Home",
+        @"clips-tab": @"Reels",
+        @"direct-inbox-tab": @"Messages",
+        @"profile-tab": @"Profile"
+    };
+    NSString *title = titles[saved.length ? saved : @"direct-inbox-tab"] ?: @"Messages";
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    [button setTitle:title forState:UIControlStateNormal];
+    button.contentEdgeInsets = UIEdgeInsetsMake(6.0, 10.0, 6.0, 10.0);
+    button.showsMenuAsPrimaryAction = YES;
+    button.menu = [self galleryShortcutTargetMenuForButton:button];
+    [button sizeToFit];
+    cell.accessoryView = button;
+}
+
+- (void)configureImportCell:(UITableViewCell *)cell {
+    cell.textLabel.text = @"Import from Files…";
     cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 }
@@ -252,13 +285,14 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
             [self configureLockCell:cell atRow:indexPath.row];
             break;
         case SCIGallerySettingsSectionShortcuts:
-            [self configureShortcutsCell:cell];
+            if (indexPath.row == 0) {
+                [self configureShortcutsCell:cell];
+            } else {
+                [self configureShortcutTargetCell:cell];
+            }
             break;
         case SCIGallerySettingsSectionImport:
             [self configureImportCell:cell];
-            break;
-        case SCIGallerySettingsSectionMaintenance:
-            [self configureMaintenanceCell:cell];
             break;
         case SCIGallerySettingsSectionDelete:
             [self configureDeleteCell:cell];
@@ -307,27 +341,6 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     [SCIUtils showRestartConfirmation];
 }
 
-- (void)confirmFilenameMigration {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Migrate Saved Filenames?"
-                                                                   message:@"Older gallery media files will be renamed on disk to the current epoch_username_source_posted format. Existing custom display names are not changed."
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Migrate" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-        NSError *error = nil;
-        NSInteger count = [SCIGalleryFile migrateLegacyFilenamesWithError:&error];
-        if (error) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:3.0 title:@"Migration failed" subtitle:error.localizedDescription iconResource:@"error_filled"];
-            return;
-        }
-        NSString *subtitle = count == 1 ? @"1 file was renamed." : [NSString stringWithFormat:@"%ld files were renamed.", (long)count];
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:3.0 title:@"Migration complete" subtitle:subtitle iconResource:@"circle_check_filled"];
-        [self reloadStats];
-        [self.tableView reloadData];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"SCIGalleryFavoritesSortPreferenceChanged" object:nil];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
@@ -341,11 +354,6 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     if (indexPath.section == SCIGallerySettingsSectionImport) {
         SCIGalleryImportViewController *vc = [[SCIGalleryImportViewController alloc] initWithDestinationFolderPath:self.importDestinationFolderPath];
         [self.navigationController pushViewController:vc animated:YES];
-        return;
-    }
-
-    if (indexPath.section == SCIGallerySettingsSectionMaintenance) {
-        [self confirmFilenameMigration];
         return;
     }
 

@@ -1,9 +1,10 @@
 #import "SCISettingsViewController.h"
 #import "../App/SCIStartupHooks.h"
+#import "../Shared/ActionButton/ActionButtonCore.h"
 #import "../Shared/UI/SCISwitch.h"
 
 static char rowStaticRef[] = "row";
-static NSInteger const kSCIUINavigationItemSearchBarPlacementIntegratedButton = 4;
+static NSInteger const kSCIUINavigationItemSearchBarPlacementStacked = 2;
 
 @interface SCISettingsViewController () <UITableViewDataSource, UITableViewDelegate, UITableViewDragDelegate, UITableViewDropDelegate, UISearchResultsUpdating>
 
@@ -207,12 +208,15 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     self.searchController = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.searchController.searchResultsUpdater = self;
     self.searchController.obscuresBackgroundDuringPresentation = NO;
+    self.searchController.hidesNavigationBarDuringPresentation = NO;
     self.searchController.searchBar.placeholder = self.searchesAllSettings ? @"Search settings" : [NSString stringWithFormat:@"Search %@", self.title ?: @"settings"];
     self.navigationItem.searchController = self.searchController;
+    self.navigationItem.hidesSearchBarWhenScrolling = YES;
     if (@available(iOS 26.0, *)) {
-        self.navigationItem.preferredSearchBarPlacement = (UINavigationItemSearchBarPlacement)kSCIUINavigationItemSearchBarPlacementIntegratedButton;
-    } else {
-        self.navigationItem.hidesSearchBarWhenScrolling = YES;
+        @try {
+            [self.navigationItem setValue:@(kSCIUINavigationItemSearchBarPlacementStacked) forKey:@"preferredSearchBarPlacement"];
+        } @catch (__unused NSException *exception) {
+        }
     }
     self.definesPresentationContext = YES;
 }
@@ -288,6 +292,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             
         case SCITableCellSwitch: {
             SCISwitch *toggle = [SCISwitch new];
+            BOOL rowEnabled = row.userInfo[@"enabled"] ? [row.userInfo[@"enabled"] boolValue] : YES;
             NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
             id storedValue = [defaults objectForKey:row.defaultsKey];
             NSNumber *defaultValue = row.userInfo[@"defaultValue"];
@@ -295,6 +300,11 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             if (row.mutuallyExclusiveDefaultsKey.length) {
                 BOOL otherOn = [defaults boolForKey:row.mutuallyExclusiveDefaultsKey];
                 toggle.enabled = toggle.isOn || !otherOn;
+            }
+            toggle.enabled = toggle.enabled && rowEnabled;
+            if (!rowEnabled) {
+                cellContentConfig.textProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
+                cellContentConfig.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramTertiaryText];
             }
             
             objc_setAssociatedObject(toggle, rowStaticRef, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -636,6 +646,10 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     NSDictionary *properties = command.propertyList;
     
     [[NSUserDefaults standardUserDefaults] setValue:properties[@"value"] forKey:properties[@"defaultsKey"]];
+    NSString *defaultsKey = properties[@"defaultsKey"];
+    if ([defaultsKey hasPrefix:@"action_button_"]) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:SCIActionButtonConfigurationDidChangeNotification object:nil];
+    }
     
     NSLog(@"Menu changed: %@", command.propertyList[@"value"]);
     

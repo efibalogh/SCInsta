@@ -1,6 +1,43 @@
 #import "../../Utils.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import <substrate.h>
+
+extern void SCIMarkStoryAsSeenForViewWithAdvancePref(UIView *view, NSString *advancePrefKey);
+extern UIView *SCIActiveStoryOverlayForInteractions(void);
+
+static inline BOOL SCIStoryLegacyInteractionPrefEnabled(void) {
+    return [[NSUserDefaults standardUserDefaults] objectForKey:@"story_mark_seen_on_interaction"] != nil &&
+        [SCIUtils getBoolPref:@"story_mark_seen_on_interaction"];
+}
+
+static inline BOOL SCIStoryMarkSeenOnLikeEnabled(void) {
+    return [SCIUtils getBoolPref:@"story_mark_seen_on_like"] || SCIStoryLegacyInteractionPrefEnabled();
+}
+
+static inline BOOL SCIStoryMarkSeenOnReplyEnabled(void) {
+    return [SCIUtils getBoolPref:@"story_mark_seen_on_reply"] || SCIStoryLegacyInteractionPrefEnabled();
+}
+
+static inline BOOL SCIStoryInteractionHooksNeeded(void) {
+    return [SCIUtils getBoolPref:@"like_confirm_stories"] ||
+        SCIStoryMarkSeenOnLikeEnabled() ||
+        SCIStoryMarkSeenOnReplyEnabled() ||
+        [SCIUtils getBoolPref:@"advance_story_when_like_marked_seen"] ||
+        [SCIUtils getBoolPref:@"advance_story_when_reply_marked_seen"];
+}
+
+static void SCIStoryMarkSeenForInteractionView(UIView *view, NSString *advancePrefKey) {
+    if (!view) return;
+    SCIMarkStoryAsSeenForViewWithAdvancePref(view, advancePrefKey);
+}
+
+static void SCIStoryReplySideEffects(void) {
+    if (!SCIStoryMarkSeenOnReplyEnabled()) return;
+    UIView *overlay = SCIActiveStoryOverlayForInteractions();
+    if (!overlay) return;
+    SCIStoryMarkSeenForInteractionView(overlay, @"advance_story_when_reply_marked_seen");
+}
 
 ///////////////////////////////////////////////////////////
 
@@ -105,6 +142,9 @@ static void (*orig_sciStoryLikeTap)(id, SEL, id);
 static void new_sciStoryLikeTap(id self, SEL _cmd, id button) {
     if (![SCIUtils getBoolPref:@"like_confirm_stories"]) {
         orig_sciStoryLikeTap(self, _cmd, button);
+        if (SCIStoryMarkSeenOnLikeEnabled() && [button isKindOfClass:[UIView class]]) {
+            SCIStoryMarkSeenForInteractionView((UIView *)button, @"advance_story_when_like_marked_seen");
+        }
         return;
     }
 
@@ -125,6 +165,9 @@ static void new_sciStoryLikeTap(id self, SEL _cmd, id button) {
             }
         }
         orig_sciStoryLikeTap(self, _cmd, button);
+        if (SCIStoryMarkSeenOnLikeEnabled() && [button isKindOfClass:[UIView class]]) {
+            SCIStoryMarkSeenForInteractionView((UIView *)button, @"advance_story_when_like_marked_seen");
+        }
     }];
 
     if (btn) {
@@ -138,7 +181,7 @@ static void new_sciStoryLikeTap(id self, SEL _cmd, id button) {
 }
 
 static void SCIInstallStoryLikeConfirmHookIfNeeded(void) {
-    if (![SCIUtils getBoolPref:@"like_confirm_stories"]) {
+    if (!SCIStoryInteractionHooksNeeded()) {
         return;
     }
 
@@ -158,6 +201,60 @@ static void SCIInstallStoryLikeConfirmHookIfNeeded(void) {
     });
 }
 
+%hook IGDirectComposer
+- (void)_didTapSend:(id)arg {
+    %orig;
+    SCIStoryReplySideEffects();
+}
+
+- (void)_send {
+    %orig;
+    SCIStoryReplySideEffects();
+}
+%end
+
+static void (*orig_storyFooterEmojiQuick)(id, SEL, id, id);
+static void SCIHookedStoryFooterEmojiQuick(id self, SEL _cmd, id inputView, id button) {
+    if (orig_storyFooterEmojiQuick) orig_storyFooterEmojiQuick(self, _cmd, inputView, button);
+    SCIStoryReplySideEffects();
+}
+
+static void (*orig_storyFooterEmojiReaction)(id, SEL, id, id);
+static void SCIHookedStoryFooterEmojiReaction(id self, SEL _cmd, id inputView, id button) {
+    if (orig_storyFooterEmojiReaction) orig_storyFooterEmojiReaction(self, _cmd, inputView, button);
+    SCIStoryReplySideEffects();
+}
+
+static void (*orig_storyQuickReaction)(id, SEL, id, id, id);
+static void SCIHookedStoryQuickReaction(id self, SEL _cmd, id view, id sourceButton, id emoji) {
+    if (orig_storyQuickReaction) orig_storyQuickReaction(self, _cmd, view, sourceButton, emoji);
+    SCIStoryReplySideEffects();
+}
+
+static void SCIInstallStoryReplyHooksIfNeeded(void) {
+    if (!SCIStoryInteractionHooksNeeded()) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class footerClass = NSClassFromString(@"IGStoryDefaultFooter.IGStoryFullscreenDefaultFooterView");
+        SEL quickSelector = NSSelectorFromString(@"inputView:didTapEmojiQuickReactionButton:");
+        if (footerClass && class_getInstanceMethod(footerClass, quickSelector)) {
+            MSHookMessageEx(footerClass, quickSelector, (IMP)SCIHookedStoryFooterEmojiQuick, (IMP *)&orig_storyFooterEmojiQuick);
+        }
+
+        SEL reactionSelector = NSSelectorFromString(@"inputView:didTapEmojiReactionButton:");
+        if (footerClass && class_getInstanceMethod(footerClass, reactionSelector)) {
+            MSHookMessageEx(footerClass, reactionSelector, (IMP)SCIHookedStoryFooterEmojiReaction, (IMP *)&orig_storyFooterEmojiReaction);
+        }
+
+        Class quickReactionClass = NSClassFromString(@"IGStoryQuickReactions.IGStoryQuickReactionsController");
+        SEL quickReactionSelector = NSSelectorFromString(@"quickReactionsView:sourceEmojiButton:didTapEmoji:");
+        if (quickReactionClass && class_getInstanceMethod(quickReactionClass, quickReactionSelector)) {
+            MSHookMessageEx(quickReactionClass, quickReactionSelector, (IMP)SCIHookedStoryQuickReaction, (IMP *)&orig_storyQuickReaction);
+        }
+    });
+}
+
 // DM like button (seems to be hidden)
 %hook IGDirectThreadViewController
 - (void)_didTapLikeButton {
@@ -170,7 +267,7 @@ static void SCIInstallStoryLikeConfirmHookIfNeeded(void) {
 void SCIInstallLikeConfirmHooksIfNeeded(void) {
     if (![SCIUtils getBoolPref:@"like_confirm_feed"] &&
         ![SCIUtils getBoolPref:@"like_confirm_reels"] &&
-        ![SCIUtils getBoolPref:@"like_confirm_stories"]) {
+        !SCIStoryInteractionHooksNeeded()) {
         return;
     }
 
@@ -180,4 +277,5 @@ void SCIInstallLikeConfirmHooksIfNeeded(void) {
     });
 
     SCIInstallStoryLikeConfirmHookIfNeeded();
+    SCIInstallStoryReplyHooksIfNeeded();
 }
