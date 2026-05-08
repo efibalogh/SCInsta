@@ -8,22 +8,13 @@
 set -e
 
 echo 'Note: This script is meant to be used while developing the tweak.'
-echo '      It does not build libFLEX; run ./build.sh sideload --buildonly-flex if you need that dylib.'
+echo '      LiveContainer / base IPAs: ./build.sh sideload --ffmpeg  (optional: --flex, --patch)'
+echo '      Build libFLEX only: ./build.sh sideload --buildonly --flex'
 echo
-
-if [ "${1:-}" == "base" ] || [ "${1:-}" == "--base" ];
-then
-    echo 'Building a LiveContainer base IPA by only injecting FFmpeg frameworks.'
-    echo
-
-    ./build.sh inject-ffmpeg
-    exit
-fi
 
 if [ "$1" == "true" ];
 then
-    # Build tweak and package into ipa
-    ./build.sh sideload --dev
+    ./build.sh sideload --dev --release
 
 else
     # Built tweak and deploy to live container

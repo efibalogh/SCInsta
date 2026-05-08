@@ -22,7 +22,7 @@ ensure_ffmpeg_frameworks() {
     for framework in "${FFMPEG_FRAMEWORKS[@]}"; do
         if [ ! -d "$framework" ]; then
             echo -e "\033[1m\033[0;31mMissing FFmpeg framework: $framework\033[0m"
-            echo "Run ./_scinsta_fetch_ffmpegkit.sh first."
+            echo "Run ./fetch-ffmpegkit.sh first."
             exit 1
         fi
     done
@@ -148,156 +148,173 @@ copy_flex_library_into_ipa() {
     rm -rf "$temp_dir"
 }
 
+# Args: instagram ipa basename without .ipa; globals OPT_* must be set
+scinsta_sideload_output_ipa() {
+    local ig_base="$1"
+    if [ "${OPT_INJECT:-0}" -eq 1 ] && [ "${OPT_FFMPEG:-0}" -eq 1 ] && [ "${OPT_PATCH:-0}" -eq 1 ]; then
+        if [ "${OPT_DEV:-0}" -eq 1 ]; then
+            if [ "${OPT_FLEX:-0}" -eq 1 ]; then
+                echo "SCInsta-dev.ipa"
+            else
+                echo "SCInsta-dev-no-flex.ipa"
+            fi
+        else
+            if [ "${OPT_FLEX:-0}" -eq 1 ]; then
+                echo "SCInsta.ipa"
+            else
+                echo "SCInsta-no-flex.ipa"
+            fi
+        fi
+        return
+    fi
+    local parts=()
+    [ "${OPT_INJECT:-0}" -eq 1 ] && parts+=(inject)
+    [ "${OPT_FFMPEG:-0}" -eq 1 ] && parts+=(ffmpeg)
+    [ "${OPT_FLEX:-0}" -eq 1 ] && parts+=(flex)
+    [ "${OPT_PATCH:-0}" -eq 1 ] && parts+=(patch)
+    [ "${OPT_DEV:-0}" -eq 1 ] && parts+=(dev)
+    local joined
+    joined=$(IFS=-; echo "${parts[*]}")
+    echo "${ig_base}-${joined}.ipa"
+}
+
 # Building modes
 if [ "$1" == "sideload" ];
 then
+    shift
+    OPT_INJECT=0
+    OPT_FFMPEG=0
+    OPT_FLEX=0
+    OPT_PATCH=0
+    OPT_DEV=0
+    OPT_BUILDONLY=0
 
-    MODE="${2:-}"
-    WITH_FLEX=0
-    SCINSTAPATH="SCInsta"
-    MAKEARGS='SIDELOAD=1 DEBUG=0 FINALPACKAGE=1'
-    COMPRESSION=9
-    OUTPUT_IPA="SCInsta-no-flex.ipa"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --release)
+                OPT_INJECT=1
+                OPT_FFMPEG=1
+                OPT_PATCH=1
+                ;;
+            --inject) OPT_INJECT=1 ;;
+            --ffmpeg) OPT_FFMPEG=1 ;;
+            --flex) OPT_FLEX=1 ;;
+            --patch) OPT_PATCH=1 ;;
+            --dev) OPT_DEV=1 ;;
+            --buildonly) OPT_BUILDONLY=1 ;;
+            *)
+                echo -e "\033[1m\033[0;31mUnknown sideload flag: $1\033[0m"
+                echo "Use: ./build.sh sideload [--release|--inject|--ffmpeg|--flex|--patch|--dev|--buildonly] ..."
+                exit 1
+                ;;
+        esac
+        shift
+    done
 
-    case "$MODE" in
-        "")
-            rm -rf "packages/cache"
-            OUTPUT_IPA="SCInsta-no-flex.ipa"
-            ;;
-        "--dev")
-            MAKEARGS='DEV=1'
-            COMPRESSION=0
-            OUTPUT_IPA="SCInsta-dev-no-flex.ipa"
-            ;;
-        "--with-flex")
-            WITH_FLEX=1
-            OUTPUT_IPA="SCInsta.ipa"
-            ;;
-        "--dev-flex")
-            WITH_FLEX=1
-            COMPRESSION=0
-            OUTPUT_IPA="SCInsta-dev.ipa"
-            ;;
-        "--devquick")
-            MAKEARGS='DEV=1'
-            COMPRESSION=0
-            SCINSTAPATH=""
-            OUTPUT_IPA="SCInsta-devquick.ipa"
-            ;;
-        "--buildonly")
-            OUTPUT_IPA=""
-            ;;
-        "--buildonly-flex")
-            WITH_FLEX=1
-            OUTPUT_IPA=""
-            ;;
-        *)
-            echo -e "\033[1m\033[0;31mUnknown sideload option: $MODE\033[0m"
-            echo "Use: ./build.sh sideload [--dev|--with-flex|--dev-flex|--devquick|--buildonly|--buildonly-flex]"
-            exit 1
-            ;;
-    esac
-
-    if [ "$WITH_FLEX" -eq 1 ]; then
-        ensure_flexing_submodule
-    fi
-
-    # Clean build artifacts
-    make clean
-    rm -rf .theos
-
-    # Check for decrypted instagram ipa
-    ipaFiles=($(ls packages/com.burbn.instagram*.ipa 2>/dev/null | sort -V))
-    if [ ${#ipaFiles[@]} -eq 0 ]; then
-        echo -e '\033[1m\033[0;31m./packages/com.burbn.instagram.ipa not found.\nPlease put a decrypted Instagram IPA in its path.\033[0m'
+    if [ "$OPT_INJECT" -eq 0 ] && [ "$OPT_FFMPEG" -eq 0 ] && [ "$OPT_FLEX" -eq 0 ]; then
+        echo -e '\033[1m\033[0;31msideload: specify at least one of --release, --inject, --ffmpeg, --flex\033[0m'
         exit 1
     fi
 
-    if [ ${#ipaFiles[@]} -gt 1 ]; then
-        echo -e '\033[1m\033[0;33mMultiple IPA files found in packages directory. Using the latest one:\033[0m'
-        for f in "${ipaFiles[@]}"; do
-            echo "  - $(basename "$f")"
-        done
-        echo
+    MAKEARGS='SIDELOAD=1 DEBUG=0 FINALPACKAGE=1'
+    COMPRESSION=9
+    if [ "$OPT_DEV" -eq 1 ]; then
+        MAKEARGS='DEV=1'
+        COMPRESSION=0
     fi
 
-    ipaFile=$(basename "${ipaFiles[${#ipaFiles[@]}-1]}")
+    if [ "$OPT_FLEX" -eq 1 ]; then
+        ensure_flexing_submodule
+    fi
 
-    echo -e '\033[1m\033[32mBuilding SCInsta tweak for sideloading (as IPA)\033[0m'
-    make $MAKEARGS
-    if [ "$WITH_FLEX" -eq 1 ]; then
+    if [ "$OPT_INJECT" -eq 1 ]; then
+        if [ "$OPT_DEV" -eq 0 ]; then
+            rm -rf "packages/cache"
+        fi
+        make clean
+        rm -rf .theos
+    fi
+
+    if [ "$OPT_BUILDONLY" -eq 0 ]; then
+        ipaFiles=($(ls packages/com.burbn.instagram*.ipa 2>/dev/null | sort -V))
+        if [ ${#ipaFiles[@]} -eq 0 ]; then
+            echo -e '\033[1m\033[0;31m./packages/com.burbn.instagram.ipa not found.\nPlease put a decrypted Instagram IPA in its path.\033[0m'
+            exit 1
+        fi
+
+        if [ ${#ipaFiles[@]} -gt 1 ]; then
+            echo -e '\033[1m\033[0;33mMultiple IPA files found in packages directory. Using the latest one:\033[0m'
+            for f in "${ipaFiles[@]}"; do
+                echo "  - $(basename "$f")"
+            done
+            echo
+        fi
+        ipaFile=$(basename "${ipaFiles[${#ipaFiles[@]}-1]}")
+    fi
+
+    echo -e '\033[1m\033[32mSideload build...\033[0m'
+    if [ "$OPT_INJECT" -eq 1 ]; then
+        make $MAKEARGS
+    fi
+    if [ "$OPT_FLEX" -eq 1 ]; then
         build_lazy_flex_library
     fi
 
-    # Only build libs (for future use in dev build mode)
-    if [ "$MODE" == "--buildonly" ] || [ "$MODE" == "--buildonly-flex" ];
-    then
-        exit
+    if [ "$OPT_BUILDONLY" -eq 1 ]; then
+        echo -e '\033[1m\033[32mBuild-only mode: skipping IPA.\033[0m'
+        exit 0
     fi
 
-    CYAN_FILES=()
-    if [ -n "$SCINSTAPATH" ]; then
+    SCINSTAPATH=""
+    LIBFLEXPATH=""
+    if [ "$OPT_INJECT" -eq 1 ]; then
         SCINSTAPATH="$(theos_dylib_path SCInsta)" || {
             echo -e '\033[1m\033[0;31mCould not find built SCInsta.dylib.\033[0m'
             exit 1
         }
-        CYAN_FILES+=("$SCINSTAPATH")
     fi
-    if [ "$WITH_FLEX" -eq 1 ]; then
+    if [ "$OPT_FLEX" -eq 1 ]; then
         LIBFLEXPATH="$(theos_dylib_path libFLEX libflex)" || {
             echo -e '\033[1m\033[0;31mCould not find built libFLEX.dylib.\033[0m'
             exit 1
         }
     fi
-    ensure_ffmpeg_frameworks
+    if [ "$OPT_FFMPEG" -eq 1 ]; then
+        ensure_ffmpeg_frameworks
+    fi
 
-    # Create IPA File
-    echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
+    ig_base="$(basename "$ipaFile" .ipa)"
+    OUTPUT_IPA="$(scinsta_sideload_output_ipa "$ig_base")"
     ipa_out="$ROOT_DIR/packages/${OUTPUT_IPA}"
     ipa_ffmpeg_tmp="$ROOT_DIR/packages/.scinsta-build-tmp-ffmpeg.ipa"
     ipa_flex_tmp="$ROOT_DIR/packages/.scinsta-build-tmp-flex.ipa"
     rm -f "$ipa_out" "$ipa_ffmpeg_tmp" "$ipa_flex_tmp"
-    cyan -i "packages/${ipaFile}" -o "$ipa_out" -f "${CYAN_FILES[@]}" -c $COMPRESSION -m 15.0 -du
 
-    echo -e '\033[1m\033[32mManually injecting FFmpeg frameworks...\033[0m'
-    inject_ffmpeg_frameworks "$ipa_out" "$ipa_ffmpeg_tmp"
-    mv -f "$ipa_ffmpeg_tmp" "$ipa_out"
+    echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
+    if [ "$OPT_INJECT" -eq 1 ]; then
+        cyan -i "packages/${ipaFile}" -o "$ipa_out" -f "$SCINSTAPATH" -c "$COMPRESSION" -m 15.0 -du
+    else
+        cp "packages/${ipaFile}" "$ipa_out"
+    fi
 
-    if [ "$WITH_FLEX" -eq 1 ]; then
+    if [ "$OPT_FFMPEG" -eq 1 ]; then
+        echo -e '\033[1m\033[32mInjecting FFmpeg frameworks...\033[0m'
+        inject_ffmpeg_frameworks "$ipa_out" "$ipa_ffmpeg_tmp"
+        mv -f "$ipa_ffmpeg_tmp" "$ipa_out"
+    fi
+
+    if [ "$OPT_FLEX" -eq 1 ]; then
         echo -e '\033[1m\033[32mBundling libFLEX.dylib for lazy loading...\033[0m'
         copy_flex_library_into_ipa "$ipa_out" "$ipa_flex_tmp" "$LIBFLEXPATH"
         mv -f "$ipa_flex_tmp" "$ipa_out"
     fi
 
-    # Patch IPA for sideloading
-    ipapatch --input "$ipa_out" --inplace --noconfirm
+    if [ "$OPT_PATCH" -eq 1 ]; then
+        echo -e '\033[1m\033[32mPatching IPA for sideloading...\033[0m'
+        ipapatch --input "$ipa_out" --inplace --noconfirm
+    fi
 
     echo -e "\033[1m\033[32mDone, we hope you enjoy SCInsta!\033[0m\n\nOutput IPA: $ipa_out"
-
-elif [ "$1" == "inject-ffmpeg" ];
-then
-    ipaFiles=($(ls packages/com.burbn.instagram*.ipa 2>/dev/null | sort -V))
-    if [ ${#ipaFiles[@]} -eq 0 ]; then
-        echo -e '\033[1m\033[0;31m./packages/com.burbn.instagram.ipa not found.\nPlease put a decrypted Instagram IPA in its path.\033[0m'
-        exit 1
-    fi
-
-    if [ ${#ipaFiles[@]} -gt 1 ]; then
-        echo -e '\033[1m\033[0;33mMultiple IPA files found in packages directory. Using the latest one:\033[0m'
-        for f in "${ipaFiles[@]}"; do
-            echo "  - $(basename "$f")"
-        done
-        echo
-    fi
-
-    ipaFile=$(basename "${ipaFiles[${#ipaFiles[@]}-1]}")
-    ffmpeg_ipa_name="$(basename "$ipaFile" .ipa)-ffmpeg.ipa"
-
-    echo -e '\033[1m\033[32mInjecting FFmpeg frameworks into the base IPA...\033[0m'
-    ensure_ffmpeg_frameworks
-    inject_ffmpeg_frameworks "packages/${ipaFile}" "$ROOT_DIR/packages/${ffmpeg_ipa_name}"
-
-    echo -e "\033[1m\033[32mDone.\033[0m\n\nOutput IPA: $(pwd)/packages/${ffmpeg_ipa_name}"
 
 elif [ "$1" == "rootless" ];
 then
@@ -356,17 +373,21 @@ else
     echo '|SCInsta Build Script|'
     echo '+--------------------+'
     echo
-    echo 'Usage: ./build.sh <sideload|inject-ffmpeg|rootless|rootful>'
+    echo 'Usage: ./build.sh <sideload|rootless|rootful>'
     echo
-    echo '  sideload      - Build a patched IPA for sideloading (SCInsta only by default)'
-    echo '    --with-flex   - Bundle libFLEX.dylib for lazy loading (output: SCInsta.ipa)'
-    echo '    --dev         - Dev IPA without FLEX (SCInsta-dev-no-flex.ipa)'
-    echo '    --dev-flex    - Dev IPA with lazy FLEX (SCInsta-dev.ipa)'
-    echo '    --devquick    - Dev IPA, tweak dylib only (SCInsta-devquick.ipa)'
-    echo '    --buildonly   - Build dylibs only (no IPA)'
-    echo '    --buildonly-flex - Build dylibs incl. libFLEX (no IPA)'
-    echo '  inject-ffmpeg - Inject FFmpeg frameworks into the input IPA only'
-    echo '  rootless      - Build a rootless .deb package'
-    echo '  rootful       - Build a rootful .deb package'
+    echo '  sideload   - Build a patched IPA; flags (combine as needed):'
+    echo '    --release   inject + ffmpeg + ipapatch (typical release; no flex)'
+    echo '    --inject    build SCInsta.dylib and inject with cyan'
+    echo '    --ffmpeg    bundle FFmpegKit frameworks'
+    echo '    --flex      bundle libFLEX.dylib for lazy loading'
+    echo '    --patch     run ipapatch'
+    echo '    --dev       DEV=1 build (use e.g. from build-dev.sh)'
+    echo '    --buildonly build dylibs only, skip IPA'
+    echo '  Example: ./build.sh sideload --release'
+    echo '           ./build.sh sideload --release --flex'
+    echo '           ./build.sh sideload --ffmpeg              (FFmpeg in IPA only)'
+    echo
+    echo '  rootless   - Build a rootless .deb package'
+    echo '  rootful    - Build a rootful .deb package'
     exit 1
 fi

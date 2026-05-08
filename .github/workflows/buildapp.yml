@@ -123,9 +123,9 @@ jobs:
                 ls -la
 
                 if [ "${{ inputs.with_flex }}" = "true" ]; then
-                  ./build.sh sideload --with-flex
+                  ./build.sh sideload --release --flex
                 else
-                  ./build.sh sideload
+                  ./build.sh sideload --release
                 fi
                 ls -la packages
                 
