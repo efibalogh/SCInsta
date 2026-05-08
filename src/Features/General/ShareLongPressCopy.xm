@@ -5,6 +5,14 @@
 
 static const void *kSCIShareCopyLongPressAssocKey = &kSCIShareCopyLongPressAssocKey;
 static __weak UIView *SCIShareActiveStoryOverlayView = nil;
+static NSHashTable<UIGestureRecognizer *> *SCIShareCopyLongPressRecognizers(void) {
+    static NSHashTable<UIGestureRecognizer *> *recognizers;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        recognizers = [NSHashTable weakObjectsHashTable];
+    });
+    return recognizers;
+}
 
 static inline BOOL SCIShareLongPressCopyEnabled(void) {
     return [SCIUtils getBoolPref:@"share_button_long_press_copy_link"];
@@ -192,13 +200,19 @@ static void SCICopyShareURLForView(UIView *view) {
     [SCIUtils showToastForDuration:1.5 title:@"Copied link"];
 }
 
+static void SCIUpdateShareLongPressRecognizerStates(void) {
+    BOOL enabled = SCIShareLongPressCopyEnabled();
+    for (UIGestureRecognizer *gesture in SCIShareCopyLongPressRecognizers()) {
+        gesture.enabled = enabled;
+    }
+}
+
 static BOOL SCIShareViewLooksLikeSendControl(UIView *view) {
     NSString *label = (view.accessibilityLabel ?: view.accessibilityIdentifier ?: @"").lowercaseString;
     if ([label containsString:@"send"] || [label containsString:@"share"] || [label containsString:@"paper"] || [label containsString:@"airplane"] || [label containsString:@"direct"]) {
         return YES;
     }
-    NSString *className = NSStringFromClass(view.class).lowercaseString;
-    return [className containsString:@"send"] || [className containsString:@"share"] || [className containsString:@"direct"];
+    return NO;
 }
 
 static NSArray<UIView *> *SCIShareCandidateSubviews(UIView *root, NSInteger maxDepth) {
@@ -231,13 +245,20 @@ static UIView *SCIShareViewForSelectorOrIvar(id container, NSString *name) {
 }
 
 static void SCIInstallShareLongPressOnView(UIView *view) {
-    if (!view || objc_getAssociatedObject(view, kSCIShareCopyLongPressAssocKey)) return;
+    if (!view) return;
+    UIGestureRecognizer *existingRecognizer = objc_getAssociatedObject(view, kSCIShareCopyLongPressAssocKey);
+    if (existingRecognizer) {
+        existingRecognizer.enabled = SCIShareLongPressCopyEnabled();
+        [SCIShareCopyLongPressRecognizers() addObject:existingRecognizer];
+        return;
+    }
     view.userInteractionEnabled = YES;
     UILongPressGestureRecognizer *gesture = [[UILongPressGestureRecognizer alloc] initWithTarget:view action:@selector(sci_copyShareLinkLongPressed:)];
     gesture.minimumPressDuration = 0.22;
     gesture.cancelsTouchesInView = YES;
     gesture.delaysTouchesBegan = YES;
     gesture.delaysTouchesEnded = YES;
+    gesture.enabled = SCIShareLongPressCopyEnabled();
     for (UIGestureRecognizer *existing in view.gestureRecognizers.copy) {
         if ([existing isKindOfClass:UILongPressGestureRecognizer.class] && existing != gesture) {
             [existing requireGestureRecognizerToFail:gesture];
@@ -245,6 +266,7 @@ static void SCIInstallShareLongPressOnView(UIView *view) {
     }
     [view addGestureRecognizer:gesture];
     objc_setAssociatedObject(view, kSCIShareCopyLongPressAssocKey, gesture, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [SCIShareCopyLongPressRecognizers() addObject:gesture];
 }
 
 static void SCIInstallShareLongPressOnNativeRecognizerHosts(UIView *view, UIView *container) {
@@ -257,25 +279,25 @@ static void SCIInstallShareLongPressOnNativeRecognizerHosts(UIView *view, UIView
                 break;
             }
         }
-        if (hasNativeLongPress || SCIShareViewLooksLikeSendControl(walker)) {
+        if (hasNativeLongPress) {
             SCIInstallShareLongPressOnView(walker);
         }
         if (walker == container) break;
     }
 }
 
-static void SCIInstallShareLongPressInContainer(UIView *container, NSArray<NSString *> *preferredNames) {
-    if (!SCIShareLongPressCopyEnabled() || !container) return;
+static void SCIInstallShareLongPressInContainer(UIView *container, NSArray<NSString *> *preferredNames, BOOL includeNativeHosts) {
+    if (!container) return;
     for (NSString *name in preferredNames) {
         UIView *view = SCIShareViewForSelectorOrIvar(container, name);
         if (view) {
             SCIInstallShareLongPressOnView(view);
-            SCIInstallShareLongPressOnNativeRecognizerHosts(view, container);
+            if (includeNativeHosts) SCIInstallShareLongPressOnNativeRecognizerHosts(view, container);
         }
     }
     for (UIView *candidate in SCIShareCandidateSubviews(container, 4)) {
         SCIInstallShareLongPressOnView(candidate);
-        SCIInstallShareLongPressOnNativeRecognizerHosts(candidate, container);
+        if (includeNativeHosts) SCIInstallShareLongPressOnNativeRecognizerHosts(candidate, container);
     }
 }
 
@@ -291,21 +313,21 @@ static void SCIInstallShareLongPressInContainer(UIView *container, NSArray<NSStr
 %hook IGUFIButtonBarView
 - (void)layoutSubviews {
     %orig;
-    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"]);
+    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"], YES);
 }
 %end
 
 %hook IGUFIInteractionCountsView
 - (void)layoutSubviews {
     %orig;
-    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"]);
+    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"], YES);
 }
 %end
 
 %hook IGSundialViewerVerticalUFI
 - (void)layoutSubviews {
     %orig;
-    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"]);
+    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"], YES);
 }
 %end
 
@@ -313,24 +335,28 @@ static void SCIInstallShareLongPressInContainer(UIView *container, NSArray<NSStr
 - (void)layoutSubviews {
     %orig;
     SCIShareActiveStoryOverlayView = (UIView *)self;
-    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"]);
+    SCIInstallShareLongPressInContainer((UIView *)self, @[@"sendButton", @"shareButton", @"reshareButton"], NO);
 }
 %end
 
 %hook IGDirectVisualMessageViewerController
 - (void)viewDidLayoutSubviews {
     %orig;
-    SCIInstallShareLongPressInContainer(((UIViewController *)self).view, @[@"sendButton", @"shareButton"]);
+    SCIInstallShareLongPressInContainer(((UIViewController *)self).view, @[@"sendButton", @"shareButton"], NO);
 }
 %end
 
 %end
 
 extern "C" void SCIInstallShareLongPressCopyHooksIfNeeded(void) {
-    if (!SCIShareLongPressCopyEnabled()) return;
-
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         %init(SCIShareLongPressCopyHooks);
+        [[NSNotificationCenter defaultCenter] addObserverForName:NSUserDefaultsDidChangeNotification
+                                                          object:nil
+                                                           queue:[NSOperationQueue mainQueue]
+                                                      usingBlock:^(__unused NSNotification *notification) {
+            SCIUpdateShareLongPressRecognizerStates();
+        }];
     });
 }
