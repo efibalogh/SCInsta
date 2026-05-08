@@ -18,6 +18,15 @@ static NSString *sSCIFlexLoadError = nil;
 static NSTimeInterval sSCIFlexLastShowAttempt = 0.0;
 static NSString *sSCIFlexLastShowTrigger = nil;
 
+static dispatch_queue_t SCIFlexLoaderQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("com.scinsta.flex-loader", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
 static NSArray<NSString *> *SCIFlexCandidatePaths(void) {
     NSMutableArray<NSString *> *paths = [NSMutableArray array];
     NSString *bundlePath = [NSBundle mainBundle].bundlePath;
@@ -136,19 +145,31 @@ static void SCIFlexShowMissingPill(NSString *trigger) {
 }
 
 void SCIFlexShowExplorer(NSString *trigger) {
-    if (SCIFlexShouldSuppressDuplicateShow(trigger ?: @"unknown")) {
-        SCILog(@"Skipping duplicate FLEX show for trigger %@", trigger);
+    NSString *showTrigger = trigger ?: @"unknown";
+    if (SCIFlexShouldSuppressDuplicateShow(showTrigger)) {
+        SCILog(@"Skipping duplicate FLEX show for trigger %@", showTrigger);
         return;
     }
 
-    dispatch_async(dispatch_get_main_queue(), ^{
+    if (SCIFlexIsLoaded()) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (sSCIFlexManager && sSCIFlexShowSelector) {
+                ((void (*)(id, SEL))objc_msgSend)(sSCIFlexManager, sSCIFlexShowSelector);
+            }
+        });
+        return;
+    }
+
+    dispatch_async(SCIFlexLoaderQueue(), ^{
         if (!SCIFlexLoadIfNeeded()) {
-            SCIFlexShowMissingPill(trigger ?: @"unknown");
+            SCIFlexShowMissingPill(showTrigger);
             return;
         }
 
-        if (sSCIFlexManager && sSCIFlexShowSelector) {
-            ((void (*)(id, SEL))objc_msgSend)(sSCIFlexManager, sSCIFlexShowSelector);
-        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (sSCIFlexManager && sSCIFlexShowSelector) {
+                ((void (*)(id, SEL))objc_msgSend)(sSCIFlexManager, sSCIFlexShowSelector);
+            }
+        });
     });
 }

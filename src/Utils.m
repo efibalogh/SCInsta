@@ -306,14 +306,15 @@ static void SCIMigrateLiquidGlassPrefsIfNeeded(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-        if ([ud objectForKey:@"liquid_glass"] == nil) {
+        NSDictionary *persistedDefaults = [ud persistentDomainForName:NSBundle.mainBundle.bundleIdentifier ?: @""];
+        if (persistedDefaults[@"liquid_glass"] == nil) {
             return;
         }
-        BOOL unified = [ud boolForKey:@"liquid_glass"];
-        if ([ud objectForKey:@"liquid_glass_surfaces"] == nil) {
+        BOOL unified = [persistedDefaults[@"liquid_glass"] boolValue];
+        if (persistedDefaults[@"liquid_glass_surfaces"] == nil) {
             [ud setBool:unified forKey:@"liquid_glass_surfaces"];
         }
-        if ([ud objectForKey:@"liquid_glass_buttons"] == nil) {
+        if (persistedDefaults[@"liquid_glass_buttons"] == nil) {
             [ud setBool:unified forKey:@"liquid_glass_buttons"];
         }
         [ud removeObjectForKey:@"liquid_glass"];

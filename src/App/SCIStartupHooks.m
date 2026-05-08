@@ -69,6 +69,8 @@ FOUNDATION_EXPORT void SCIInstallDMRefreshConfirmHooksIfEnabled(void);
 
 void SCIInstallLaunchCriticalHooks(void) {
     SCIInstallTweakLaunchCriticalHooks();
+    SCIInstallLiquidGlassHooksIfEnabled();
+    SCIInstallNavigationHooksIfNeeded();
     SCIInstallSettingsShortcutsHooksIfNeeded();
     SCIInstallOpenLinkFromClipboardHooksIfEnabled();
     SCIInstallAdBlockingEarlyHooksIfEnabled();
