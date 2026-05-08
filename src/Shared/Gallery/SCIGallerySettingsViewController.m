@@ -10,6 +10,46 @@
 #import "../../Utils.h"
 
 static NSString * const kFavoritesAtTopKey = @"show_favorites_at_top";
+static NSString * const kGalleryLongPressTabKey = @"gallery_long_press_tab";
+static NSString * const kNavigationIconOrderingKey = @"nav_icon_ordering";
+
+static BOOL SCIGalleryUsesClassicTabOrdering(void) {
+    return [[[NSUserDefaults standardUserDefaults] stringForKey:kNavigationIconOrderingKey] isEqualToString:@"classic"];
+}
+
+static NSString *SCIGalleryResolvedShortcutTabIdentifier(NSString *identifier) {
+    NSString *resolved = identifier.length > 0 ? identifier : @"direct-inbox-tab";
+    BOOL usesClassic = SCIGalleryUsesClassicTabOrdering();
+    if (usesClassic && [resolved isEqualToString:@"direct-inbox-tab"]) return @"camera-tab";
+    if (!usesClassic && [resolved isEqualToString:@"camera-tab"]) return @"direct-inbox-tab";
+    return resolved;
+}
+
+static NSArray<NSDictionary *> *SCIGalleryShortcutTargetItems(void) {
+    NSMutableArray<NSDictionary *> *items = [@[
+        @{@"title": @"Home", @"value": @"mainfeed-tab"},
+        @{@"title": @"Reels", @"value": @"reels-tab"}
+    ] mutableCopy];
+
+    if (SCIGalleryUsesClassicTabOrdering()) {
+        [items addObject:@{@"title": @"Create", @"value": @"camera-tab"}];
+    } else {
+        [items addObject:@{@"title": @"Messages", @"value": @"direct-inbox-tab"}];
+    }
+
+    [items addObject:@{@"title": @"Profile", @"value": @"profile-tab"}];
+    return items;
+}
+
+static NSString *SCIGalleryShortcutTargetTitle(NSString *identifier) {
+    NSString *resolved = SCIGalleryResolvedShortcutTabIdentifier(identifier);
+    for (NSDictionary *item in SCIGalleryShortcutTargetItems()) {
+        if ([item[@"value"] isEqualToString:resolved]) {
+            return item[@"title"];
+        }
+    }
+    return SCIGalleryUsesClassicTabOrdering() ? @"Create" : @"Messages";
+}
 
 typedef NS_ENUM(NSInteger, SCIGalleryStatsRow) {
     SCIGalleryStatsRowTotal = 0,
@@ -206,20 +246,14 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
 }
 
 - (UIMenu *)galleryShortcutTargetMenuForButton:(UIButton *)button {
-    NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:@"gallery_long_press_tab"];
-    if (saved.length == 0) saved = @"direct-inbox-tab";
-    NSArray<NSDictionary *> *items = @[
-        @{@"title": @"Home", @"value": @"mainfeed-tab"},
-        @{@"title": @"Reels", @"value": @"clips-tab"},
-        @{@"title": @"Messages", @"value": @"direct-inbox-tab"},
-        @{@"title": @"Profile", @"value": @"profile-tab"}
-    ];
+    NSString *saved = SCIGalleryResolvedShortcutTabIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:kGalleryLongPressTabKey]);
+    NSArray<NSDictionary *> *items = SCIGalleryShortcutTargetItems();
     NSMutableArray<UIMenuElement *> *actions = [NSMutableArray array];
     for (NSDictionary *item in items) {
         NSString *title = item[@"title"];
         NSString *value = item[@"value"];
         UIAction *action = [UIAction actionWithTitle:title image:nil identifier:nil handler:^(__unused UIAction *a) {
-            [[NSUserDefaults standardUserDefaults] setObject:value forKey:@"gallery_long_press_tab"];
+            [[NSUserDefaults standardUserDefaults] setObject:value forKey:kGalleryLongPressTabKey];
             [button setTitle:title forState:UIControlStateNormal];
             [SCIUtils showRestartConfirmation];
         }];
@@ -233,14 +267,7 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     cell.textLabel.text = @"Open from Tab";
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-    NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:@"gallery_long_press_tab"];
-    NSDictionary *titles = @{
-        @"mainfeed-tab": @"Home",
-        @"clips-tab": @"Reels",
-        @"direct-inbox-tab": @"Messages",
-        @"profile-tab": @"Profile"
-    };
-    NSString *title = titles[saved.length ? saved : @"direct-inbox-tab"] ?: @"Messages";
+    NSString *title = SCIGalleryShortcutTargetTitle([[NSUserDefaults standardUserDefaults] stringForKey:kGalleryLongPressTabKey]);
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     [button setTitle:title forState:UIControlStateNormal];
     button.contentEdgeInsets = UIEdgeInsetsMake(6.0, 10.0, 6.0, 10.0);

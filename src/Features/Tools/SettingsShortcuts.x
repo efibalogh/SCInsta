@@ -7,8 +7,15 @@
 
 static const void *kSCIHomeTabSettingsLongPressAssocKey = &kSCIHomeTabSettingsLongPressAssocKey;
 static const void *kSCIGalleryTabLongPressAssocKey = &kSCIGalleryTabLongPressAssocKey;
+static const void *kSCIProfileMoreSettingsLongPressAssocKey = &kSCIProfileMoreSettingsLongPressAssocKey;
 static const NSTimeInterval kSCIHomeTabLongPressDuration = 0.3;
 static const NSTimeInterval kSCIGalleryTabLongPressDuration = 0.65;
+static const NSTimeInterval kSCIProfileMoreSettingsLongPressDuration = 0.85;
+
+@interface IGBadgedNavigationButton (SCISettingsShortcuts)
+- (void)sci_addSettingsLongPressGestureRecognizer;
+- (void)sci_handleSettingsLongPress:(UILongPressGestureRecognizer *)sender;
+@end
 
 @interface IGTabBarButton (SCIQuickActions)
 - (void)sci_addLongPressWithAction:(SEL)action marker:(const void *)marker minimumDuration:(NSTimeInterval)minimumDuration;
@@ -18,7 +25,11 @@ static const NSTimeInterval kSCIGalleryTabLongPressDuration = 0.65;
 
 static NSString *SCIGalleryShortcutTabIdentifier(void) {
     NSString *identifier = [[NSUserDefaults standardUserDefaults] stringForKey:@"gallery_long_press_tab"];
-    return identifier.length > 0 ? identifier : @"direct-inbox-tab";
+    NSString *target = identifier.length > 0 ? identifier : @"direct-inbox-tab";
+    BOOL usesClassicTabOrdering = [[[NSUserDefaults standardUserDefaults] stringForKey:@"nav_icon_ordering"] isEqualToString:@"classic"];
+    if (usesClassicTabOrdering && [target isEqualToString:@"direct-inbox-tab"]) return @"camera-tab";
+    if (!usesClassicTabOrdering && [target isEqualToString:@"camera-tab"]) return @"direct-inbox-tab";
+    return target;
 }
 
 static BOOL SCITabIdentifierMatchesGalleryShortcut(NSString *identifier, NSString *label) {
@@ -26,9 +37,13 @@ static BOOL SCITabIdentifierMatchesGalleryShortcut(NSString *identifier, NSStrin
     NSString *candidate = [NSString stringWithFormat:@"%@ %@", identifier ?: @"", label ?: @""].lowercaseString;
     if ([identifier isEqualToString:target]) return YES;
     if ([target isEqualToString:@"mainfeed-tab"] && ([candidate containsString:@"mainfeed"] || [candidate containsString:@"home"])) return YES;
-    if ([target isEqualToString:@"clips-tab"] && ([candidate containsString:@"clips"] || [candidate containsString:@"reels"])) return YES;
-    if ([target isEqualToString:@"direct-inbox-tab"] && ([candidate containsString:@"direct"] || [candidate containsString:@"inbox"] || [candidate containsString:@"message"])) return YES;
-    if ([target isEqualToString:@"profile-tab"] && ([candidate containsString:@"profile"] || [candidate containsString:@"tab_avatar"])) return YES;
+    if ([target isEqualToString:@"reels-tab"] && ([candidate containsString:@"clips"] || [candidate containsString:@"reels"])) return YES;
+    if ([target isEqualToString:@"camera-tab"] && [candidate containsString:@"create"]) return YES;
+    if ([target isEqualToString:@"direct-inbox-tab"] && ([candidate containsString:@"direct"] ||
+                                                         [candidate containsString:@"inbox"] ||
+                                                         [candidate containsString:@"message"])) return YES;
+    if ([target isEqualToString:@"profile-tab"] && ([candidate containsString:@"profile"] ||
+                                                    [candidate containsString:@"tab_avatar"])) return YES;
     return NO;
 }
 
@@ -40,21 +55,36 @@ static BOOL SCITabIdentifierMatchesGalleryShortcut(NSString *identifier, NSStrin
     %orig;
 
     if ([self.accessibilityIdentifier isEqualToString:@"profile-more-button"]) {
-        [self addLongPressGestureRecognizer];
+        [self sci_addSettingsLongPressGestureRecognizer];
     }
 
     return;
 }
 
-%new - (void)addLongPressGestureRecognizer {
-    if ([self.gestureRecognizers count] == 0) {
-        NSLog(@"[SCInsta] Adding tweak settings long press gesture recognizer");
-
-        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-        [self addGestureRecognizer:longPress];
+%new - (void)sci_addSettingsLongPressGestureRecognizer {
+    for (UIGestureRecognizer *gesture in self.gestureRecognizers) {
+        if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]]) continue;
+        if (objc_getAssociatedObject(gesture, kSCIProfileMoreSettingsLongPressAssocKey)) {
+            return;
+        }
     }
+
+    NSLog(@"[SCInsta] Adding tweak settings long press gesture recognizer");
+
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(sci_handleSettingsLongPress:)];
+    longPress.minimumPressDuration = kSCIProfileMoreSettingsLongPressDuration;
+    longPress.cancelsTouchesInView = NO;
+    longPress.delaysTouchesBegan = NO;
+    longPress.delaysTouchesEnded = NO;
+
+    for (UIGestureRecognizer *existing in self.gestureRecognizers) {
+        [existing requireGestureRecognizerToFail:longPress];
+    }
+
+    [self addGestureRecognizer:longPress];
+    objc_setAssociatedObject(longPress, kSCIProfileMoreSettingsLongPressAssocKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
-%new - (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
+%new - (void)sci_handleSettingsLongPress:(UILongPressGestureRecognizer *)sender {
     if (sender.state != UIGestureRecognizerStateBegan) return;
     
     NSLog(@"[SCInsta] Tweak settings gesture activated");
@@ -119,11 +149,6 @@ static BOOL SCITabIdentifierMatchesGalleryShortcut(NSString *identifier, NSStrin
 %end
 
 void SCIInstallSettingsShortcutsHooksIfNeeded(void) {
-    if (![SCIUtils getBoolPref:@"settings_shortcut"] &&
-        ![SCIUtils getBoolPref:@"header_long_press_gallery"]) {
-        return;
-    }
-
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         %init(SCISettingsShortcutsHooks);
