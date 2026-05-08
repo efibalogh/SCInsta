@@ -102,6 +102,11 @@ build_lazy_flex_library() {
     make -C "$ROOT_DIR/modules/FLEXing/libflex" DEBUG=0 FINALPACKAGE=1
 }
 
+build_sideload_fix_library() {
+    echo -e '\033[1m\033[32mBuilding SCISideloadFix.dylib...\033[0m'
+    make -C "$ROOT_DIR/modules/SCISideloadFix" DEBUG=0 FINALPACKAGE=1
+}
+
 theos_dylib_path() {
     local name
     local path
@@ -116,6 +121,19 @@ theos_dylib_path() {
                 return 0
             fi
         done
+    done
+    return 1
+}
+
+sideload_fix_dylib_path() {
+    local path
+    for path in \
+        "$ROOT_DIR/modules/SCISideloadFix/.theos/obj/SCISideloadFix.dylib" \
+        "$ROOT_DIR/modules/SCISideloadFix/.theos/obj/debug/SCISideloadFix.dylib"; do
+        if [ -f "$path" ]; then
+            echo "$path"
+            return 0
+        fi
     done
     return 1
 }
@@ -259,6 +277,9 @@ then
     if [ "$OPT_FLEX" -eq 1 ]; then
         build_lazy_flex_library
     fi
+    if [ "$OPT_PATCH" -eq 1 ]; then
+        build_sideload_fix_library
+    fi
 
     if [ "$OPT_BUILDONLY" -eq 1 ]; then
         echo -e '\033[1m\033[32mBuild-only mode: skipping IPA.\033[0m'
@@ -267,6 +288,7 @@ then
 
     SCINSTAPATH=""
     LIBFLEXPATH=""
+    SIDELOADFIXPATH=""
     if [ "$OPT_INJECT" -eq 1 ]; then
         SCINSTAPATH="$(theos_dylib_path SCInsta)" || {
             echo -e '\033[1m\033[0;31mCould not find built SCInsta.dylib.\033[0m'
@@ -276,6 +298,12 @@ then
     if [ "$OPT_FLEX" -eq 1 ]; then
         LIBFLEXPATH="$(theos_dylib_path libFLEX libflex)" || {
             echo -e '\033[1m\033[0;31mCould not find built libFLEX.dylib.\033[0m'
+            exit 1
+        }
+    fi
+    if [ "$OPT_PATCH" -eq 1 ]; then
+        SIDELOADFIXPATH="$(sideload_fix_dylib_path)" || {
+            echo -e '\033[1m\033[0;31mCould not find built SCISideloadFix.dylib.\033[0m'
             exit 1
         }
     fi
@@ -292,7 +320,7 @@ then
 
     echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
     if [ "$OPT_INJECT" -eq 1 ]; then
-        cyan -i "packages/${ipaFile}" -o "$ipa_out" -f "$SCINSTAPATH" -c "$COMPRESSION" -m 15.0 -du
+        cyan -i "packages/${ipaFile}" -o "$ipa_out" -f "$SCINSTAPATH" -c "$COMPRESSION" -m 15.0 -duq
     else
         cp "packages/${ipaFile}" "$ipa_out"
     fi
@@ -311,7 +339,7 @@ then
 
     if [ "$OPT_PATCH" -eq 1 ]; then
         echo -e '\033[1m\033[32mPatching IPA for sideloading...\033[0m'
-        ipapatch --input "$ipa_out" --inplace --noconfirm
+        ipapatch --input "$ipa_out" --inplace --noconfirm --dylib "$SIDELOADFIXPATH"
     fi
 
     echo -e "\033[1m\033[32mDone, we hope you enjoy SCInsta!\033[0m\n\nOutput IPA: $ipa_out"
