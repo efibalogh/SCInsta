@@ -36,7 +36,13 @@
 
 + (SCISetting *)rootSetting {
     return SCITopicNavigationSetting(@"Interface", @"interface", 24.0, @[
-        SCITopicSection(@"Navigation", @[
+        SCITopicSection(@"Feedback Pill", @[
+            [SCISetting navigationCellWithTitle:@"Feedback Pill"
+                                       subtitle:@"Style, preview, and choose which actions show the feedback pill"
+                                           icon:SCISettingsInstagramIcon(@"info", 20.0)
+                                    navSections:[SCIFeedbackPillSettingsProvider sections]]
+        ], nil),
+        SCITopicSection(@"Tabs", @[
             [SCISetting menuCellWithTitle:@"Icon Order" subtitle:@"The order of the icons on the bottom navigation bar" menu:SCINavigationIconOrderingMenu()],
             [SCISetting menuCellWithTitle:@"Swipe Between Tabs" subtitle:@"Lets you swipe to switch between navigation bar tabs" menu:SCISwipeBetweenTabsMenu()],
             [SCISetting switchCellWithTitle:@"Hide Feed Tab" subtitle:@"Hides the feed or home tab on the bottom navigation bar" defaultsKey:@"hide_feed_tab" requiresRestart:YES],
@@ -45,18 +51,10 @@
             [SCISetting switchCellWithTitle:@"Hide Reels Tab" subtitle:@"Hides the reels tab on the bottom navigation bar" defaultsKey:@"hide_reels_tab" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Hide Create Tab" subtitle:@"Hides the create tab on the bottom navigation bar" defaultsKey:@"hide_create_tab" requiresRestart:YES]
         ], nil),
-        SCITopicSection(@"Appearance", @[
-            [SCISetting navigationCellWithTitle:@"Feedback Pill"
-                                       subtitle:@"Style, preview, and choose which actions show the feedback pill"
-                                           icon:SCISettingsInstagramIcon(@"info", 20.0)
-                                    navSections:[SCIFeedbackPillSettingsProvider sections]],
-            [SCISetting switchCellWithTitle:@"Enable Teen App Icons" subtitle:@"When enabled, hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Disable App Haptics" subtitle:@"Disables haptics and vibrations within the Instagram app" defaultsKey:@"disable_haptics"]
-        ], nil),
-        SCITopicSection(@"Explore", @[
+        SCITopicSection(@"Explore & Search", @[
             [SCISetting switchCellWithTitle:@"Hide Explore Posts Grid" subtitle:@"Hides the grid of suggested posts on the explore and search tab" defaultsKey:@"hide_explore_grid"],
             [SCISetting switchCellWithTitle:@"Hide Trending Searches" subtitle:@"Hides the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"],
-            [SCISetting switchCellWithTitle:@"Open Clipboard Link from Search Bar" subtitle:@"Long press a search bar to open the current clipboard URL with haptic feedback" defaultsKey:@"search_bar_open_clipboard_link"]
+            [SCISetting switchCellWithTitle:@"Open Clipboard Link" subtitle:@"Long press the Explore tab to open the current clipboard URL" defaultsKey:@"search_bar_open_clipboard_link"]
         ], nil)
     ]);
 }

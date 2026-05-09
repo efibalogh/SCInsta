@@ -167,8 +167,10 @@ static NSArray *SCIManageSettingsDataSections(void) {
             [SCISetting navigationCellWithTitle:@"Manage Settings & Data" subtitle:@"Export or import settings, Gallery media, or both" icon:nil navSections:SCIManageSettingsDataSections()]
         ], nil),
         SCITopicSection(@"Liquid Glass", @[
+            [SCISetting switchCellWithTitle:@"Enable Liquid Glass Buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Enable Liquid Glass Surfaces" subtitle:@"Enables liquid glass for menus and other surfaces, and updates Instagram's related liquid glass override defaults." defaultsKey:@"liquid_glass_surfaces" requiresRestart:YES],
             [SCIInterfaceSettingsProvider experimentalLiquidGlassSetting]
-        ], nil)
+        ], @"Experimental controls. Restart Instagram after changing Liquid Glass settings.")
     ]];
 
     [sections addObjectsFromArray:SCIDevExampleSections()];

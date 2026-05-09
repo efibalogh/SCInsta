@@ -15,7 +15,7 @@ static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_butt
             [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this action. Long press opens the full menu" menu:SCIActionButtonDefaultActionMenu(kSCIMessagesActionButtonDefaultActionKey, @"Messages", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceDirect))],
             SCIActionButtonConfigurationNavigationSetting(SCIActionButtonSourceDirect, @"Messages", SCIActionButtonSupportedActionsForSource(SCIActionButtonSourceDirect), SCIActionButtonDefaultSectionsForSource(SCIActionButtonSourceDirect))
         ], nil),
-        SCITopicSection(@"Messages", @[
+        SCITopicSection(@"Privacy & Behavior", @[
             [SCISetting switchCellWithTitle:@"Keep Deleted Messages" subtitle:@"Saves deleted messages in chat conversations" defaultsKey:@"keep_deleted_message"],
             [SCISetting switchCellWithTitle:@"Manually Mark Messages as Seen" subtitle:@"Adds a button to DM threads that marks messages as seen" defaultsKey:@"remove_lastseen"],
             [SCISetting switchCellWithTitle:@"Auto-Seen on Send" subtitle:@"Marks messages as seen automatically right after you send a message in the thread" defaultsKey:@"seen_auto_on_send"],

@@ -19,12 +19,11 @@ static NSString * const kSCIReelsActionButtonDefaultActionKey = @"action_button_
             [SCISetting menuCellWithTitle:@"Tap Controls" subtitle:@"Change what happens when you tap on a reel" menu:SCIReelsTapControlMenu()],
             [SCISetting switchCellWithTitle:@"Always Show Progress Scrubber" subtitle:@"Forces the progress bar to appear on every reel" defaultsKey:@"reels_show_scrubber"],
             [SCISetting switchCellWithTitle:@"Disable Auto-Unmuting Reels" subtitle:@"Prevents reels from unmuting when the volume or silent button is pressed" defaultsKey:@"disable_auto_unmuting_reels" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Confirm Reel Refresh" subtitle:@"Shows an alert when you trigger a reels refresh" defaultsKey:@"refresh_reel_confirm"],
-            [SCISetting switchCellWithTitle:@"Disable Reels Tab Tap Refresh" subtitle:@"Prevents reels refresh when re-tapping the reels tab button" defaultsKey:@"disable_reels_tab_refresh"],
-            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"Removes the repost button from reels" defaultsKey:@"hide_repost_button_reels" requiresRestart:YES]
+            [SCISetting switchCellWithTitle:@"Disable Reels Tab Tap Refresh" subtitle:@"Prevents reels refresh when re-tapping the reels tab button" defaultsKey:@"disable_reels_tab_refresh"]
         ], nil),
         SCITopicSection(@"Layout", @[
-            [SCISetting switchCellWithTitle:@"Hide Reels Header" subtitle:@"Hides the top navigation bar when watching reels" defaultsKey:@"hide_reels_header"]
+            [SCISetting switchCellWithTitle:@"Hide Reels Header" subtitle:@"Hides the top navigation bar when watching reels" defaultsKey:@"hide_reels_header"],
+            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"Removes the repost button from reels" defaultsKey:@"hide_repost_button_reels" requiresRestart:YES]
         ], nil),
         SCITopicSection(@"Limits", @[
             [SCISetting switchCellWithTitle:@"Disable Scrolling Reels" subtitle:@"Prevents reels from being scrolled to the next video" defaultsKey:@"disable_scrolling_reels" requiresRestart:YES],
@@ -33,6 +32,7 @@ static NSString * const kSCIReelsActionButtonDefaultActionKey = @"action_button_
         ], nil),
         SCITopicSection(@"Confirmation", @[
             [SCISetting switchCellWithTitle:@"Confirm Like" subtitle:@"Shows an alert when you like a reel to confirm the action" defaultsKey:@"like_confirm_reels"],
+            [SCISetting switchCellWithTitle:@"Confirm Reel Refresh" subtitle:@"Shows an alert when you trigger a reels refresh" defaultsKey:@"refresh_reel_confirm"],
             [SCISetting switchCellWithTitle:@"Confirm Repost" subtitle:@"Shows an alert when you repost a reel to confirm the action" defaultsKey:@"repost_confirm_reels"]
         ], nil)
     ]);
