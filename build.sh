@@ -174,6 +174,34 @@ sideload_fix_dylib_path() {
     return 1
 }
 
+copy_flex_library_into_ipa() {
+    local input_ipa="$1"
+    local output_ipa="$2"
+    local libflex_path="$3"
+    local temp_dir
+    temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/scinsta-flex-ipa.XXXXXX")"
+
+    unzip -q "$input_ipa" -d "$temp_dir"
+
+    local app_dir
+    app_dir="$(find "$temp_dir/Payload" -maxdepth 1 -type d -name "*.app" | head -n 1)"
+    if [ -z "$app_dir" ]; then
+        echo -e '\033[1m\033[0;31mCould not find Payload/*.app in IPA.\033[0m'
+        rm -rf "$temp_dir"
+        exit 1
+    fi
+
+    mkdir -p "$app_dir/Frameworks"
+    ditto "$libflex_path" "$app_dir/Frameworks/libFLEX.dylib"
+
+    rm -f "$output_ipa"
+    (
+        cd "$temp_dir"
+        zip -qry "$output_ipa" Payload
+    )
+    rm -rf "$temp_dir"
+}
+
 # Args: instagram ipa basename without .ipa; globals OPT_* must be set
 scinsta_sideload_output_ipa() {
     local ig_base="$1"
@@ -317,7 +345,8 @@ then
     ipa_out="$ROOT_DIR/packages/${OUTPUT_IPA}"
     ipa_ffmpeg_tmp="$ROOT_DIR/packages/.scinsta-build-tmp-ffmpeg.ipa"
     ipa_stage_input="$ROOT_DIR/packages/.scinsta-build-stage-input.ipa"
-    rm -f "$ipa_out" "$ipa_ffmpeg_tmp" "$ipa_stage_input"
+    ipa_flex_tmp="$ROOT_DIR/packages/.scinsta-build-tmp-flex.ipa"
+    rm -f "$ipa_out" "$ipa_ffmpeg_tmp" "$ipa_stage_input" "$ipa_flex_tmp"
 
     if [ "$OPT_FFMPEG" -eq 1 ]; then
         echo -e '\033[1m\033[32mInjecting FFmpeg frameworks...\033[0m'
@@ -327,17 +356,15 @@ then
         cp "packages/${ipaFile}" "$ipa_stage_input"
     fi
 
-    echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
-    if [ "$OPT_INJECT" -eq 1 ] || [ "$OPT_FLEX" -eq 1 ]; then
-        cyan_files=()
-        if [ "$OPT_INJECT" -eq 1 ]; then
-            cyan_files+=("$SCINSTAPATH")
-        fi
-        if [ "$OPT_FLEX" -eq 1 ]; then
-            cyan_files+=("$LIBFLEXPATH")
-        fi
+    if [ "$OPT_FLEX" -eq 1 ]; then
+        echo -e '\033[1m\033[32mBundling libFLEX.dylib for lazy loading...\033[0m'
+        copy_flex_library_into_ipa "$ipa_stage_input" "$ipa_flex_tmp" "$LIBFLEXPATH"
+        mv -f "$ipa_flex_tmp" "$ipa_stage_input"
+    fi
 
-        cyan -i "$ipa_stage_input" -o "$ipa_out" -f "${cyan_files[@]}" -c "$COMPRESSION" -m 15.0 -duq
+    echo -e '\033[1m\033[32mCreating the IPA file...\033[0m'
+    if [ "$OPT_INJECT" -eq 1 ]; then
+        cyan -i "$ipa_stage_input" -o "$ipa_out" -f "$SCINSTAPATH" -c "$COMPRESSION" -m 15.0 -duq
     else
         cp "$ipa_stage_input" "$ipa_out"
     fi
