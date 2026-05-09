@@ -941,7 +941,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
     shareItem.accessibilityLabel = @"Share";
     UIBarButtonItem *copyItem = SCIMediaChromeTopBarButtonItem(@"copy", self, @selector(copyTapped));
     copyItem.accessibilityLabel = @"Copy";
-    self.navigationItem.rightBarButtonItems = @[ shareItem, copyItem ];
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[ copyItem, shareItem ]);
 
     [self reloadContent];
 }
@@ -988,7 +988,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
     shareAllItem.accessibilityLabel = @"Share all";
     UIBarButtonItem *clearItem = SCIMediaChromeTopBarButtonItem(@"trash", self, @selector(clearTapped));
     clearItem.accessibilityLabel = @"Clear";
-    self.navigationItem.rightBarButtonItems = @[ shareAllItem, clearItem ];
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[ clearItem, shareAllItem ]);
 }
 
 - (void)viewWillAppear:(BOOL)animated {

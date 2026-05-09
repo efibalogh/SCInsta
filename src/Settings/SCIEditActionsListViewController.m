@@ -4,6 +4,7 @@
 #import "SCIActionSectionEditViewController.h"
 #import "SCIBulkActionMenuEditViewController.h"
 #import "../Shared/UI/SCISwitch.h"
+#import "../Shared/UI/SCIMediaChrome.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../AssetUtils.h"
 #import "../Utils.h"
@@ -43,17 +44,7 @@ static char kSCIActionsListSwitchAssocKey;
     [super viewDidLoad];
     self.navigationController.navigationBar.prefersLargeTitles = NO;
     self.view.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
-    UIBarButtonItemStyle buttonStyle;
-    if (@available(iOS 26.0, *)) {
-        buttonStyle = (UIBarButtonItemStyle)2; // prominent
-    } else {
-        buttonStyle = UIBarButtonItemStylePlain;
-    }
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[SCIAssetUtils instagramIconNamed:@"plus"]
-                                                                              style:buttonStyle
-                                                                             target:self
-                                                                             action:@selector(addSectionTapped)];
-    // self.navigationItem.rightBarButtonItem.tintColor = [UIColor labelColor];
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[ SCIMediaChromeTopBarButtonItem(@"plus", self, @selector(addSectionTapped)) ]);
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;

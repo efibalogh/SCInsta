@@ -58,7 +58,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryImportMainSection) {
     self.importBarButtonItem.accessibilityLabel = @"Import queue";
     UIBarButtonItem *addItem = SCIMediaChromeTopBarButtonItem(@"plus", self, @selector(addFiles));
     addItem.accessibilityLabel = @"Add files";
-    self.navigationItem.rightBarButtonItems = @[ self.importBarButtonItem, addItem ];
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[ self.importBarButtonItem, addItem ]);
 }
 
 - (void)viewWillAppear:(BOOL)animated {

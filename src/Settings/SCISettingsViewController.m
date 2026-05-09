@@ -2,6 +2,7 @@
 #import "../App/SCIStartupHooks.h"
 #import "../Shared/ActionButton/ActionButtonCore.h"
 #import "../Shared/UI/SCIIGAlertPresenter.h"
+#import "../Shared/UI/SCIMediaChrome.h"
 #import "../Shared/UI/SCISwitch.h"
 
 static char rowStaticRef[] = "row";
@@ -195,11 +196,10 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
 - (void)setupNavigationItems {
     BOOL isModalRoot = self.navigationController.presentingViewController &&
                        self.navigationController.viewControllers.firstObject == self;
-    self.navigationItem.leftBarButtonItem = isModalRoot
-        ? [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemClose
-                                                        target:self
-                                                        action:@selector(closeTapped)]
-        : nil;
+    NSArray<UIBarButtonItem *> *items = isModalRoot
+        ? @[ SCIMediaChromeTopBarButtonItem(@"xmark", self, @selector(closeTapped)) ]
+        : @[];
+    SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, items);
 }
 
 - (void)setupSearchController {

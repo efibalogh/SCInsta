@@ -12,6 +12,8 @@ UILabel *SCIMediaChromeTitleLabel(NSString *text);
 UIImage *SCIMediaChromeTopIcon(NSString *resourceName);
 UIImage *SCIMediaChromeBottomIcon(NSString *resourceName);
 UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action);
+void SCIMediaChromeSetLeadingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items);
+void SCIMediaChromeSetTrailingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items);
 
 UIView *SCIMediaChromeInstallBottomBar(UIView *hostView);
 UIButton *SCIMediaChromeBottomButton(NSString *resourceName, NSString *accessibilityLabel);

@@ -36,11 +36,72 @@ UIImage *SCIMediaChromeBottomIcon(NSString *resourceName) {
                                    pointSize:kSCIMediaChromeBottomIconPointSize];
 }
 
+static UIImage *SCIMediaChromeNormalizedTopIcon(NSString *resourceName) {
+    UIImage *source = SCIMediaChromeTopIcon(resourceName);
+    if (!source) {
+        return nil;
+    }
+
+    CGSize canvasSize = CGSizeMake(kSCIMediaChromeTopIconPointSize, kSCIMediaChromeTopIconPointSize);
+    CGSize sourceSize = source.size;
+    if (sourceSize.width <= 0.0 || sourceSize.height <= 0.0) {
+        return [source imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+
+    CGFloat scale = MIN(canvasSize.width / sourceSize.width, canvasSize.height / sourceSize.height);
+    CGSize drawSize = CGSizeMake(sourceSize.width * scale, sourceSize.height * scale);
+    CGRect drawRect = CGRectMake((canvasSize.width - drawSize.width) / 2.0,
+                                 (canvasSize.height - drawSize.height) / 2.0,
+                                 drawSize.width,
+                                 drawSize.height);
+
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:canvasSize];
+    UIImage *normalized = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull context) {
+        (void)context;
+        [source drawInRect:CGRectIntegral(drawRect)];
+    }];
+    return [normalized imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
 UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action) {
-    return [[UIBarButtonItem alloc] initWithImage:SCIMediaChromeTopIcon(resourceName)
-                                            style:UIBarButtonItemStylePlain
-                                           target:target
-                                           action:action];
+    UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithImage:SCIMediaChromeNormalizedTopIcon(resourceName)
+                                                             style:UIBarButtonItemStylePlain
+                                                            target:target
+                                                            action:action];
+    item.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    return item;
+}
+
+void SCIMediaChromeSetLeadingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items) {
+    if (!navigationItem) {
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        navigationItem.leftBarButtonItems = nil;
+        navigationItem.leftBarButtonItem = nil;
+        navigationItem.leadingItemGroups = items.count > 0
+            ? @[ [UIBarButtonItemGroup fixedGroupWithRepresentativeItem:nil items:items] ]
+            : @[];
+        return;
+    }
+    navigationItem.leftBarButtonItems = items.count > 0 ? items : nil;
+    navigationItem.leftBarButtonItem = nil;
+}
+
+void SCIMediaChromeSetTrailingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items) {
+    if (!navigationItem) {
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        navigationItem.rightBarButtonItems = nil;
+        navigationItem.rightBarButtonItem = nil;
+        navigationItem.trailingItemGroups = items.count > 0
+            ? @[ [UIBarButtonItemGroup fixedGroupWithRepresentativeItem:nil items:items] ]
+            : @[];
+        return;
+    }
+    navigationItem.rightBarButtonItems = items.count > 0 ? items : nil;
+    navigationItem.rightBarButtonItem = nil;
 }
 
 UIView *SCIMediaChromeInstallBottomBar(UIView *hostView) {

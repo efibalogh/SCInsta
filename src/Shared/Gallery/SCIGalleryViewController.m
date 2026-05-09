@@ -31,27 +31,20 @@ static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
 static CGFloat const kGalleryMenuIconPointSize = 22.0;
 static CGFloat const kGalleryBottomBarInsetHeight = 44.0;
+static NSInteger const kSCIUINavigationItemSearchBarPlacementStacked = 2;
 
 static UIImage *SCIGalleryMenuActionIcon(NSString *resourceName) {
     return [SCIAssetUtils instagramIconNamed:(resourceName.length > 0 ? resourceName : @"more")
                                    pointSize:kGalleryMenuIconPointSize];
 }
 
-static UIBarButtonItem *SCIGalleryFixedTextBarButtonItem(NSString *title, id target, SEL action, CGFloat width) {
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    button.frame = CGRectMake(0, 0, width, 34.0);
-    button.titleLabel.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightRegular];
-    button.titleLabel.adjustsFontSizeToFitWidth = YES;
-    button.titleLabel.minimumScaleFactor = 0.82;
-    button.contentEdgeInsets = UIEdgeInsetsZero;
-    button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
-    [button setTitle:title forState:UIControlStateNormal];
-    [button setTitleColor:[SCIUtils SCIColor_InstagramPrimaryText] forState:UIControlStateNormal];
-    button.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
-    [button addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
-    [button.widthAnchor constraintEqualToConstant:width].active = YES;
-    [button.heightAnchor constraintEqualToConstant:34.0].active = YES;
-    return [[UIBarButtonItem alloc] initWithCustomView:button];
+static UIBarButtonItem *SCIGalleryTextBarButtonItem(NSString *title, id target, SEL action) {
+    UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithTitle:title
+                                                             style:UIBarButtonItemStylePlain
+                                                            target:target
+                                                            action:action];
+    item.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    return item;
 }
 
 static NSInteger SCIGalleryItemCountForFolderPath(NSManagedObjectContext *context, NSString *folderPath) {
@@ -227,6 +220,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     if (!nav) {
         return;
     }
+    nav.navigationBar.prefersLargeTitles = NO;
     SCIApplyMediaChromeNavigationBar(nav.navigationBar);
 }
 
@@ -258,7 +252,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     self.navigationItem.hidesSearchBarWhenScrolling = YES;
     if (@available(iOS 26.0, *)) {
         @try {
-            [self.navigationItem setValue:@2 forKey:@"preferredSearchBarPlacement"];
+            [self.navigationItem setValue:@(kSCIUINavigationItemSearchBarPlacementStacked) forKey:@"preferredSearchBarPlacement"];
         } @catch (__unused NSException *exception) {
         }
     }
@@ -269,29 +263,36 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
     if (self.selectionMode) {
         NSArray<SCIGalleryFile *> *files = [self visibleGalleryFiles];
         BOOL allSelected = files.count > 0 && self.selectedFileIDs.count == files.count;
-        self.navigationItem.rightBarButtonItems = nil;
-        self.navigationItem.leftBarButtonItem = SCIGalleryFixedTextBarButtonItem(@"Cancel", self, @selector(exitSelectionMode), 82.0);
-        self.navigationItem.rightBarButtonItem = SCIGalleryFixedTextBarButtonItem((allSelected ? @"Deselect All" : @"Select All"),
-                                                                                 self,
-                                                                                 @selector(selectAllVisibleFiles),
-                                                                                 116.0);
+        UIBarButtonItem *cancelItem = SCIGalleryTextBarButtonItem(@"Cancel", self, @selector(exitSelectionMode));
+        NSString *selectionIcon = @"circle";
+        NSString *selectionAccessibilityLabel = @"Select all";
+        if (allSelected) {
+            selectionIcon = @"circle_check_filled";
+            selectionAccessibilityLabel = @"Deselect all";
+        } else if (self.selectedFileIDs.count > 0) {
+            selectionIcon = @"circle_check";
+            selectionAccessibilityLabel = @"Select all";
+        }
+        UIBarButtonItem *selectAllItem = SCIMediaChromeTopBarButtonItem(selectionIcon, self, @selector(selectAllVisibleFiles));
+        selectAllItem.accessibilityLabel = selectionAccessibilityLabel;
+        SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, @[ cancelItem ]);
+        SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[ selectAllItem ]);
         return;
     }
 
     if (self.navigationController.viewControllers.firstObject == self) {
-        self.navigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItem(@"xmark", self, @selector(dismissSelf));
+        SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, @[ SCIMediaChromeTopBarButtonItem(@"xmark", self, @selector(dismissSelf)) ]);
     } else {
-        self.navigationItem.leftBarButtonItem = nil;
+        SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, @[]);
     }
 
-    self.navigationItem.rightBarButtonItem = nil;
     NSMutableArray<UIBarButtonItem *> *items = [NSMutableArray array];
+    UIBarButtonItem *selectItem = SCIMediaChromeTopBarButtonItem(@"circle_check", self, @selector(enterSelectionMode));
+    [items addObject:selectItem];
     if (self.navigationController.viewControllers.firstObject == self) {
         [items addObject:SCIMediaChromeTopBarButtonItem(@"settings", self, @selector(pushSettings))];
     }
-    UIBarButtonItem *selectItem = SCIMediaChromeTopBarButtonItem(@"circle_check", self, @selector(enterSelectionMode));
-    [items addObject:selectItem];
-    self.navigationItem.rightBarButtonItems = items;
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, items);
 }
 
 - (void)setupBottomToolbar {
