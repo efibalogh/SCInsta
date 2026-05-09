@@ -1,7 +1,7 @@
 #import "SCIFeedbackPillSettingsProvider.h"
-#import "../../Utils.h"
-
 #import "../SCITopicSettingsSupport.h"
+#import "../../Utils.h"
+#import "../../AssetUtils.h"
 
 @implementation SCIFeedbackPillSettingsProvider
 
@@ -16,7 +16,7 @@
             NSString *iconName = item[@"iconName"] ?: @"info";
             SCISetting *setting = [SCISetting switchCellWithTitle:title
                                                          subtitle:@""
-                                                             icon:SCISettingsInstagramIcon(iconName, 20.0)
+                                                             icon:[SCIAssetUtils instagramIconNamed:iconName pointSize:20.0]
                                                       defaultsKey:SCIFeedbackPillDefaultsKey(identifier)];
             setting.userInfo = @{@"defaultValue": @YES};
             [rows addObject:setting];
@@ -70,9 +70,10 @@
                                      menu:SCIFeedbackPillStyleMenu()]
         ], @"Choose between neutral or colorful pill style"),
         SCITopicSection(@"Preview", @[
-            [SCISetting buttonCellWithTitle:@"Test Feedback Pill" subtitle:@"Cycles through the success, error, and info tones" icon:SCISettingsInstagramIcon(@"info", 20.0) action:^{
-                [self sci_showNextFeedbackPillPreview];
-            }]
+            [SCISetting buttonCellWithTitle:@"Test Feedback Pill"
+                                   subtitle:@"Cycles through the success, error, and info tones"
+                                       icon:[SCIAssetUtils instagramIconNamed:@"info" pointSize:20.0]
+                                     action:^{ [self sci_showNextFeedbackPillPreview]; }]
         ], nil)
     ]];
 

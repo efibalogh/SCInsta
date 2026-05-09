@@ -20,10 +20,6 @@ NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString *footer)
     return [section copy];
 }
 
-UIImage *SCISettingsInstagramIcon(NSString *name, CGFloat pointSize) {
-    return [SCIAssetUtils instagramIconNamed:name pointSize:pointSize];
-}
-
 UIImage *SCISettingsSystemIcon(NSString *name, CGFloat pointSize, UIImageSymbolWeight weight) {
     return [SCIAssetUtils resolvedImageNamed:name
                                    pointSize:pointSize
@@ -40,7 +36,7 @@ SCISetting *SCISettingApplyIconTint(SCISetting *setting, UIColor *tintColor) {
 SCISetting *SCITopicNavigationSetting(NSString *title, NSString *iconName, CGFloat iconSize, NSArray *sections) {
     return SCISettingApplyIconTint([SCISetting navigationCellWithTitle:title
                                                               subtitle:@""
-                                                                  icon:SCISettingsInstagramIcon(iconName, iconSize)
+                                                                  icon:[SCIAssetUtils instagramIconNamed:iconName pointSize:iconSize]
                                                            navSections:sections],
                                    [SCIUtils SCIColor_InstagramPrimaryText]);
 }

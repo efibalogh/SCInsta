@@ -1,32 +1,12 @@
 #import "SCIToolsSettingsProvider.h"
+#include <UIKit/UIKit.h>
 
 #import "../SCITopicSettingsSupport.h"
 #import "SCIInterfaceSettingsProvider.h"
 #import "../SCISettingsTransferManager.h"
 #import "../../App/SCIFlexLoader.h"
 #import "../../Utils.h"
-
-static UIImage *SCIRotatedSettingsIcon(UIImage *image, CGFloat radians) {
-    if (!image) return nil;
-    CGSize size = CGSizeMake(24.0, 24.0);
-    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
-    format.opaque = NO;
-    format.scale = UIScreen.mainScreen.scale;
-    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
-    UIImage *rotated = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
-        CGContextTranslateCTM(context.CGContext, size.width / 2.0, size.height / 2.0);
-        CGContextRotateCTM(context.CGContext, radians);
-        [[image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] drawInRect:CGRectMake(-12.0, -12.0, 24.0, 24.0)];
-    }];
-    return [rotated imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-}
-
-static UIImage *SCIImportBackupIcon(void) {
-    UIImage *merge = SCISettingsInstagramIcon(@"merge_right", 24.0);
-    if (!merge) merge = SCISettingsInstagramIcon(@"merge_left", 24.0);
-    if (!merge) merge = SCISettingsSystemIcon(@"arrow.down.doc", 24.0, UIImageSymbolWeightRegular);
-    return SCIRotatedSettingsIcon([merge imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate], (CGFloat)M_PI_2);
-}
+#import "../../AssetUtils.h"
 
 @interface SCISettingsTransferSelectionViewController : UITableViewController
 @property (nonatomic, assign) BOOL importMode;
@@ -53,7 +33,7 @@ static UIImage *SCIImportBackupIcon(void) {
     self.tableView.backgroundColor = [SCIUtils SCIColor_InstagramGroupedBackground];
     self.tableView.separatorColor = [SCIUtils SCIColor_InstagramSeparator];
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:(self.importMode ? @"Import" : @"Export")
-                                                                              style:UIBarButtonItemStyleDone
+                                                                              style:(UIBarButtonItemStyle)2 // done/prominent
                                                                              target:self
                                                                              action:@selector(runTransfer)];
     [self updateActionEnabled];
@@ -84,7 +64,9 @@ static UIImage *SCIImportBackupIcon(void) {
     BOOL selected = indexPath.row == 0 ? self.includeSettings : self.includeGallery;
     config.text = indexPath.row == 0 ? @"Settings" : @"Gallery";
     config.secondaryText = indexPath.row == 0 ? @"SCInsta preferences" : @"Gallery media and metadata";
-    config.image = indexPath.row == 0 ? SCISettingsInstagramIcon(@"settings", 22.0) : SCISettingsInstagramIcon(@"media", 22.0);
+    config.image = indexPath.row == 0 
+        ? [SCIAssetUtils instagramIconNamed:@"settings" pointSize:22.0]
+        : [SCIAssetUtils instagramIconNamed:@"media" pointSize:22.0];
     config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.contentConfiguration = config;
     cell.accessoryType = selected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
@@ -123,12 +105,12 @@ static NSArray *SCIManageSettingsDataSections(void) {
         SCITopicSection(@"", @[
             SCISettingApplyIconTint([SCISetting navigationCellWithTitle:@"Export"
                                                                 subtitle:@"Choose settings, Gallery, or both"
-                                                                    icon:SCISettingsInstagramIcon(@"share", 24.0)
+                                                                    icon:[SCIAssetUtils instagramIconNamed:@"arrow_up" pointSize:24.0]
                                                           viewController:[[SCISettingsTransferSelectionViewController alloc] initWithImportMode:NO]],
                                   [SCIUtils SCIColor_InstagramPrimaryText]),
             SCISettingApplyIconTint([SCISetting navigationCellWithTitle:@"Import"
                                                                 subtitle:@"Choose settings, Gallery, or both"
-                                                                    icon:SCIImportBackupIcon()
+                                                                    icon:[SCIAssetUtils instagramIconNamed:@"arrow_down" pointSize:24.0]
                                                           viewController:[[SCISettingsTransferSelectionViewController alloc] initWithImportMode:YES]],
                                   [SCIUtils SCIColor_InstagramPrimaryText])
         ], nil)

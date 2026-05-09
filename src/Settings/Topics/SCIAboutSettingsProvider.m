@@ -1,9 +1,9 @@
 #import "SCIAboutSettingsProvider.h"
-#import "../../Utils.h"
 
 #import "../SCITopicSettingsSupport.h"
 #import "../../Tweak.h"
 #import "../../Utils.h"
+#import "../../AssetUtils.h"
 
 @implementation SCIAboutSettingsProvider
 
@@ -12,7 +12,7 @@
         SCITopicSection(@"Support", @[
             SCISettingApplyIconTint([SCISetting linkCellWithTitle:@"Donate to the original developer"
                                                          subtitle:@""
-                                                             icon:SCISettingsInstagramIcon(@"heart_filled", 24.0)
+                                                             icon:[SCIAssetUtils instagramIconNamed:@"heart_filled" pointSize:24.0]
                                                               url:@"https://ko-fi.com/SoCuul"],
                                    [SCIUtils SCIColor_InstagramFavorite])
         ], @"Consider donating to support this tweak's development"),
@@ -33,13 +33,13 @@
         SCITopicSection(@"Information", @[
             [SCISetting staticCellWithTitle:@"Tweak"
                                    subtitle:SCIVersionString
-                                       icon:SCISettingsInstagramIcon(@"action", 24.0)],
+                                       icon:[SCIAssetUtils instagramIconNamed:@"action" pointSize:24.0]],
             [SCISetting staticCellWithTitle:@"Instagram"
                                    subtitle:[SCIUtils IGVersionString]
-                                       icon:SCISettingsInstagramIcon(@"app", 24.0)],
+                                       icon:[SCIAssetUtils instagramIconNamed:@"app" pointSize:24.0]],
             [SCISetting staticCellWithTitle:@"Bundle ID"
                                    subtitle:[[NSBundle mainBundle] bundleIdentifier]
-                                       icon:SCISettingsInstagramIcon(@"key", 24.0)]
+                                       icon:[SCIAssetUtils instagramIconNamed:@"key" pointSize:24.0]]
         ], nil)
     ]);
 }

@@ -380,7 +380,7 @@ static UIMenu *SCIProfileCopyInfoMenu(id user) {
     [children addObject:[UIAction actionWithTitle:@"Copy Bio" image:SCIProfileMenuIcon(@"caption") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoBio);
     }]];
-    [children addObject:[UIAction actionWithTitle:@"Copy Profile Link" image:SCIProfileMenuIcon(@"link") identifier:nil handler:^(__unused UIAction *action) {
+    [children addObject:[UIAction actionWithTitle:@"Copy Profile URL" image:SCIProfileMenuIcon(@"link") identifier:nil handler:^(__unused UIAction *action) {
         SCIProfileExecuteCopyInfoAction(user, kSCIProfileCopyInfoLink);
     }]];
 

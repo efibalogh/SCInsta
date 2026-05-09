@@ -1,8 +1,8 @@
 #import "SCIInterfaceSettingsProvider.h"
-#import "../../Utils.h"
-
-#import "../SCITopicSettingsSupport.h"
 #import "SCIFeedbackPillSettingsProvider.h"
+#import "../SCITopicSettingsSupport.h"
+#import "../../Utils.h"
+#import "../../AssetUtils.h"
 
 @implementation SCIInterfaceSettingsProvider
 
@@ -39,7 +39,7 @@
         SCITopicSection(@"Feedback Pill", @[
             [SCISetting navigationCellWithTitle:@"Feedback Pill"
                                        subtitle:@"Style, preview, and choose which actions show the feedback pill"
-                                           icon:SCISettingsInstagramIcon(@"info", 20.0)
+                                           icon:[SCIAssetUtils instagramIconNamed:@"info" pointSize:20.0]
                                     navSections:[SCIFeedbackPillSettingsProvider sections]]
         ], nil),
         SCITopicSection(@"Tabs", @[
