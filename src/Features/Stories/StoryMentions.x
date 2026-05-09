@@ -10,6 +10,18 @@
 #import <objc/message.h>
 
 static NSMutableDictionary<NSString *, NSArray<NSDictionary *> *> *SCIStoryMentionsSessionCache;
+static NSMutableDictionary<NSString *, NSDictionary *> *SCIStoryMentionsFriendshipStatusCache;
+static NSCache<NSString *, UIImage *> *SCIStoryMentionsAvatarCache;
+
+static void SCIStoryMentionsEnsureSessionCaches(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        SCIStoryMentionsSessionCache = [NSMutableDictionary dictionary];
+        SCIStoryMentionsFriendshipStatusCache = [NSMutableDictionary dictionary];
+        SCIStoryMentionsAvatarCache = [[NSCache alloc] init];
+        SCIStoryMentionsAvatarCache.countLimit = 128;
+    });
+}
 
 static NSString *SCIStoryMentionsCacheKeyForMedia(id media) {
     if (!media) return nil;
@@ -127,10 +139,7 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
 
     if (!media) return @[];
 
-    static dispatch_once_t cacheOnce;
-    dispatch_once(&cacheOnce, ^{
-        SCIStoryMentionsSessionCache = [NSMutableDictionary dictionary];
-    });
+    SCIStoryMentionsEnsureSessionCaches();
     NSString *cacheKey = SCIStoryMentionsCacheKeyForMedia(media);
     NSArray<NSDictionary *> *cached = cacheKey.length > 0 ? SCIStoryMentionsSessionCache[cacheKey] : nil;
     if (cached) return cached;
@@ -227,16 +236,25 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     ]];
 
     // Bulk-fetch friendship statuses in one round trip
+    SCIStoryMentionsEnsureSessionCaches();
     self.friendshipStatuses = [NSMutableDictionary dictionary];
-    NSMutableArray *pks = [NSMutableArray array];
+    NSMutableArray<NSString *> *missingPKs = [NSMutableArray array];
     for (NSDictionary *info in self.userInfos) {
         NSString *pk = SCIMentionUserPK(info[@"userObj"]);
-        if (pk.length) [pks addObject:pk];
+        if (!pk.length) continue;
+        NSDictionary *cachedStatus = SCIStoryMentionsFriendshipStatusCache[pk];
+        if (cachedStatus) {
+            self.friendshipStatuses[pk] = cachedStatus;
+        } else {
+            [missingPKs addObject:pk];
+        }
     }
-    if (pks.count) {
+    if (missingPKs.count) {
         __weak typeof(self) weakSelf = self;
-        [SCIInstagramAPI fetchFriendshipStatusesForPKs:pks completion:^(NSDictionary *statuses, NSError *error) {
+        [SCIInstagramAPI fetchFriendshipStatusesForPKs:missingPKs completion:^(NSDictionary *statuses, NSError *error) {
+            (void)error;
             if (!statuses.count) return;
+            [SCIStoryMentionsFriendshipStatusCache addEntriesFromDictionary:statuses];
             [weakSelf.friendshipStatuses addEntriesFromDictionary:statuses];
             [weakSelf.tableView reloadData];
         }];
@@ -408,23 +426,39 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
     avatar.image = [SCIAssetUtils instagramIconNamed:@"profile" pointSize:24.0];
     avatar.tintColor = [SCIUtils SCIColor_InstagramTertiaryText];
 
-    // Async avatar fetch
+    // Avatar fetch with session cache
     if (picURL) {
-        NSURL *url = [picURL copy];
-        NSInteger row = indexPath.row;
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *cacheKey = picURL.absoluteString;
+        objc_setAssociatedObject(avatar, @selector(cellForRowAtIndexPath:), cacheKey, OBJC_ASSOCIATION_COPY_NONATOMIC);
+
+        UIImage *cachedAvatar = cacheKey.length > 0 ? [SCIStoryMentionsAvatarCache objectForKey:cacheKey] : nil;
+        if (cachedAvatar) {
+            avatar.image = cachedAvatar;
+            avatar.tintColor = nil;
+        } else {
+            NSURL *url = [picURL copy];
+            NSInteger row = indexPath.row;
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             NSData *data = [NSData dataWithContentsOfURL:url];
             if (!data) return;
             UIImage *img = [UIImage imageWithData:data];
             if (!img) return;
+            if (cacheKey.length > 0) {
+                [SCIStoryMentionsAvatarCache setObject:img forKey:cacheKey];
+            }
             dispatch_async(dispatch_get_main_queue(), ^{
                 UITableViewCell *c = [tableView cellForRowAtIndexPath:
                     [NSIndexPath indexPathForRow:row inSection:0]];
                 if (!c) return;
                 UIImageView *av = [c.contentView viewWithTag:kAvTag];
-                if (av) { av.image = img; av.tintColor = nil; }
+                NSString *boundKey = objc_getAssociatedObject(av, @selector(cellForRowAtIndexPath:));
+                if (av && (!boundKey || [boundKey isEqualToString:cacheKey])) {
+                    av.image = img;
+                    av.tintColor = nil;
+                }
             });
         });
+        }
     }
 
     // Follow button state
@@ -490,7 +524,10 @@ static NSArray<NSDictionary *> *SCIStoryMentionsEnriched(UIView *overlayView) {
                 SCIMentionStyleFollowButton(sender, !currentlyFollowing);
                 NSMutableDictionary *s = [weakSelf.friendshipStatuses[pk] mutableCopy] ?: [NSMutableDictionary dictionary];
                 s[@"following"] = @(!currentlyFollowing);
-                weakSelf.friendshipStatuses[pk] = [s copy];
+                NSDictionary *updatedStatus = [s copy];
+                weakSelf.friendshipStatuses[pk] = updatedStatus;
+                SCIStoryMentionsEnsureSessionCaches();
+                SCIStoryMentionsFriendshipStatusCache[pk] = updatedStatus;
             } else {
                 [sender setTitle:savedTitle forState:UIControlStateNormal];
             }
