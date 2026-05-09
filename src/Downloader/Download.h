@@ -26,7 +26,7 @@ typedef NS_ENUM(NSUInteger, DownloadAction) {
 
 @property (nonatomic, strong) SCIDownloadManager *downloadManager;
 @property (nonatomic, strong) SCIFeedbackPillView *progressView;
-/// Set immediately before `downloadFileWithURL:` when `action == saveToGallery`; consumed when the download finishes.
+/// Set immediately before `downloadFileWithURL:` to name and annotate the completed file; consumed when the download finishes.
 @property (nonatomic, strong, nullable) SCIGallerySaveMetadata *pendingGallerySaveMetadata;
 @property (nonatomic, copy, nullable) SCIDownloadCompletionBlock completionBlock;
 @property (nonatomic, copy, nullable) dispatch_block_t customCancelHandler;
