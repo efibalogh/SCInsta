@@ -4,9 +4,12 @@
 
 CGFloat const SCIMediaChromeTopBarContentHeight = 44.0;
 CGFloat const SCIMediaChromeBottomBarHeight = 44.0;
+CGFloat const SCIMediaChromeFloatingBottomBarHeight = 60.0;
+CGFloat const SCIMediaChromeFloatingBottomBarBottomMargin = -12.0;
 
 static CGFloat const kSCIMediaChromeTopIconPointSize = 24.0;
 static CGFloat const kSCIMediaChromeBottomIconPointSize = 24.0;
+static CGFloat const kSCIMediaChromeFloatingBottomBarHorizontalMargin = 22.0;
 
 UIBlurEffect *SCIMediaChromeBlurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
@@ -63,13 +66,51 @@ static UIImage *SCIMediaChromeNormalizedTopIcon(NSString *resourceName) {
     return [normalized imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 }
 
+UIImage *SCIMediaChromeTopBarIcon(NSString *resourceName) {
+    return SCIMediaChromeNormalizedTopIcon(resourceName);
+}
+
 UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action) {
-    UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithImage:SCIMediaChromeNormalizedTopIcon(resourceName)
+    return SCIMediaChromeTopBarButtonItemWithTint(resourceName,
+                                                 target,
+                                                 action,
+                                                 [SCIUtils SCIColor_InstagramPrimaryText],
+                                                 nil);
+}
+
+UIBarButtonItem *SCIMediaChromeTopBarButtonItemWithTint(NSString *resourceName, id target, SEL action, UIColor *tintColor, NSString *accessibilityLabel) {
+    UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithImage:SCIMediaChromeTopBarIcon(resourceName)
                                                              style:UIBarButtonItemStylePlain
                                                             target:target
                                                             action:action];
-    item.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    item.tintColor = tintColor ?: [SCIUtils SCIColor_InstagramPrimaryText];
+    item.accessibilityLabel = accessibilityLabel;
     return item;
+}
+
+UINavigationBar *SCIMediaChromeEmbeddedNavigationBar(void) {
+    UINavigationBar *bar = [[UINavigationBar alloc] initWithFrame:CGRectZero];
+    bar.translatesAutoresizingMaskIntoConstraints = NO;
+    bar.prefersLargeTitles = NO;
+    bar.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    bar.translucent = YES;
+    bar.backgroundColor = [UIColor clearColor];
+    bar.clipsToBounds = YES;
+
+    UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+    [appearance configureWithTransparentBackground];
+    appearance.backgroundColor = [UIColor clearColor];
+    appearance.backgroundEffect = nil;
+    appearance.shadowColor = [UIColor clearColor];
+    appearance.titleTextAttributes = @{
+        NSForegroundColorAttributeName: [UIColor labelColor],
+        NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]
+    };
+    bar.standardAppearance = appearance;
+    bar.compactAppearance = appearance;
+    bar.scrollEdgeAppearance = appearance;
+    bar.compactScrollEdgeAppearance = appearance;
+    return bar;
 }
 
 void SCIMediaChromeSetLeadingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items) {
@@ -104,37 +145,66 @@ void SCIMediaChromeSetTrailingTopBarItems(UINavigationItem *navigationItem, NSAr
     navigationItem.rightBarButtonItem = nil;
 }
 
+static UIVisualEffect *SCIMediaChromeLiquidGlassEffect(void) {
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    SEL selector = NSSelectorFromString(@"effectWithStyle:");
+    if (!glassClass || ![glassClass respondsToSelector:selector]) {
+        return nil;
+    }
+
+    NSMethodSignature *signature = [glassClass methodSignatureForSelector:selector];
+    if (!signature) {
+        return nil;
+    }
+
+    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+    NSInteger style = 0;
+    __unsafe_unretained UIVisualEffect *effect = nil;
+    invocation.target = glassClass;
+    invocation.selector = selector;
+    [invocation setArgument:&style atIndex:2];
+    [invocation invoke];
+    [invocation getReturnValue:&effect];
+    return effect;
+}
+
+static UIVisualEffect *SCIMediaChromeBottomBarEffect(void) {
+    if (@available(iOS 26.0, *)) {
+        UIVisualEffect *glassEffect = SCIMediaChromeLiquidGlassEffect();
+        if (glassEffect) {
+            return glassEffect;
+        }
+    }
+    return SCIMediaChromeBlurEffect();
+}
+
 UIView *SCIMediaChromeInstallBottomBar(UIView *hostView) {
     UIView *bar = [[UIView alloc] initWithFrame:CGRectZero];
     bar.translatesAutoresizingMaskIntoConstraints = NO;
+    bar.backgroundColor = [UIColor clearColor];
     [hostView addSubview:bar];
 
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:SCIMediaChromeBlurEffect()];
-    blurView.translatesAutoresizingMaskIntoConstraints = NO;
-    blurView.backgroundColor = [[SCIUtils SCIColor_InstagramBackground] colorWithAlphaComponent:0.82];
-    [bar addSubview:blurView];
+    UIVisualEffectView *effectView = [[UIVisualEffectView alloc] initWithEffect:SCIMediaChromeBottomBarEffect()];
+    effectView.translatesAutoresizingMaskIntoConstraints = NO;
+    effectView.userInteractionEnabled = NO;
+    effectView.clipsToBounds = YES;
+    effectView.layer.cornerCurve = kCACornerCurveContinuous;
+    effectView.layer.cornerRadius = SCIMediaChromeFloatingBottomBarHeight / 2.0;
+    effectView.backgroundColor = [UIColor clearColor];
+    effectView.contentView.backgroundColor = [UIColor clearColor];
+    [bar addSubview:effectView];
     [NSLayoutConstraint activateConstraints:@[
-        [blurView.topAnchor constraintEqualToAnchor:bar.topAnchor], [blurView.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor],
-        [blurView.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
-        [blurView.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
-    ]];
-
-    UIView *topBorder = [[UIView alloc] initWithFrame:CGRectZero];
-    topBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    topBorder.backgroundColor = [SCIUtils SCIColor_InstagramSeparator];
-    [bar addSubview:topBorder];
-    [NSLayoutConstraint activateConstraints:@[
-        [topBorder.topAnchor constraintEqualToAnchor:bar.topAnchor],
-        [topBorder.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
-        [topBorder.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
-        [topBorder.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale],
+        [effectView.topAnchor constraintEqualToAnchor:bar.topAnchor],
+        [effectView.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor],
+        [effectView.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
+        [effectView.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
     ]];
 
     [NSLayoutConstraint activateConstraints:@[
-        [bar.leadingAnchor constraintEqualToAnchor:hostView.leadingAnchor],
-        [bar.trailingAnchor constraintEqualToAnchor:hostView.trailingAnchor],
-        [bar.bottomAnchor constraintEqualToAnchor:hostView.bottomAnchor],
-        [bar.topAnchor constraintEqualToAnchor:hostView.safeAreaLayoutGuide.bottomAnchor constant:-SCIMediaChromeBottomBarHeight],
+        [bar.leadingAnchor constraintEqualToAnchor:hostView.leadingAnchor constant:kSCIMediaChromeFloatingBottomBarHorizontalMargin],
+        [bar.trailingAnchor constraintEqualToAnchor:hostView.trailingAnchor constant:-kSCIMediaChromeFloatingBottomBarHorizontalMargin],
+        [bar.bottomAnchor constraintEqualToAnchor:hostView.safeAreaLayoutGuide.bottomAnchor constant:-SCIMediaChromeFloatingBottomBarBottomMargin],
+        [bar.heightAnchor constraintEqualToConstant:SCIMediaChromeFloatingBottomBarHeight],
     ]];
 
     return bar;
@@ -161,10 +231,10 @@ UIStackView *SCIMediaChromeInstallBottomRow(UIView *bottomBar, NSArray<UIView *>
         [stack.topAnchor constraintEqualToAnchor:bottomBar.topAnchor],
         [stack.leadingAnchor constraintEqualToAnchor:bottomBar.leadingAnchor],
         [stack.trailingAnchor constraintEqualToAnchor:bottomBar.trailingAnchor],
-        [stack.heightAnchor constraintEqualToConstant:SCIMediaChromeBottomBarHeight],
+        [stack.bottomAnchor constraintEqualToAnchor:bottomBar.bottomAnchor],
     ]];
     for (UIView *v in row) {
-        [v.heightAnchor constraintEqualToConstant:SCIMediaChromeBottomBarHeight].active = YES;
+        [v.heightAnchor constraintEqualToConstant:SCIMediaChromeFloatingBottomBarHeight].active = YES;
     }
 
     return stack;

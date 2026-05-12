@@ -80,9 +80,10 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 @property (nonatomic, strong) UIPageViewController *pageViewController;
 
 @property (nonatomic, strong) UIView *topToolbar;
-@property (nonatomic, strong) UIButton *closeButton;
 @property (nonatomic, strong) UILabel *counterLabel;
-@property (nonatomic, strong) UIButton *topFavoriteButton;
+@property (nonatomic, strong) UINavigationBar *topNavigationBar;
+@property (nonatomic, strong) UINavigationItem *topNavigationItem;
+@property (nonatomic, strong) UIBarButtonItem *topFavoriteItem;
 
 @property (nonatomic, strong) UIView *bottomBar;
 @property (nonatomic, strong) UIButton *savePhotosButton;
@@ -360,6 +361,7 @@ fromViewController:(UIViewController *)presenter {
     self.modalPresentationStyle = [self shouldUseLifecycleSuppressingPresentation]
         ? UIModalPresentationFullScreen
         : UIModalPresentationOverFullScreen;
+    self.modalPresentationCapturesStatusBarAppearance = YES;
     self.transitioningDelegate = self;
     [presenter presentViewController:self animated:YES completion:nil];
 }
@@ -386,7 +388,11 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (BOOL)prefersStatusBarHidden {
-    return YES;
+    return !self.isToolbarVisible;
+}
+
+- (UIStatusBarAnimation)preferredStatusBarUpdateAnimation {
+    return UIStatusBarAnimationFade;
 }
 
 - (BOOL)prefersHomeIndicatorAutoHidden {
@@ -415,30 +421,31 @@ fromViewController:(UIViewController *)presenter {
     _topToolbar.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_topToolbar];
 
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:SCIMediaChromeBlurEffect()];
-    blurView.translatesAutoresizingMaskIntoConstraints = NO;
-    [_topToolbar addSubview:blurView];
+    _topNavigationBar = SCIMediaChromeEmbeddedNavigationBar();
+    [_topToolbar addSubview:_topNavigationBar];
 
-    UIView *contentView = [[UIView alloc] initWithFrame:CGRectZero];
-    contentView.translatesAutoresizingMaskIntoConstraints = NO;
-    [_topToolbar addSubview:contentView];
-
-    UIView *bottomBorder = [[UIView alloc] initWithFrame:CGRectZero];
-    bottomBorder.translatesAutoresizingMaskIntoConstraints = NO;
-    bottomBorder.backgroundColor = [UIColor separatorColor];
-    [_topToolbar addSubview:bottomBorder];
-
-    _closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _closeButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [_closeButton setImage:SCIMediaChromeTopIcon(@"xmark") forState:UIControlStateNormal];
-    _closeButton.tintColor = [UIColor labelColor];
-    _closeButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-    [_closeButton addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
-    [contentView addSubview:_closeButton];
+    _topNavigationItem = [[UINavigationItem alloc] initWithTitle:@""];
+    _topNavigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItemWithTint(@"xmark",
+                                                                                  self,
+                                                                                  @selector(closeTapped),
+                                                                                  [UIColor labelColor],
+                                                                                  @"Close");
 
     _counterLabel = SCIMediaChromeTitleLabel(@"");
     _counterLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [contentView addSubview:_counterLabel];
+    _topNavigationItem.titleView = _counterLabel;
+
+    if (_isFromGallery) {
+        _topFavoriteItem = SCIMediaChromeTopBarButtonItemWithTint(@"heart",
+                                                                  self,
+                                                                  @selector(favoriteTapped),
+                                                                  [UIColor labelColor],
+                                                                  @"Favorite");
+        _topNavigationItem.rightBarButtonItem = _topFavoriteItem;
+    } else {
+        _topFavoriteItem = nil;
+    }
+    [_topNavigationBar setItems:@[_topNavigationItem] animated:NO];
 
     [NSLayoutConstraint activateConstraints:@[
         [_topToolbar.topAnchor constraintEqualToAnchor:self.view.topAnchor],
@@ -446,48 +453,11 @@ fromViewController:(UIViewController *)presenter {
         [_topToolbar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_topToolbar.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:SCIMediaChromeTopBarContentHeight],
 
-        [blurView.topAnchor constraintEqualToAnchor:_topToolbar.topAnchor],
-        [blurView.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [blurView.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
-        [blurView.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
-
-        [contentView.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
-        [contentView.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
-        [contentView.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [contentView.heightAnchor constraintEqualToConstant:SCIMediaChromeTopBarContentHeight],
-
-        [bottomBorder.bottomAnchor constraintEqualToAnchor:_topToolbar.bottomAnchor],
-        [bottomBorder.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
-        [bottomBorder.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
-        [bottomBorder.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale],
-
-        [_closeButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:16],
-        [_closeButton.topAnchor constraintEqualToAnchor:contentView.topAnchor],
-        [_closeButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor],
-        [_closeButton.widthAnchor constraintEqualToConstant:44],
-
-        [_counterLabel.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
-        [_counterLabel.centerYAnchor constraintEqualToAnchor:_closeButton.centerYAnchor],
+        [_topNavigationBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [_topNavigationBar.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
+        [_topNavigationBar.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
+        [_topNavigationBar.heightAnchor constraintEqualToConstant:SCIMediaChromeTopBarContentHeight],
     ]];
-
-    if (_isFromGallery) {
-        _topFavoriteButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        _topFavoriteButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_topFavoriteButton setImage:SCIMediaChromeTopIcon(@"heart") forState:UIControlStateNormal];
-        _topFavoriteButton.tintColor = [UIColor labelColor];
-        _topFavoriteButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentRight;
-        [_topFavoriteButton addTarget:self action:@selector(favoriteTapped) forControlEvents:UIControlEventTouchUpInside];
-        [contentView addSubview:_topFavoriteButton];
-
-        [NSLayoutConstraint activateConstraints:@[
-            [_topFavoriteButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-16],
-            [_topFavoriteButton.topAnchor constraintEqualToAnchor:contentView.topAnchor],
-            [_topFavoriteButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor],
-            [_topFavoriteButton.widthAnchor constraintEqualToConstant:44],
-        ]];
-    } else {
-        _topFavoriteButton = nil;
-    }
 }
 
 #pragma mark - Bottom Bar
@@ -497,34 +467,27 @@ fromViewController:(UIViewController *)presenter {
 
     _savePhotosButton = SCIMediaChromeBottomButton(@"download", @"Save to Photos");
     [_savePhotosButton addTarget:self action:@selector(saveToPhotos) forControlEvents:UIControlEventTouchUpInside];
-    [_bottomBar addSubview:_savePhotosButton];
 
     _shareButton = SCIMediaChromeBottomButton(@"share", @"Share");
     [_shareButton addTarget:self action:@selector(shareMedia) forControlEvents:UIControlEventTouchUpInside];
-    [_bottomBar addSubview:_shareButton];
 
     _clipboardButton = SCIMediaChromeBottomButton(@"copy", @"Copy");
     [_clipboardButton addTarget:self action:@selector(copyMedia) forControlEvents:UIControlEventTouchUpInside];
-    [_bottomBar addSubview:_clipboardButton];
 
     if (!_isFromGallery && _items.count > 1) {
         _bulkActionsButton = SCIMediaChromeBottomButton(@"more", @"Download All");
         _bulkActionsButton.showsMenuAsPrimaryAction = YES;
-        [_bottomBar addSubview:_bulkActionsButton];
     }
 
     if (_isFromGallery) {
         _galleryOriginButton = SCIMediaChromeBottomButton(@"more", @"More");
-        [_bottomBar addSubview:_galleryOriginButton];
 
         _deleteGalleryButton = SCIMediaChromeBottomButton(@"trash", @"Delete from Gallery");
         _deleteGalleryButton.tintColor = [UIColor systemRedColor];
         [_deleteGalleryButton addTarget:self action:@selector(deleteFromGallery) forControlEvents:UIControlEventTouchUpInside];
-        [_bottomBar addSubview:_deleteGalleryButton];
     } else {
         _saveGalleryButton = SCIMediaChromeBottomButton(@"media", @"Save to Gallery");
         [_saveGalleryButton addTarget:self action:@selector(saveToGallery) forControlEvents:UIControlEventTouchUpInside];
-        [_bottomBar addSubview:_saveGalleryButton];
     }
 
     NSArray<UIView *> *row = _isFromGallery
@@ -734,22 +697,23 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)updateFavoriteButton {
-    if (!_topFavoriteButton) return;
+    if (!_topFavoriteItem) return;
 
     SCIMediaItem *item = [self currentItem];
     BOOL isFav = item.galleryFile.isFavorite;
     UIImage *img = isFav
-        ? SCIMediaChromeTopIcon(@"heart_filled")
-        : SCIMediaChromeTopIcon(@"heart");
+        ? SCIMediaChromeTopBarIcon(@"heart_filled")
+        : SCIMediaChromeTopBarIcon(@"heart");
 
     if (!item.galleryFile) {
-        _topFavoriteButton.hidden = YES;
+        _topNavigationItem.rightBarButtonItem = nil;
         return;
     }
 
-    _topFavoriteButton.hidden = NO;
-    [_topFavoriteButton setImage:img forState:UIControlStateNormal];
-    _topFavoriteButton.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
+    _topFavoriteItem.image = img;
+    _topFavoriteItem.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
+    _topFavoriteItem.accessibilityLabel = isFav ? @"Unfavorite" : @"Favorite";
+    _topNavigationItem.rightBarButtonItem = _topFavoriteItem;
 }
 
 - (void)showGalleryOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
@@ -908,6 +872,7 @@ fromViewController:(UIViewController *)presenter {
 - (void)toggleToolbar {
     _isToolbarVisible = !_isToolbarVisible;
     [UIView animateWithDuration:0.25 animations:^{
+        [self setNeedsStatusBarAppearanceUpdate];
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
         self->_topToolbar.alpha = alpha;
         if (self->_bottomBar) self->_bottomBar.alpha = alpha;
@@ -1171,7 +1136,7 @@ fromViewController:(UIViewController *)presenter {
                                                    items:bulkItems
                                         actionIdentifier:kSCIActionDownloadAllLibrary
                                                presenter:self
-                                              anchorView:self.bulkActionsButton];
+	                                              anchorView:self.bottomBar];
                 return;
             }
             if ([identifier isEqualToString:kSCIActionDownloadAllShare]) {
@@ -1179,7 +1144,7 @@ fromViewController:(UIViewController *)presenter {
                                                    items:bulkItems
                                         actionIdentifier:kSCIActionDownloadAllShare
                                                presenter:self
-                                              anchorView:self.bulkActionsButton];
+	                                              anchorView:self.bottomBar];
                 return;
             }
             if ([identifier isEqualToString:kSCIActionDownloadAllGallery]) {
@@ -1187,7 +1152,7 @@ fromViewController:(UIViewController *)presenter {
                                                    items:bulkItems
                                         actionIdentifier:kSCIActionDownloadAllGallery
                                                presenter:self
-                                              anchorView:self.bulkActionsButton];
+	                                              anchorView:self.bottomBar];
                 return;
             }
             if ([identifier isEqualToString:kSCIActionDownloadAllClipboard]) {
@@ -1195,7 +1160,7 @@ fromViewController:(UIViewController *)presenter {
                                                    items:bulkItems
                                         actionIdentifier:kSCIActionDownloadAllClipboard
                                                presenter:self
-                                              anchorView:self.bulkActionsButton];
+	                                              anchorView:self.bottomBar];
                 return;
             }
             if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) {
@@ -1273,7 +1238,7 @@ fromViewController:(UIViewController *)presenter {
     return [SCIMediaQualityManager handleDownloadAction:action
                                             identifier:feedbackIdentifier
                                              presenter:self
-                                            sourceView:(action == share ? self.shareButton : action == saveToGallery ? self.saveGalleryButton : self.savePhotosButton)
+	                                            sourceView:self.bottomBar
                                              mediaObject:item.sourceMediaObject
                                                photoURL:photoURL
                                                videoURL:videoURL
@@ -1291,7 +1256,7 @@ fromViewController:(UIViewController *)presenter {
     BOOL showProgress = [SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy];
     return [SCIMediaQualityManager handleCopyActionWithIdentifier:kSCIFeedbackActionMediaPreviewCopy
                                                         presenter:self
-                                                       sourceView:self.clipboardButton
+	                                                       sourceView:self.bottomBar
                                                         mediaObject:item.sourceMediaObject
                                                           photoURL:(item.mediaType == SCIMediaItemTypeImage ? sourceURL : nil)
                                                           videoURL:(item.mediaType == SCIMediaItemTypeVideo ? sourceURL : nil)
@@ -1408,10 +1373,10 @@ fromViewController:(UIViewController *)presenter {
                                   iconResource:@"share"
                                           tone:SCIFeedbackPillToneInfo];
         UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[activityItem] applicationActivities:nil];
-        if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && _shareButton) {
-            acVC.popoverPresentationController.sourceView = _shareButton;
-            acVC.popoverPresentationController.sourceRect = _shareButton.bounds;
-        }
+	    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && self.bottomBar) {
+	        acVC.popoverPresentationController.sourceView = self.bottomBar;
+	        acVC.popoverPresentationController.sourceRect = self.bottomBar.bounds;
+	    }
         [self presentViewController:acVC animated:YES completion:nil];
         return;
     }

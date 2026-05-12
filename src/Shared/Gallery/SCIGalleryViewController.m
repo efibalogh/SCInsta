@@ -30,7 +30,6 @@ static NSString * const kFavoritesAtTopKey = @"show_favorites_at_top";
 static CGFloat const kGridSpacing = 2.0;
 static NSInteger const kGridColumns = 3;
 static CGFloat const kGalleryMenuIconPointSize = 22.0;
-static CGFloat const kGalleryBottomBarInsetHeight = 44.0;
 static NSInteger const kSCIUINavigationItemSearchBarPlacementStacked = 2;
 
 static UIImage *SCIGalleryMenuActionIcon(NSString *resourceName) {
@@ -73,7 +72,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 @property (nonatomic, strong) NSFetchedResultsController *fetchedResultsController;
 @property (nonatomic, strong) UIView *emptyStateView;
 @property (nonatomic, strong) UILabel *emptyStateLabel;
-/// Same chrome as media preview: blurred bar + equal-width icon buttons (not `UIToolbar`).
+/// Same floating pill toolbar chrome as media preview.
 @property (nonatomic, strong) UIView *bottomBar;
 @property (nonatomic, strong, nullable) UIStackView *bottomBarStack;
 
@@ -395,7 +394,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 }
 
 - (void)updateCollectionInsets {
-    CGFloat bottomInset = kGalleryBottomBarInsetHeight + self.view.safeAreaInsets.bottom;
+    CGFloat bottomInset = SCIMediaChromeFloatingBottomBarHeight + SCIMediaChromeFloatingBottomBarBottomMargin + self.view.safeAreaInsets.bottom;
     UIEdgeInsets contentInsets = self.collectionView.contentInset;
     contentInsets.bottom = bottomInset;
     self.collectionView.contentInset = contentInsets;

@@ -4,6 +4,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 FOUNDATION_EXPORT CGFloat const SCIMediaChromeTopBarContentHeight;
 FOUNDATION_EXPORT CGFloat const SCIMediaChromeBottomBarHeight;
+FOUNDATION_EXPORT CGFloat const SCIMediaChromeFloatingBottomBarHeight;
+FOUNDATION_EXPORT CGFloat const SCIMediaChromeFloatingBottomBarBottomMargin;
 
 UIBlurEffect *SCIMediaChromeBlurEffect(void);
 void SCIApplyMediaChromeNavigationBar(UINavigationBar *bar);
@@ -11,7 +13,10 @@ void SCIApplyMediaChromeNavigationBar(UINavigationBar *bar);
 UILabel *SCIMediaChromeTitleLabel(NSString *text);
 UIImage *SCIMediaChromeTopIcon(NSString *resourceName);
 UIImage *SCIMediaChromeBottomIcon(NSString *resourceName);
+UIImage *SCIMediaChromeTopBarIcon(NSString *resourceName);
 UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action);
+UIBarButtonItem *SCIMediaChromeTopBarButtonItemWithTint(NSString *resourceName, id target, SEL action, UIColor *_Nullable tintColor, NSString *_Nullable accessibilityLabel);
+UINavigationBar *SCIMediaChromeEmbeddedNavigationBar(void);
 void SCIMediaChromeSetLeadingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items);
 void SCIMediaChromeSetTrailingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items);
 
