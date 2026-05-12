@@ -207,6 +207,11 @@ static void SCIInstallStoryLikeConfirmHookIfNeeded(void) {
 }
 
 %hook IGDirectComposer
+- (void)_didTapSend {
+    %orig;
+    SCIStoryReplySideEffects();
+}
+
 - (void)_didTapSend:(id)arg {
     %orig;
     SCIStoryReplySideEffects();
@@ -236,12 +241,35 @@ static void SCIHookedStoryQuickReaction(id self, SEL _cmd, id view, id sourceBut
     SCIStoryReplySideEffects();
 }
 
+static void (*orig_storyPrivateEmojiQuick)(id, SEL, id);
+static void SCIHookedStoryPrivateEmojiQuick(id self, SEL _cmd, id button) {
+    if (orig_storyPrivateEmojiQuick) orig_storyPrivateEmojiQuick(self, _cmd, button);
+    SCIStoryReplySideEffects();
+}
+
+static void (*orig_directReshareQuickReaction)(id, SEL, id);
+static void SCIHookedDirectReshareQuickReaction(id self, SEL _cmd, id arg) {
+    if (orig_directReshareQuickReaction) orig_directReshareQuickReaction(self, _cmd, arg);
+    SCIStoryReplySideEffects();
+}
+
+static Class SCIStoryReplyFooterClass(void) {
+    for (NSString *className in @[
+        @"IGStoryDefaultFooter.IGStoryFullscreenDefaultFooterView",
+        @"IGStoryFullscreenDefaultFooterView"
+    ]) {
+        Class cls = NSClassFromString(className);
+        if (cls) return cls;
+    }
+    return Nil;
+}
+
 static void SCIInstallStoryReplyHooksIfNeeded(void) {
     if (!SCIStoryInteractionHooksNeeded()) return;
 
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        Class footerClass = NSClassFromString(@"IGStoryDefaultFooter.IGStoryFullscreenDefaultFooterView");
+        Class footerClass = SCIStoryReplyFooterClass();
         SEL quickSelector = NSSelectorFromString(@"inputView:didTapEmojiQuickReactionButton:");
         if (footerClass && class_getInstanceMethod(footerClass, quickSelector)) {
             MSHookMessageEx(footerClass, quickSelector, (IMP)SCIHookedStoryFooterEmojiQuick, (IMP *)&orig_storyFooterEmojiQuick);
@@ -256,6 +284,18 @@ static void SCIInstallStoryReplyHooksIfNeeded(void) {
         SEL quickReactionSelector = NSSelectorFromString(@"quickReactionsView:sourceEmojiButton:didTapEmoji:");
         if (quickReactionClass && class_getInstanceMethod(quickReactionClass, quickReactionSelector)) {
             MSHookMessageEx(quickReactionClass, quickReactionSelector, (IMP)SCIHookedStoryQuickReaction, (IMP *)&orig_storyQuickReaction);
+        }
+
+        SEL privateQuickSelector = NSSelectorFromString(@"_didTapEmojiQuickReactionButton:");
+        if (footerClass && class_getInstanceMethod(footerClass, privateQuickSelector)) {
+            MSHookMessageEx(footerClass, privateQuickSelector, (IMP)SCIHookedStoryPrivateEmojiQuick, (IMP *)&orig_storyPrivateEmojiQuick);
+        }
+
+        Class quickReactionDelegateClass = NSClassFromString(@"_TtC29IGStoryQuickReactionsDelegate33IGStoryQuickReactionsDelegateImpl");
+        if (!quickReactionDelegateClass) quickReactionDelegateClass = NSClassFromString(@"IGStoryQuickReactionsDelegateImpl");
+        SEL directReshareSelector = NSSelectorFromString(@"directReshareMediaReplyFooterViewDidTapQuickReactionEmoji:");
+        if (quickReactionDelegateClass && class_getInstanceMethod(quickReactionDelegateClass, directReshareSelector)) {
+            MSHookMessageEx(quickReactionDelegateClass, directReshareSelector, (IMP)SCIHookedDirectReshareQuickReaction, (IMP *)&orig_directReshareQuickReaction);
         }
     });
 }

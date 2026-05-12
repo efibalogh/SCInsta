@@ -411,14 +411,25 @@ static void SCIAdvanceStoryAfterManualSeenIfNeeded(UIView *overlayView, NSString
     if (advancePrefKey.length == 0 || ![SCIUtils getBoolPref:advancePrefKey]) return;
 
     id sectionController = SCIStorySectionControllerFromOverlayView(overlayView);
-    SEL advanceSelector = NSSelectorFromString(@"storyPlayerMediaViewDidPlayToEnd:");
-    if (!sectionController || ![sectionController respondsToSelector:advanceSelector]) return;
-
-    id mediaView = [SCIUtils getIvarForObj:sectionController name:"_mediaView"];
-    if (!mediaView) mediaView = [SCIUtils getIvarForObj:overlayView name:"_mediaView"];
+    if (!sectionController) return;
 
     SCIForceStoryAutoAdvance = YES;
-    ((void (*)(id, SEL, id))objc_msgSend)(sectionController, advanceSelector, mediaView);
+    BOOL advanced = NO;
+    SEL advanceSelector = NSSelectorFromString(@"advanceToNextItemWithNavigationAction:");
+    if ([sectionController respondsToSelector:advanceSelector]) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(sectionController, advanceSelector, 1);
+        advanced = YES;
+    }
+
+    if (!advanced) {
+        advanceSelector = NSSelectorFromString(@"storyPlayerMediaViewDidPlayToEnd:");
+        if ([sectionController respondsToSelector:advanceSelector]) {
+            id mediaView = [SCIUtils getIvarForObj:sectionController name:"_mediaView"];
+            if (!mediaView) mediaView = [SCIUtils getIvarForObj:overlayView name:"_mediaView"];
+            ((void (*)(id, SEL, id))objc_msgSend)(sectionController, advanceSelector, mediaView);
+        }
+    }
+
     dispatch_async(dispatch_get_main_queue(), ^{
         SCIForceStoryAutoAdvance = NO;
     });
@@ -444,9 +455,14 @@ static void SCIMarkCurrentStoryAsSeenFromOverlayWithAdvancePref(UIView *overlayV
     }
 
     SEL markSelector = NSSelectorFromString(@"fullscreenSectionController:didMarkItemAsSeen:");
+    SCIForcedStorySeenMediaPK = [SCIStoryMediaIdentifier(media) copy];
     SCIForceMarkStoryAsSeen = YES;
-    ((void (*)(id, SEL, id, id))objc_msgSend)(markTarget, markSelector, sectionController, media);
-    SCIForceMarkStoryAsSeen = NO;
+    @try {
+        ((void (*)(id, SEL, id, id))objc_msgSend)(markTarget, markSelector, sectionController, media);
+    } @finally {
+        SCIForceMarkStoryAsSeen = NO;
+        SCIForcedStorySeenMediaPK = nil;
+    }
 
     if (resolved) {
         SCIAdvanceStoryAfterManualSeenIfNeeded(overlayView, advancePrefKey);
@@ -639,15 +655,61 @@ static BOOL SCIDirectInvokeIntegerArgSelector(id object, SEL selector, NSInteger
     return YES;
 }
 
-static BOOL SCIDirectAdvanceVisualViewer(UIViewController *controller) {
-    if (!controller) return NO;
+static BOOL SCIDirectInvokeDismissShowNextSelector(id object) {
+    SEL selector = NSSelectorFromString(@"dismissWithShowNext:completion:");
+    if (!object || ![object respondsToSelector:selector]) return NO;
+    ((void (*)(id, SEL, BOOL, id))objc_msgSend)(object, selector, YES, nil);
+    return YES;
+}
 
-    NSMutableArray *targets = [NSMutableArray arrayWithObject:controller];
-    for (NSString *key in @[@"_dataSource", @"dataSource", @"_viewerContainerView", @"viewerContainerView", @"_viewerContainer", @"viewerContainer"]) {
+static NSArray *SCIDirectVisualAdvanceTargets(UIViewController *controller) {
+    if (!controller) return @[];
+
+    NSMutableArray *targets = [NSMutableArray array];
+    NSArray<NSString *> *keys = @[
+        @"_presentationManager",
+        @"presentationManager",
+        @"_viewerPresentationManager",
+        @"viewerPresentationManager",
+        @"_viewerContainerView",
+        @"viewerContainerView",
+        @"_viewerContainer",
+        @"viewerContainer",
+        @"_dataSource",
+        @"dataSource",
+        @"_delegate",
+        @"delegate",
+        @"_viewModel",
+        @"viewModel"
+    ];
+
+    for (NSString *key in keys) {
         id target = [key hasPrefix:@"_"] ? [SCIUtils getIvarForObj:controller name:key.UTF8String] : SCIKVCObject(controller, key);
         if (target && ![targets containsObject:target]) {
             [targets addObject:target];
         }
+    }
+
+    if (![targets containsObject:controller]) {
+        [targets addObject:controller];
+    }
+
+    return targets;
+}
+
+static BOOL SCIDirectAdvanceVisualViewer(UIViewController *controller) {
+    if (!controller) return NO;
+
+    SEL overlayTapSelector = NSSelectorFromString(@"fullscreenOverlay:didTapInRegion:");
+    if ([controller respondsToSelector:overlayTapSelector]) {
+        ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
+        return YES;
+    }
+
+    NSArray *targets = SCIDirectVisualAdvanceTargets(controller);
+
+    for (id target in targets) {
+        if (SCIDirectInvokeDismissShowNextSelector(target)) return YES;
     }
 
     NSArray<NSString *> *integerSelectors = @[
@@ -678,7 +740,7 @@ static BOOL SCIDirectAdvanceVisualViewer(UIViewController *controller) {
         }
     }
 
-    SEL overlayTapSelector = NSSelectorFromString(@"expandOverlay:didTapInRegion:");
+    overlayTapSelector = NSSelectorFromString(@"expandOverlay:didTapInRegion:");
     if ([controller respondsToSelector:overlayTapSelector]) {
         ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(controller, overlayTapSelector, nil, 3);
         return YES;
@@ -703,24 +765,34 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
     id responders = [SCIUtils getIvarForObj:controller name:"_eventResponders"];
     if (!responders) responders = SCIKVCObject(controller, @"eventResponders");
 
-    NSInteger currentIndex = SCIDirectCurrentIndexFromController(controller);
     SEL beginPlaybackSelector = NSSelectorFromString(@"visualMessageViewerController:didBeginPlaybackForVisualMessage:atIndex:");
-    SEL endPlaybackSelector = NSSelectorFromString(@"visualMessageViewerController:didEndPlaybackForVisualMessage:atIndex:mediaCurrentTime:forNavType:");
-    SCIPendingDirectVisualMessageToMarkSeen = message;
-    BOOL dispatched = NO;
-
-    for (id responder in SCIArrayFromCollection(responders) ?: @[]) {
-        if ([responder respondsToSelector:beginPlaybackSelector]) {
-            dispatched = YES;
-            ((void (*)(id, SEL, id, id, NSInteger))objc_msgSend)(responder, beginPlaybackSelector, controller, message, currentIndex);
+    Class eventHandlerClass = NSClassFromString(@"IGDirectVisualMessageViewerEventHandler");
+    NSArray *responderCollection = SCIArrayFromCollection(responders);
+    NSMutableArray *orderedResponders = [NSMutableArray array];
+    for (id responder in responderCollection ?: (responders ? @[responders] : @[])) {
+        if (eventHandlerClass && [responder isKindOfClass:eventHandlerClass]) {
+            [orderedResponders addObject:responder];
         }
-        if ([responder respondsToSelector:endPlaybackSelector]) {
-            dispatched = YES;
-            ((void (*)(id, SEL, id, id, NSInteger, CGFloat, NSInteger))objc_msgSend)(responder, endPlaybackSelector, controller, message, currentIndex, 0.0, 0);
+    }
+    for (id responder in responderCollection ?: (responders ? @[responders] : @[])) {
+        if (![orderedResponders containsObject:responder]) {
+            [orderedResponders addObject:responder];
         }
     }
 
-    SCIPendingDirectVisualMessageToMarkSeen = nil;
+    BOOL dispatched = NO;
+
+    SCIPendingDirectVisualMessageToMarkSeen = message;
+    @try {
+        for (id responder in orderedResponders) {
+            if ([responder respondsToSelector:beginPlaybackSelector]) {
+                dispatched = YES;
+                ((void (*)(id, SEL, id, id, NSInteger))objc_msgSend)(responder, beginPlaybackSelector, controller, message, 0);
+            }
+        }
+    } @finally {
+        SCIPendingDirectVisualMessageToMarkSeen = nil;
+    }
     if (!dispatched) {
         [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
                                  title:@"Unable to mark as seen"

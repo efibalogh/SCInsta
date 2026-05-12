@@ -1,4 +1,5 @@
 #import <substrate.h>
+#import <objc/message.h>
 #import <objc/runtime.h>
 #import "InstagramHeaders.h"
 #import "Tweak.h"
@@ -20,8 +21,60 @@ NSString *SCIVersionString = @"v1.2.0-dev";
 
 // Variables that work across features
 __weak id SCIPendingDirectVisualMessageToMarkSeen = nil;
+NSString *SCIForcedStorySeenMediaPK = nil;
 BOOL SCIForceMarkStoryAsSeen = NO;
 BOOL SCIForceStoryAutoAdvance = NO;
+
+static NSString *SCIIdentifierStringFromValue(id value) {
+    if (!value || value == (id)kCFNull) return nil;
+    if ([value isKindOfClass:[NSString class]]) {
+        NSString *string = (NSString *)value;
+        return string.length > 0 ? string : nil;
+    }
+    if ([value respondsToSelector:@selector(stringValue)]) {
+        NSString *string = [value stringValue];
+        return string.length > 0 ? string : nil;
+    }
+    return nil;
+}
+
+static id SCIValueForSelectorOrKey(id object, NSString *name) {
+    if (!object || name.length == 0) return nil;
+
+    SEL selector = NSSelectorFromString(name);
+    if ([object respondsToSelector:selector]) {
+        return ((id (*)(id, SEL))objc_msgSend)(object, selector);
+    }
+
+    @try {
+        return [object valueForKey:name];
+    } @catch (__unused NSException *exception) {
+        return nil;
+    }
+}
+
+static NSString *SCIStoryMediaIdentifierFromObject(id object, NSInteger depth) {
+    if (!object || depth > 3) return nil;
+
+    for (NSString *name in @[@"pk", @"mediaPK", @"mediaPk", @"mediaID", @"mediaId", @"id", @"itemID", @"itemId"]) {
+        NSString *identifier = SCIIdentifierStringFromValue(SCIValueForSelectorOrKey(object, name));
+        if (identifier.length > 0) return identifier;
+    }
+
+    for (NSString *name in @[@"media", @"mediaItem", @"storyItem", @"item", @"model"]) {
+        id nested = SCIValueForSelectorOrKey(object, name);
+        if (nested && nested != object) {
+            NSString *identifier = SCIStoryMediaIdentifierFromObject(nested, depth + 1);
+            if (identifier.length > 0) return identifier;
+        }
+    }
+
+    return nil;
+}
+
+NSString *SCIStoryMediaIdentifier(id media) {
+    return SCIStoryMediaIdentifierFromObject(media, 0);
+}
 
 static void SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSource source) {
     NSDictionary<NSString *, NSString *> *feedback = SCIConsumePendingRepostFeedback(source);
