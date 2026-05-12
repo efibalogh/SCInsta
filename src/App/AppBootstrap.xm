@@ -8,7 +8,7 @@
 %hook IGInstagramAppDelegate
 - (_Bool)application:(UIApplication *)application willFinishLaunchingWithOptions:(id)arg2 {
     SCIStartupMark(@"willFinishLaunching begin");
-    SCICoreRegisterBootstrapDefaults();
+    SCICoreRegisterDefaults();
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
     [SCIUtils sci_normalizeLiquidGlassPreferences];
@@ -27,8 +27,8 @@
         [defaults setBool:NO forKey:@"IGLiquidGlassOverrideEnabled"];
     }
     [SCIUtils applyLiquidGlassNavigationExperimentOverride];
-    SCICoreInstallLaunchCriticalHooks();
-    SCIStartupMark(@"launch critical hooks installed");
+    SCICoreInstallEnabledFeatureHooks();
+    SCIStartupMark(@"enabled feature hooks installed");
 
     return %orig;
 }

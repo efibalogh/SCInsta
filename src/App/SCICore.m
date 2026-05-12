@@ -181,6 +181,11 @@ void SCICoreInstallLaunchCriticalHooks(void) {
     SCIInstallLaunchCriticalHooks();
 }
 
+void SCICoreInstallEnabledFeatureHooks(void) {
+    SCICoreRegisterDefaults();
+    SCIInstallEnabledFeatureHooks();
+}
+
 void SCICoreInstallSurfaceHooks(SCISurface surface) {
     SCICoreRegisterDefaults();
 

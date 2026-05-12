@@ -19,6 +19,7 @@ extern "C" {
 FOUNDATION_EXPORT void SCICoreRegisterBootstrapDefaults(void);
 FOUNDATION_EXPORT void SCICoreRegisterDefaults(void);
 FOUNDATION_EXPORT void SCICoreInstallLaunchCriticalHooks(void);
+FOUNDATION_EXPORT void SCICoreInstallEnabledFeatureHooks(void);
 FOUNDATION_EXPORT void SCICoreInstallSurfaceHooks(SCISurface surface);
 FOUNDATION_EXPORT void SCICoreShowSettingsIfNeeded(UIWindow *window);
 
