@@ -7,10 +7,10 @@
 @implementation SCIInterfaceSettingsProvider
 
 + (SCISetting *)experimentalLiquidGlassSetting {
-    return SCISettingApplyIconTint([SCISetting navigationCellWithTitle:@"Liquid Glass"
-                                                              subtitle:@"Unsafe per-hook overrides for Instagram's internal liquid glass gates"
-                                                                  icon:SCISettingsSystemIcon(@"exclamationmark.triangle.fill", 24.0, UIImageSymbolWeightRegular)
-                                                           navSections:@[
+    SCISetting *setting = [SCISetting navigationCellWithTitle:@"Liquid Glass"
+                                                     subtitle:@"Unsafe per-hook overrides for Instagram's internal liquid glass gates"
+                                                         icon:SCISettingsSystemIcon(@"exclamationmark.triangle.fill", 24.0, UIImageSymbolWeightRegular)
+                                                  navSections:@[
         SCITopicSection(@"Unsafe / Experimental", @[
             [SCISetting switchCellWithTitle:@"In-App Notifications (Launcher)" subtitle:@"Forces liquid-glass styling for in-app notification surfaces when enabled" defaultsKey:@"liquid_glass_in_app_notifications" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Context Menus (Launcher)" subtitle:@"Forces liquid-glass styling for context menus when enabled" defaultsKey:@"liquid_glass_context_menus" requiresRestart:YES],
@@ -30,8 +30,9 @@
             [SCISetting switchCellWithTitle:@"Alert Dialog Action Buttons" subtitle:@"Primary and secondary actions on IGDS alert dialogs" defaultsKey:@"liquid_glass_alert_dialog_actions" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Interactive Liquid Tab Bar" subtitle:@"Replaces IGTabBar with IGLiquidGlassInteractiveTabBar and can break navigation" defaultsKey:@"liquid_glass_interactive_tab_bar" requiresRestart:YES]
         ], @"Restart Instagram after changes. These override Instagram's internal liquid-glass gates and may crash or mis-render the UI.")
-    ]],
-                                   [UIColor systemOrangeColor]);
+    ]];
+    setting.userInfo = @{@"deferRestartPrompt": @YES};
+    return SCISettingApplyIconTint(setting, [UIColor systemOrangeColor]);
 }
 
 + (SCISetting *)rootSetting {

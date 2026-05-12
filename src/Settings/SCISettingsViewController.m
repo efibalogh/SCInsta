@@ -14,7 +14,10 @@ static NSInteger const kSCIUINavigationItemSearchBarPlacementStacked = 2;
 @property (nonatomic, strong) NSMutableArray *sections;
 @property (nonatomic, strong) NSArray *originalSections;
 @property (nonatomic, strong) UISearchController *searchController;
+@property (nonatomic, strong) UIBarButtonItem *applyRestartItem;
 @property (nonatomic) BOOL reduceMargin;
+@property (nonatomic) BOOL defersRestartPrompt;
+@property (nonatomic) BOOL hasPendingRestartChanges;
 
 @end
 
@@ -196,10 +199,25 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
 - (void)setupNavigationItems {
     BOOL isModalRoot = self.navigationController.presentingViewController &&
                        self.navigationController.viewControllers.firstObject == self;
-    NSArray<UIBarButtonItem *> *items = isModalRoot
+    NSArray<UIBarButtonItem *> *leadingItems = isModalRoot
         ? @[ SCIMediaChromeTopBarButtonItem(@"xmark", self, @selector(closeTapped)) ]
         : @[];
-    SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, items);
+    SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, leadingItems);
+
+    NSArray<UIBarButtonItem *> *trailingItems = @[];
+    if (self.defersRestartPrompt) {
+        UIBarButtonItem *applyItem = SCIMediaChromeTopBarButtonItemWithTint(@"check",
+                                                                           self,
+                                                                           @selector(applyRestartChanges),
+                                                                           [SCIUtils SCIColor_InstagramPrimaryText],
+                                                                           @"Apply Liquid Glass changes");
+        applyItem.enabled = self.hasPendingRestartChanges;
+        self.applyRestartItem = applyItem;
+        trailingItems = @[ applyItem ];
+    } else {
+        self.applyRestartItem = nil;
+    }
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, trailingItems);
 }
 
 - (void)setupSearchController {
@@ -412,6 +430,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     else if (row.type == SCITableCellNavigation) {
         if (row.navSections.count > 0) {
             UIViewController *vc = [[SCISettingsViewController alloc] initWithTitle:row.title sections:row.navSections reduceMargin:NO];
+            ((SCISettingsViewController *)vc).defersRestartPrompt = [row.userInfo[@"deferRestartPrompt"] boolValue];
             vc.title = row.title;
             [self.navigationController pushViewController:vc animated:YES];
         }
@@ -627,8 +646,17 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     }
     
     if (row.requiresRestart) {
-        [SCIUtils showRestartConfirmation];
+        if (self.defersRestartPrompt) {
+            self.hasPendingRestartChanges = YES;
+            self.applyRestartItem.enabled = YES;
+        } else {
+            [SCIUtils showRestartConfirmation];
+        }
     }
+}
+
+- (void)applyRestartChanges {
+    [SCIUtils showRestartConfirmation];
 }
 
 - (void)stepperChanged:(UIStepper *)sender {
