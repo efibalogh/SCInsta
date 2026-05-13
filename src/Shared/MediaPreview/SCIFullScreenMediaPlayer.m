@@ -635,9 +635,7 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)updatePlayerControlInsetsForVideoController:(SCIFullScreenVideoViewController *)videoController animated:(BOOL)animated {
-    UIEdgeInsets insets = self.isToolbarVisible
-        ? UIEdgeInsetsMake(0.0, 0.0, kVideoPlayerControlBottomInset, 0.0)
-        : UIEdgeInsetsZero;
+    UIEdgeInsets insets = UIEdgeInsetsMake(0.0, 0.0, kVideoPlayerControlBottomInset, 0.0);
     [videoController setPlayerControlOverlayInsets:insets animated:animated];
 }
 
@@ -886,10 +884,8 @@ fromViewController:(UIViewController *)presenter {
 - (void)toggleToolbar {
     _isToolbarVisible = !_isToolbarVisible;
     UINavigationController *navigationController = self.navigationController;
-    if (_isToolbarVisible) {
-        navigationController.navigationBar.alpha = 1.0;
-    }
-    [navigationController setNavigationBarHidden:!_isToolbarVisible animated:YES];
+    [navigationController setNavigationBarHidden:NO animated:NO];
+    navigationController.navigationBar.userInteractionEnabled = _isToolbarVisible;
     [self updateCurrentVideoPlayerControlInsetsAnimated:YES];
     [UIView animateWithDuration:kPreviewChromeAnimationDuration
                           delay:0.0
@@ -898,6 +894,7 @@ fromViewController:(UIViewController *)presenter {
         [self setNeedsStatusBarAppearanceUpdate];
         [navigationController setNeedsStatusBarAppearanceUpdate];
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
+        navigationController.navigationBar.alpha = alpha;
         if (self->_bottomBar) self->_bottomBar.alpha = alpha;
     } completion:^(__unused BOOL finished) {
         [self updateCurrentVideoPlayerControlInsetsAnimated:NO];

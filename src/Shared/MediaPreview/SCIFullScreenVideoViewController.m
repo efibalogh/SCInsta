@@ -6,7 +6,7 @@
 
 static NSTimeInterval const kPlayerControlOverlayInsetAnimationDuration = 0.25;
 
-@interface SCIFullScreenVideoViewController () <AVPlayerViewControllerDelegate>
+@interface SCIFullScreenVideoViewController () <AVPlayerViewControllerDelegate, UIGestureRecognizerDelegate>
 
 @property (nonatomic, strong) AVPlayer *player;
 @property (nonatomic, strong) AVPlayerItem *playerItem;
@@ -146,7 +146,26 @@ static NSTimeInterval const kPlayerControlOverlayInsetAnimationDuration = 0.25;
 - (void)setupTapGesture {
     _singleTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTap:)];
     _singleTapGesture.cancelsTouchesInView = NO;
+    _singleTapGesture.delegate = self;
     [self.view addGestureRecognizer:_singleTapGesture];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    if (gestureRecognizer != _singleTapGesture) {
+        return YES;
+    }
+
+    UIView *view = touch.view;
+    while (view) {
+        if ([view isKindOfClass:[UIControl class]]) {
+            return NO;
+        }
+        if (view == self.view) {
+            break;
+        }
+        view = view.superview;
+    }
+    return YES;
 }
 
 #pragma mark - Thumbnail
