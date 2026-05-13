@@ -17,7 +17,7 @@
             NSString *iconName = item[@"iconName"] ?: @"info";
             SCISetting *setting = [SCISetting switchCellWithTitle:title
                                                          subtitle:@""
-                                                             icon:[SCIAssetUtils instagramIconNamed:iconName pointSize:20.0]
+                                                             icon:SCISettingsIcon(iconName)
                                                       defaultsKey:haptics ? SCINotificationHapticDefaultsKey(identifier) : SCINotificationDefaultsKey(identifier)];
             setting.userInfo = @{@"defaultValue": @YES};
             [rows addObject:setting];
@@ -88,7 +88,7 @@
         SCITopicSection(@"Haptics", @[
             [SCISetting navigationCellWithTitle:@"Haptics"
                                        subtitle:@"Feature-specific haptic feedback"
-                                           icon:[SCIAssetUtils instagramIconNamed:@"notification" pointSize:22.0]
+                                           icon:SCISettingsIcon(@"notification")
                                     navSections:[self sci_featureSectionsForHaptics:YES]]
         ], nil)
     ]];

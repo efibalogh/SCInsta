@@ -64,9 +64,9 @@
     BOOL selected = indexPath.row == 0 ? self.includeSettings : self.includeGallery;
     config.text = indexPath.row == 0 ? @"Settings" : @"Gallery";
     config.secondaryText = indexPath.row == 0 ? @"SCInsta preferences" : @"Gallery media and metadata";
-    config.image = indexPath.row == 0 
-        ? [SCIAssetUtils instagramIconNamed:@"settings" pointSize:22.0]
-        : [SCIAssetUtils instagramIconNamed:@"media" pointSize:22.0];
+    config.image = indexPath.row == 0
+        ? SCISettingsIcon(@"settings")
+        : SCISettingsIcon(@"media");
     config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.contentConfiguration = config;
     cell.accessoryType = selected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;

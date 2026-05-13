@@ -1,5 +1,6 @@
 #import "SCIActionSectionIconPickerViewController.h"
 
+#import "SCITopicSettingsSupport.h"
 #import "../AssetUtils.h"
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../Utils.h"
@@ -65,7 +66,7 @@
 
     SCIActionDescriptor *descriptor = [SCIActionDescriptor availableSectionIconDescriptors][indexPath.row];
     config.text = descriptor.title;
-    config.image = [SCIAssetUtils instagramIconNamed:descriptor.iconName pointSize:22.0];
+    config.image = SCISettingsIcon(descriptor.iconName);
     config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.contentConfiguration = config;
     cell.accessoryType = [descriptor.iconName isEqualToString:self.selectedIconName] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;

@@ -7,6 +7,8 @@
 #import "../Shared/ActionButton/SCIActionDescriptor.h"
 #import "../Shared/ActionButton/SCIActionButtonConfiguration.h"
 
+CGFloat const SCISettingsCellIconPointSize = 24.0;
+
 NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString *footer) {
     NSMutableDictionary *section = [@{
         @"header": header ?: @"",
@@ -18,6 +20,10 @@ NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString *footer)
     }
 
     return [section copy];
+}
+
+UIImage *SCISettingsIcon(NSString *name) {
+    return [SCIAssetUtils instagramIconNamed:name pointSize:SCISettingsCellIconPointSize];
 }
 
 UIImage *SCISettingsSystemIcon(NSString *name, CGFloat pointSize, UIImageSymbolWeight weight) {
@@ -34,9 +40,10 @@ SCISetting *SCISettingApplyIconTint(SCISetting *setting, UIColor *tintColor) {
 }
 
 SCISetting *SCITopicNavigationSetting(NSString *title, NSString *iconName, CGFloat iconSize, NSArray *sections) {
+    CGFloat resolvedIconSize = iconSize > 0.0 ? iconSize : SCISettingsCellIconPointSize;
     return SCISettingApplyIconTint([SCISetting navigationCellWithTitle:title
                                                               subtitle:@""
-                                                                  icon:[SCIAssetUtils instagramIconNamed:iconName pointSize:iconSize]
+                                                                  icon:[SCIAssetUtils instagramIconNamed:iconName pointSize:resolvedIconSize]
                                                            navSections:sections],
                                    [SCIUtils SCIColor_InstagramPrimaryText]);
 }
@@ -199,13 +206,13 @@ UIMenu *SCIMediaPhotoQualityMenu(void) {
 NSArray *SCIDevExampleSections(void) {
     return @[
         SCITopicSection(@"_ Example", @[
-            [SCISetting staticCellWithTitle:@"Static Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"tablecells", 18.0, UIImageSymbolWeightRegular)],
+            [SCISetting staticCellWithTitle:@"Static Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"tablecells", SCISettingsCellIconPointSize, UIImageSymbolWeightRegular)],
             [SCISetting switchCellWithTitle:@"Switch Cell" subtitle:@"Tap the switch" defaultsKey:@"test_switch_cell"],
             [SCISetting switchCellWithTitle:@"Switch Cell (Restart)" subtitle:@"Tap the switch" defaultsKey:@"test_switch_cell_restart" requiresRestart:YES],
             [SCISetting stepperCellWithTitle:@"Stepper Cell" subtitle:@"I have %@%@" defaultsKey:@"test_stepper_cell" min:-10 max:1000 step:5.5 label:@"$" singularLabel:@"$"],
-            SCISettingApplyIconTint([SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using icon" icon:SCISettingsSystemIcon(@"link", 20.0, UIImageSymbolWeightRegular) url:@"https://google.com"], [UIColor systemTealColor]),
+            SCISettingApplyIconTint([SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using icon" icon:SCISettingsSystemIcon(@"link", SCISettingsCellIconPointSize, UIImageSymbolWeightRegular) url:@"https://google.com"], [UIColor systemTealColor]),
             [SCISetting linkCellWithTitle:@"Link Cell" subtitle:@"Using image" imageUrl:@"https://i.imgur.com/c9CbytZ.png" url:@"https://google.com"],
-            [SCISetting buttonCellWithTitle:@"Button Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"oval.inset.filled", 18.0, UIImageSymbolWeightRegular) action:^(void) { [SCIUtils showConfirmation:^(void){} title:@"Run Example Action?" message:@"Are you sure you want to run this example settings action?"]; }],
+            [SCISetting buttonCellWithTitle:@"Button Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"oval.inset.filled", SCISettingsCellIconPointSize, UIImageSymbolWeightRegular) action:^(void) { [SCIUtils showConfirmation:^(void){} title:@"Run Example Action?" message:@"Are you sure you want to run this example settings action?"]; }],
             [SCISetting menuCellWithTitle:@"Menu Cell" subtitle:@"Change the value on the right" menu:[UIMenu menuWithChildren:@[
                 [UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[
                     SCIMenuCommand(@"ABC", nil, nil, @"test_menu_cell", @"abc", NO),
@@ -213,7 +220,7 @@ NSArray *SCIDevExampleSections(void) {
                 ]],
                 SCIMenuCommand(@"Requires Restart", nil, nil, @"test_menu_cell", @"requires_restart", YES)
             ]]],
-            [SCISetting navigationCellWithTitle:@"Navigation Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"rectangle.stack", 18.0, UIImageSymbolWeightRegular) navSections:@[SCITopicSection(@"", @[], nil)]]
+            [SCISetting navigationCellWithTitle:@"Navigation Cell" subtitle:@"" icon:SCISettingsSystemIcon(@"rectangle.stack", SCISettingsCellIconPointSize, UIImageSymbolWeightRegular) navSections:@[SCITopicSection(@"", @[], nil)]]
         ], @"_ Example")
     ];
 }

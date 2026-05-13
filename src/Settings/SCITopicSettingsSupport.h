@@ -7,6 +7,8 @@
 NS_ASSUME_NONNULL_BEGIN
 
 NSDictionary *SCITopicSection(NSString *header, NSArray *rows, NSString * _Nullable footer);
+FOUNDATION_EXPORT CGFloat const SCISettingsCellIconPointSize;
+UIImage *SCISettingsIcon(NSString *name);
 UIImage *SCISettingsSystemIcon(NSString *name, CGFloat pointSize, UIImageSymbolWeight weight);
 SCISetting *SCISettingApplyIconTint(SCISetting *setting, UIColor * _Nullable tintColor);
 SCISetting *SCITopicNavigationSetting(NSString *title, NSString *iconName, CGFloat iconSize, NSArray *sections);

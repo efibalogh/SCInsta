@@ -1,6 +1,7 @@
 #import "SCIActionSectionEditViewController.h"
 #import "SCIActionSectionIconPickerViewController.h"
 #import "SCIBulkActionMenuEditViewController.h"
+#import "SCITopicSettingsSupport.h"
 #import "../Shared/UI/SCISwitch.h"
 
 #import "../AssetUtils.h"
@@ -168,7 +169,7 @@ static char kSCISectionEditSwitchAssocKey;
         } else if (indexPath.row == 1) {
             config.text = @"Icon";
             config.secondaryText = [self displayTitleForSectionIconName:section.iconName];
-            config.image = [SCIAssetUtils instagramIconNamed:section.iconName pointSize:22.0];
+            config.image = SCISettingsIcon(section.iconName);
             config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -183,7 +184,7 @@ static char kSCISectionEditSwitchAssocKey;
         } else {
             NSString *kind = [self bulkEditorKindForCurrentSection];
             config.text = [kind isEqualToString:@"copy"] ? @"Configure Copy All Menu" : @"Configure Download All Menu";
-            config.image = [SCIAssetUtils instagramIconNamed:([kind isEqualToString:@"copy"] ? @"copy" : @"download") pointSize:22.0];
+            config.image = SCISettingsIcon([kind isEqualToString:@"copy"] ? @"copy" : @"download");
             config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -191,14 +192,14 @@ static char kSCISectionEditSwitchAssocKey;
     } else if (indexPath.section == 1) {
         NSString *identifier = section.actions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
+        config.image = SCISettingsIcon(SCIActionDescriptorIconName(identifier));
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
         cell.showsReorderControl = YES;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else {
         NSString *identifier = self.configuration.supportedActions[indexPath.row];
         config.text = SCIActionDescriptorDisplayTitle(identifier, self.configuration.topicTitle);
-        config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
+        config.image = SCISettingsIcon(SCIActionDescriptorIconName(identifier));
         config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
         NSString *owner = [self.configuration sectionIdentifierForAction:identifier];

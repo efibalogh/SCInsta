@@ -1,5 +1,6 @@
 #import "SCIBulkActionMenuEditViewController.h"
 
+#import "SCITopicSettingsSupport.h"
 #import "../AssetUtils.h"
 #import "../Utils.h"
 #import "../Shared/ActionButton/SCIActionButtonConfiguration.h"
@@ -99,7 +100,7 @@
 
     NSString *identifier = (indexPath.section == 0) ? self.configuredActions[indexPath.row] : self.availableActions[indexPath.row];
     config.text = SCIActionDescriptorDisplayTitle(identifier, SCIActionButtonTopicTitleForSource(self.source));
-    config.image = [SCIAssetUtils instagramIconNamed:SCIActionDescriptorIconName(identifier) pointSize:22.0];
+    config.image = SCISettingsIcon(SCIActionDescriptorIconName(identifier));
     config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.contentConfiguration = config;
     cell.showsReorderControl = (indexPath.section == 0);

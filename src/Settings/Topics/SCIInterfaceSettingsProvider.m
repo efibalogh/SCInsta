@@ -9,7 +9,7 @@
 + (SCISetting *)experimentalLiquidGlassSetting {
     SCISetting *setting = [SCISetting navigationCellWithTitle:@"Liquid Glass"
                                                      subtitle:@"Unsafe per-hook overrides for Instagram's internal liquid glass gates"
-                                                         icon:[SCIAssetUtils instagramIconNamed:@"warning_filled" pointSize:22.0]
+                                                         icon:SCISettingsIcon(@"warning_filled")
                                                   navSections:@[
         SCITopicSection(@"Unsafe / Experimental", @[
             [SCISetting switchCellWithTitle:@"In-App Notifications (Launcher)" subtitle:@"Forces liquid-glass styling for in-app notification surfaces when enabled" defaultsKey:@"liquid_glass_in_app_notifications" requiresRestart:YES],
@@ -40,7 +40,7 @@
         SCITopicSection(@"Notifications", @[
             [SCISetting navigationCellWithTitle:@"Notifications"
                                        subtitle:@""
-                                           icon:[SCIAssetUtils instagramIconNamed:@"notification" pointSize:22.0]
+                                           icon:SCISettingsIcon(@"notification")
                                     navSections:[SCINotificationSettingsProvider sections]]
         ], nil),
         SCITopicSection(@"Tabs", @[
