@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
 
-@interface SCIFeedbackPillSettingsProvider : NSObject
+@interface SCINotificationSettingsProvider : NSObject
 + (NSArray *)sections;
 @end

@@ -1,33 +1,20 @@
 #import <UIKit/UIKit.h>
 
-typedef NS_ENUM(NSUInteger, SCIFeedbackPillTone) {
-    SCIFeedbackPillToneSuccess = 0,
-    SCIFeedbackPillToneError = 1,
-    SCIFeedbackPillToneInfo = 2
+typedef NS_ENUM(NSUInteger, SCINotificationTone) {
+    SCINotificationToneSuccess = 0,
+    SCINotificationToneError = 1,
+    SCINotificationToneInfo = 2
 };
 
-typedef NS_ENUM(NSUInteger, SCIFeedbackPillStyle) {
-    SCIFeedbackPillStyleColorful = 0,
-    SCIFeedbackPillStyleClean = 1,
-    SCIFeedbackPillStyleDynamic = 2
-};
+@interface SCINotificationPillView : UIView
 
-@interface SCIFeedbackPillView : UIView
++ (instancetype)progressPill;
++ (instancetype)toastPillWithTitle:(NSString *)title
+                           subtitle:(nullable NSString *)subtitle
+                               icon:(nullable UIImage *)icon
+                               tone:(SCINotificationTone)tone;
 
-/// Shows a progress-style pill in the given view.
-+ (instancetype)showInView:(UIView *)view;
-
-/// Shows an auto-dismissing toast-style pill in the given view.
-+ (instancetype)showToastInView:(UIView *)view
-                       duration:(NSTimeInterval)duration
-                          title:(NSString *)title
-                       subtitle:(nullable NSString *)subtitle
-                           icon:(nullable UIImage *)icon
-                           tone:(SCIFeedbackPillTone)tone;
-
-/// Sets the default style used by newly created pills.
-+ (void)setDefaultStyle:(SCIFeedbackPillStyle)style;
-+ (SCIFeedbackPillStyle)defaultStyle;
+- (void)setPresentationTopConstraint:(NSLayoutConstraint *)constraint;
 
 /// Updates progress (0.0 – 1.0) for progress-style pills.
 - (void)setProgress:(float)progress animated:(BOOL)animated;
@@ -61,6 +48,9 @@ typedef NS_ENUM(NSUInteger, SCIFeedbackPillStyle) {
 
 /// Called when user taps the pill body after success state is shown.
 @property (nonatomic, copy) void(^onTapWhenCompleted)(void);
+
+/// Called when a progress pill transitions to a visible terminal tone.
+@property (nonatomic, copy) void(^onTonePresented)(SCINotificationTone tone);
 
 /// Called after the pill has been fully removed from its superview.
 @property (nonatomic, copy) void(^onDidDismiss)(void);

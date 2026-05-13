@@ -5,8 +5,7 @@
 
 #import "InstagramHeaders.h"
 #import "Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
-#import "Shared/UI/SCIFeedbackPillPreferences.h"
-#import "Shared/UI/SCIFeedbackPillView.h"
+#import "Shared/UI/SCINotificationCenter.h"
 
 #import "Settings/SCISettingsViewController.h"
 
@@ -107,33 +106,6 @@ typedef BOOL (*SCILiquidGlassBoolMsg)(id, SEL);
 + (BOOL)showConfirmation:(void(^)(void))okHandler;
 + (BOOL)showConfirmation:(void(^)(void))okHandler cancelHandler:(void(^)(void))cancelHandler;
 + (void)showRestartConfirmation;
-
-// Toasts
-+ (void)showToastForDuration:(double)duration title:(NSString *)title;
-+ (void)showToastForDuration:(double)duration title:(NSString *)title subtitle:(NSString *)subtitle;
-+ (void)showToastForDuration:(double)duration
-                       title:(NSString *)title
-                    subtitle:(NSString *)subtitle
-                iconResource:(nullable NSString *)iconResource;
-+ (void)showToastForDuration:(double)duration
-                       title:(NSString *)title
-                    subtitle:(NSString *)subtitle
-                iconResource:(nullable NSString *)iconResource
-                        tone:(SCIFeedbackPillTone)tone;
-+ (void)showToastForActionIdentifier:(NSString *)actionIdentifier
-                            duration:(double)duration
-                               title:(NSString *)title
-                            subtitle:(NSString *)subtitle
-                        iconResource:(nullable NSString *)iconResource;
-+ (void)showToastForActionIdentifier:(NSString *)actionIdentifier
-                            duration:(double)duration
-                               title:(NSString *)title
-                            subtitle:(NSString *)subtitle
-                        iconResource:(nullable NSString *)iconResource
-                                tone:(SCIFeedbackPillTone)tone;
-
-+ (SCIFeedbackPillView *)showProgressPill;
-+ (BOOL)shouldShowFeedbackPillForActionIdentifier:(NSString *)identifier;
 
 // Math
 + (NSUInteger)decimalPlacesInDouble:(double)value;

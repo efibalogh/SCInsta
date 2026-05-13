@@ -168,14 +168,6 @@ UIMenu *SCISwipeBetweenTabsMenu(void) {
     ]];
 }
 
-UIMenu *SCIFeedbackPillStyleMenu(void) {
-    return [UIMenu menuWithChildren:@[
-        SCIMenuCommand(@"Clean", nil, nil, @"feedback_pill_style", @"clean", NO),
-        SCIMenuCommand(@"Colorful", nil, nil, @"feedback_pill_style", @"colorful", NO),
-        SCIMenuCommand(@"Dynamic", nil, nil, @"feedback_pill_style", @"dynamic", NO)
-    ]];
-}
-
 UIMenu *SCICacheAutoClearMenu(void) {
     return [UIMenu menuWithChildren:@[
         SCIMenuCommand(@"Never", nil, nil, @"cache_auto_clear_mode", @"never", NO),

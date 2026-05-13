@@ -1,5 +1,5 @@
 #import "SCIInterfaceSettingsProvider.h"
-#import "SCIFeedbackPillSettingsProvider.h"
+#import "SCINotificationSettingsProvider.h"
 #import "../SCITopicSettingsSupport.h"
 #import "../../Utils.h"
 #import "../../AssetUtils.h"
@@ -9,7 +9,7 @@
 + (SCISetting *)experimentalLiquidGlassSetting {
     SCISetting *setting = [SCISetting navigationCellWithTitle:@"Liquid Glass"
                                                      subtitle:@"Unsafe per-hook overrides for Instagram's internal liquid glass gates"
-                                                         icon:SCISettingsSystemIcon(@"exclamationmark.triangle.fill", 24.0, UIImageSymbolWeightRegular)
+                                                         icon:[SCIAssetUtils instagramIconNamed:@"warning_filled" pointSize:22.0]
                                                   navSections:@[
         SCITopicSection(@"Unsafe / Experimental", @[
             [SCISetting switchCellWithTitle:@"In-App Notifications (Launcher)" subtitle:@"Forces liquid-glass styling for in-app notification surfaces when enabled" defaultsKey:@"liquid_glass_in_app_notifications" requiresRestart:YES],
@@ -37,20 +37,20 @@
 
 + (SCISetting *)rootSetting {
     return SCITopicNavigationSetting(@"Interface", @"interface", 24.0, @[
-        SCITopicSection(@"Feedback Pill", @[
-            [SCISetting navigationCellWithTitle:@"Feedback Pill"
-                                       subtitle:@"Style, preview, and choose which actions show the feedback pill"
-                                           icon:[SCIAssetUtils instagramIconNamed:@"info" pointSize:20.0]
-                                    navSections:[SCIFeedbackPillSettingsProvider sections]]
+        SCITopicSection(@"Notifications", @[
+            [SCISetting navigationCellWithTitle:@"Notifications"
+                                       subtitle:@""
+                                           icon:[SCIAssetUtils instagramIconNamed:@"notification" pointSize:22.0]
+                                    navSections:[SCINotificationSettingsProvider sections]]
         ], nil),
         SCITopicSection(@"Tabs", @[
-            [SCISetting menuCellWithTitle:@"Icon Order" subtitle:@"The order of the icons on the bottom navigation bar" menu:SCINavigationIconOrderingMenu()],
-            [SCISetting menuCellWithTitle:@"Swipe Between Tabs" subtitle:@"Lets you swipe to switch between navigation bar tabs" menu:SCISwipeBetweenTabsMenu()],
-            [SCISetting switchCellWithTitle:@"Hide Feed Tab" subtitle:@"Hides the feed or home tab on the bottom navigation bar" defaultsKey:@"hide_feed_tab" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Hide Explore Tab" subtitle:@"Hides the explore or search tab on the bottom navigation bar" defaultsKey:@"hide_explore_tab" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Hide Messages Tab" subtitle:@"Hides the direct messages tab on the bottom navigation bar" defaultsKey:@"hide_messages_tab" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Hide Reels Tab" subtitle:@"Hides the reels tab on the bottom navigation bar" defaultsKey:@"hide_reels_tab" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Hide Create Tab" subtitle:@"Hides the create tab on the bottom navigation bar" defaultsKey:@"hide_create_tab" requiresRestart:YES]
+            [SCISetting menuCellWithTitle:@"Icon Order" subtitle:@"The order of the icons on the tab bar" menu:SCINavigationIconOrderingMenu()],
+            [SCISetting menuCellWithTitle:@"Swipe Between Tabs" subtitle:@"Lets you swipe to switch between tabs" menu:SCISwipeBetweenTabsMenu()],
+            [SCISetting switchCellWithTitle:@"Hide Feed Tab" subtitle:@"" defaultsKey:@"hide_feed_tab" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Hide Explore Tab" subtitle:@"" defaultsKey:@"hide_explore_tab" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Hide Messages Tab" subtitle:@"" defaultsKey:@"hide_messages_tab" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Hide Reels Tab" subtitle:@"" defaultsKey:@"hide_reels_tab" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Hide Create Tab" subtitle:@"" defaultsKey:@"hide_create_tab" requiresRestart:YES]
         ], nil),
         SCITopicSection(@"Explore & Search", @[
             [SCISetting switchCellWithTitle:@"Hide Explore Posts Grid" subtitle:@"Hides the grid of suggested posts on the explore and search tab" defaultsKey:@"hide_explore_grid"],

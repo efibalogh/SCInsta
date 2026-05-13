@@ -56,6 +56,32 @@ static SCIActionButtonSource SCIActionButtonSourceForPlaybackSource(SCIFullScree
     }
 }
 
+static NSString *SCICopiedDownloadURLTitleForPlaybackSource(SCIFullScreenPlaybackSource playbackSource, BOOL plural) {
+    NSString *noun = nil;
+    switch (playbackSource) {
+        case SCIFullScreenPlaybackSourceStories:
+            noun = @"Story";
+            break;
+        case SCIFullScreenPlaybackSourceReels:
+            noun = @"Reel";
+            break;
+        case SCIFullScreenPlaybackSourceFeed:
+        case SCIFullScreenPlaybackSourceProfile:
+            noun = @"Post";
+            break;
+        case SCIFullScreenPlaybackSourceDirect:
+        case SCIFullScreenPlaybackSourceUnknown:
+        default:
+            noun = nil;
+            break;
+    }
+
+    NSString *urlWord = plural ? @"URLs" : @"URL";
+    return noun.length > 0
+        ? [NSString stringWithFormat:@"%@ download %@ copied", noun, urlWord]
+        : [NSString stringWithFormat:@"Download %@ copied", urlWord];
+}
+
 static UIViewController *SCIPreviewPresenterForContext(SCIFullScreenPlaybackSource playbackSource,
                                                        UIViewController *sourceController) {
     if ((playbackSource == SCIFullScreenPlaybackSourceStories ||
@@ -161,20 +187,12 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
     }
 
     if (items.count == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenGallery duration:2.0
-                                 title:@"No files found"
-                              subtitle:nil
-                          iconResource:@"search"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationMediaPreviewOpenGallery, @"No files found", nil, @"search", SCINotificationToneError);
         return;
     }
 
     NSInteger adjustedIndex = MAX(0, MIN(index, (NSInteger)items.count - 1));
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewOpenGallery duration:1.4
-                                     title:@"Opened Gallery media"
-                                  subtitle:nil
-                              iconResource:@"media"
-                                      tone:SCIFeedbackPillToneInfo];
+    SCINotify(kSCINotificationMediaPreviewOpenGallery, @"Opened Gallery media", nil, @"media", SCINotificationToneInfo);
 
     SCIFullScreenMediaPlayer *player = [[SCIFullScreenMediaPlayer alloc] init];
     player.isFromGallery = YES;
@@ -717,11 +735,7 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)showGalleryOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
-    [SCIUtils showToastForActionIdentifier:actionIdentifier duration:2.0
-                             title:title
-                          subtitle:@"The original content may no longer exist."
-                      iconResource:@"error_filled"
-                              tone:SCIFeedbackPillToneError];
+    SCINotify(actionIdentifier, title, @"The original content may no longer exist.", @"error_filled", SCINotificationToneError);
 }
 
 - (void)dismissGalleryFlowForOriginOpenWithCompletion:(void (^)(void))completion {
@@ -765,10 +779,10 @@ fromViewController:(UIViewController *)presenter {
     SCIGalleryFile *file = self.currentItem.galleryFile;
     if ([SCIGalleryOriginController openOriginalPostForGalleryFile:file]) {
         [self dismissGalleryFlowForOriginOpenWithCompletion:^{
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4 title:@"Opened original post" subtitle:nil iconResource:@"external_link"];
+            SCINotify(kSCINotificationGalleryOpenOriginal, @"Opened original post", nil, @"external_link", SCINotificationToneForIconResource(@"external_link"));
         }];
     } else {
-        [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionGalleryOpenOriginal];
+        [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCINotificationGalleryOpenOriginal];
     }
 }
 
@@ -776,10 +790,10 @@ fromViewController:(UIViewController *)presenter {
     SCIGalleryFile *file = self.currentItem.galleryFile;
     if ([SCIGalleryOriginController openProfileForGalleryFile:file]) {
         [self dismissGalleryFlowForOriginOpenWithCompletion:^{
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4 title:@"Opened profile" subtitle:nil iconResource:@"profile"];
+            SCINotify(kSCINotificationGalleryOpenProfile, @"Opened profile", nil, @"profile", SCINotificationToneForIconResource(@"profile"));
         }];
     } else {
-        [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionGalleryOpenProfile];
+        [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCINotificationGalleryOpenProfile];
     }
 }
 
@@ -928,21 +942,15 @@ fromViewController:(UIViewController *)presenter {
                                        title:(NSString *)title
                                     subtitle:(NSString *)subtitle
                                completedTap:(void(^)(void))completedTap {
-    if (![SCIUtils shouldShowFeedbackPillForActionIdentifier:identifier]) {
-        [SCIUtils showToastForActionIdentifier:identifier
-                                      duration:2.0
-                                         title:title
-                                      subtitle:nil
-                                  iconResource:@"circle_check_filled"
-                                          tone:SCIFeedbackPillToneSuccess];
+    SCINotificationPillView *pill = SCINotifyProgress(identifier, title, nil);
+    if (!pill) {
+        SCINotificationTriggerHaptic(identifier, SCINotificationToneSuccess);
         return;
     }
-
-    SCIFeedbackPillView *pill = [SCIUtils showProgressPill];
     [pill setProgress:1.0f animated:NO];
     [pill showSuccessWithTitle:title subtitle:subtitle icon:nil];
     pill.onTapWhenCompleted = completedTap;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [pill dismiss];
     });
 }
@@ -975,9 +983,9 @@ fromViewController:(UIViewController *)presenter {
         }
 
         if (success) {
-            [self showCompletedPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos
+            [self showCompletedPillForActionIdentifier:kSCINotificationMediaPreviewSavePhotos
                                                  title:@"Saved to Photos"
-                                              subtitle:@"Saved to Photos successfully"
+                                              subtitle:@"Tap to open Photos"
                                          completedTap:^{
                 [SCIUtils openPhotosApp];
             }];
@@ -1102,17 +1110,12 @@ fromViewController:(UIViewController *)presenter {
 - (void)copyAllDownloadLinks {
     NSArray<NSString *> *links = [self bulkDownloadLinksForPreview];
     if (links.count == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIActionCopyDownloadLink duration:2.0 title:@"No links available" subtitle:nil iconResource:@"link"];
+        SCINotify(kSCIActionCopyDownloadLink, @"No links available", nil, @"error_filled", SCINotificationToneError);
         return;
     }
 
     [UIPasteboard generalPasteboard].string = [links componentsJoinedByString:@"\n"];
-    [SCIUtils showToastForActionIdentifier:kSCIActionCopyDownloadLink
-                                  duration:1.5
-                                     title:@"Download links copied"
-                                  subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)links.count, links.count == 1 ? @"" : @"s"]
-                              iconResource:@"circle_check_filled"
-                                      tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCIActionCopyDownloadLink, SCICopiedDownloadURLTitleForPlaybackSource(self.playbackSource, YES), [NSString stringWithFormat:@"%lu item%@", (unsigned long)links.count, links.count == 1 ? @"" : @"s"], @"circle_check_filled", SCINotificationToneSuccess);
 }
 
 - (UIMenu *)bulkActionsMenu {
@@ -1173,7 +1176,7 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)saveToPhotos {
-    if ([self handleRemoteOperationWithAction:saveToPhotos feedbackIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos]) {
+    if ([self handleRemoteOperationWithAction:saveToPhotos feedbackIdentifier:kSCINotificationMediaPreviewSavePhotos]) {
         return;
     }
 
@@ -1203,24 +1206,17 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = url.pathExtension;
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos]];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToPhotos showProgress:SCINotificationIsEnabled(kSCINotificationMediaPreviewSavePhotos)];
+    delegate.notificationIdentifier = kSCINotificationMediaPreviewSavePhotos;
     delegate.pendingGallerySaveMetadata = [self metadataForCurrentItem];
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
 
 - (void)showSaveResult:(BOOL)success error:(NSError *)error {
     if (success) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos duration:2.0
-                                 title:@"Saved to Photos"
-                              subtitle:nil
-                          iconResource:@"circle_check_filled"
-                                  tone:SCIFeedbackPillToneSuccess];
+        SCINotify(kSCINotificationMediaPreviewSavePhotos, @"Saved to Photos", nil, @"circle_check_filled", SCINotificationToneSuccess);
     } else {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSavePhotos duration:3.0
-                                 title:@"Failed to save"
-                              subtitle:error.localizedDescription
-                          iconResource:@"error_filled"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationMediaPreviewSavePhotos, @"Failed to save", error.localizedDescription, @"error_filled", SCINotificationToneError);
     }
 }
 
@@ -1234,7 +1230,7 @@ fromViewController:(UIViewController *)presenter {
     NSURL *sourceURL = item.fileURL ?: url;
     NSURL *photoURL = item.mediaType == SCIMediaItemTypeImage ? sourceURL : nil;
     NSURL *videoURL = item.mediaType == SCIMediaItemTypeVideo ? sourceURL : nil;
-    BOOL showProgress = [SCIUtils shouldShowFeedbackPillForActionIdentifier:feedbackIdentifier];
+    BOOL showProgress = SCINotificationIsEnabled(feedbackIdentifier);
     return [SCIMediaQualityManager handleDownloadAction:action
                                             identifier:feedbackIdentifier
                                              presenter:self
@@ -1253,8 +1249,8 @@ fromViewController:(UIViewController *)presenter {
     }
 
     NSURL *sourceURL = item.fileURL;
-    BOOL showProgress = [SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy];
-    return [SCIMediaQualityManager handleCopyActionWithIdentifier:kSCIFeedbackActionMediaPreviewCopy
+    BOOL showProgress = SCINotificationIsEnabled(kSCINotificationMediaPreviewCopy);
+    return [SCIMediaQualityManager handleCopyActionWithIdentifier:kSCINotificationMediaPreviewCopy
                                                         presenter:self
 	                                                       sourceView:self.bottomBar
                                                         mediaObject:item.sourceMediaObject
@@ -1264,7 +1260,7 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)saveToGallery {
-    if ([self handleRemoteOperationWithAction:saveToGallery feedbackIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery]) {
+    if ([self handleRemoteOperationWithAction:saveToGallery feedbackIdentifier:kSCINotificationMediaPreviewSaveGallery]) {
         return;
     }
 
@@ -1272,11 +1268,7 @@ fromViewController:(UIViewController *)presenter {
     SCIMediaItem *item = [self currentItem];
 
     if (!targetURL && !item.image) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:2.0
-                                 title:@"No media to save"
-                              subtitle:nil
-                          iconResource:@"media"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationMediaPreviewSaveGallery, @"No media to save", nil, @"media", SCINotificationToneError);
         return;
     }
 
@@ -1302,7 +1294,8 @@ fromViewController:(UIViewController *)presenter {
 
     SCIGallerySaveMetadata *meta = [self metadataForCurrentItem];
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery]];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:SCINotificationIsEnabled(kSCINotificationMediaPreviewSaveGallery)];
+    delegate.notificationIdentifier = kSCINotificationMediaPreviewSaveGallery;
     delegate.pendingGallerySaveMetadata = meta;
     [delegate downloadFileWithURL:targetURL fileExtension:ext hudLabel:nil];
 }
@@ -1318,24 +1311,20 @@ fromViewController:(UIViewController *)presenter {
                                                  error:&error];
 
     if (file) {
-        [self showCompletedPillForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery
+        [self showCompletedPillForActionIdentifier:kSCINotificationMediaPreviewSaveGallery
                                              title:@"Saved to Gallery"
-                                          subtitle:@"Saved to Gallery successfully"
+                                          subtitle:@"Tap to open Gallery"
                                      completedTap:^{
             [SCIGalleryViewController presentGallery];
         }];
     } else {
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : @"Failed to save";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewSaveGallery duration:3.0
-                                 title:@"Failed to save"
-                              subtitle:msg
-                          iconResource:@"error_filled"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationMediaPreviewSaveGallery, @"Failed to save", msg, @"error_filled", SCINotificationToneError);
     }
 }
 
 - (void)shareMedia {
-    if ([self handleRemoteOperationWithAction:share feedbackIdentifier:kSCIFeedbackActionMediaPreviewShare]) {
+    if ([self handleRemoteOperationWithAction:share feedbackIdentifier:kSCINotificationMediaPreviewShare]) {
         return;
     }
 
@@ -1367,11 +1356,7 @@ fromViewController:(UIViewController *)presenter {
                 activityItem = item.image;
             }
         }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewShare duration:1.4
-                                         title:@"Opened share sheet"
-                                      subtitle:nil
-                                  iconResource:@"share"
-                                          tone:SCIFeedbackPillToneInfo];
+        SCINotify(kSCINotificationMediaPreviewShare, @"Opened share sheet", nil, @"share", SCINotificationToneInfo);
         UIActivityViewController *acVC = [[UIActivityViewController alloc] initWithActivityItems:@[activityItem] applicationActivities:nil];
 	    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad && self.bottomBar) {
 	        acVC.popoverPresentationController.sourceView = self.bottomBar;
@@ -1384,7 +1369,8 @@ fromViewController:(UIViewController *)presenter {
     NSString *ext = url.pathExtension;
     if (ext.length == 0) ext = item.mediaType == SCIMediaItemTypeVideo ? @"mp4" : @"jpg";
     
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionMediaPreviewShare]];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:SCINotificationIsEnabled(kSCINotificationMediaPreviewShare)];
+    delegate.notificationIdentifier = kSCINotificationMediaPreviewShare;
     delegate.pendingGallerySaveMetadata = [self metadataForCurrentItem];
     [delegate downloadFileWithURL:url fileExtension:ext hudLabel:nil];
 }
@@ -1403,21 +1389,13 @@ fromViewController:(UIViewController *)presenter {
         UIImage *image = item.image ?: [UIImage imageWithData:imageData];
         if (image) {
             [[UIPasteboard generalPasteboard] setImage:image];
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5
-                                     title:@"Copied photo to clipboard"
-                                  subtitle:nil
-                              iconResource:@"circle_check_filled"
-                                      tone:SCIFeedbackPillToneSuccess];
+            SCINotify(kSCINotificationMediaPreviewCopy, @"Copied photo to clipboard", nil, @"circle_check_filled", SCINotificationToneSuccess);
         }
     } else {
         NSData *data = [NSData dataWithContentsOfURL:url];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5
-                                     title:@"Copied video to clipboard"
-                                  subtitle:nil
-                              iconResource:@"circle_check_filled"
-                                      tone:SCIFeedbackPillToneSuccess];
+            SCINotify(kSCINotificationMediaPreviewCopy, @"Copied video to clipboard", nil, @"circle_check_filled", SCINotificationToneSuccess);
         }
     }
 }
@@ -1446,11 +1424,7 @@ fromViewController:(UIViewController *)presenter {
     NSError *err;
     [item.galleryFile removeWithError:&err];
     if (err) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:2.0
-                                 title:@"Failed to delete"
-                              subtitle:err.localizedDescription
-                          iconResource:@"error_filled"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationMediaPreviewDeleteGallery, @"Failed to delete", err.localizedDescription, @"error_filled", SCINotificationToneError);
         return;
     }
 
@@ -1464,11 +1438,7 @@ fromViewController:(UIViewController *)presenter {
     }
 
     if (_items.count == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:1.5
-                                         title:@"Deleted from Gallery"
-                                      subtitle:nil
-                                  iconResource:@"circle_check_filled"
-                                          tone:SCIFeedbackPillToneSuccess];
+        SCINotify(kSCINotificationMediaPreviewDeleteGallery, @"Deleted from Gallery", nil, @"circle_check_filled", SCINotificationToneSuccess);
         [self closeTapped];
         return;
     }
@@ -1491,11 +1461,7 @@ fromViewController:(UIViewController *)presenter {
     [self prepareViewControllerForDisplay:newVC];
     [self prepareAdjacentViewControllersAroundIndex:_currentIndex];
     [self updateUI];
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewDeleteGallery duration:1.5
-                                     title:@"Deleted from Gallery"
-                                  subtitle:nil
-                              iconResource:@"circle_check_filled"
-                                      tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCINotificationMediaPreviewDeleteGallery, @"Deleted from Gallery", nil, @"circle_check_filled", SCINotificationToneSuccess);
 }
 
 #pragma mark - Swipe to Dismiss

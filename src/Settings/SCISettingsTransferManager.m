@@ -601,7 +601,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     if (includeGallery) {
         NSError *copyError = nil;
         if (![fm copyItemAtPath:[SCIGalleryPaths galleryDirectory] toPath:galleryDestination error:&copyError]) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:copyError.localizedDescription iconResource:@"error_filled"];
+            SCINotify(kSCINotificationSettingsExport, @"Export failed", copyError.localizedDescription, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
             return;
         }
     }
@@ -612,13 +612,13 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     NSString *archivePath = [root stringByAppendingPathComponent:@"SCInsta.zip"];
     if (!SCIWriteStoredZipFromDirectory(bundleRoot, archivePath, &archiveError)) {
         NSString *message = archiveError.localizedDescription ?: @"The export zip could not be created.";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:3.0 title:@"Export failed" subtitle:message iconResource:@"error_filled"];
+        SCINotify(kSCINotificationSettingsExport, @"Export failed", message, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         return;
     }
 
     NSURL *archiveURL = [NSURL fileURLWithPath:archivePath isDirectory:NO];
     UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[archiveURL] asCopy:YES];
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsExport duration:1.4 title:@"Opened export sheet" subtitle:nil iconResource:@"arrow_up"];
+    SCINotify(kSCINotificationSettingsExport, @"Opened export sheet", nil, @"arrow_up", SCINotificationToneForIconResource(@"arrow_up"));
     [controller presentViewController:picker animated:YES completion:nil];
 }
 
@@ -636,7 +636,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     [contentTypes addObject:UTTypeData];
     picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:YES];
     picker.delegate = self;
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:1.4 title:@"Choose an export bundle" subtitle:nil iconResource:@"arrow_down"];
+    SCINotify(kSCINotificationSettingsImport, @"Choose an export bundle", nil, @"arrow_down", SCINotificationToneForIconResource(@"arrow_down"));
     [controller presentViewController:picker animated:YES completion:nil];
 }
 
@@ -676,7 +676,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     if ((importSettings && !archiveHasSettings) || (importGallery && !archiveHasGallery) || (!archiveHasSettings && !archiveHasGallery)) {
         if (scoped) [url stopAccessingSecurityScopedResource];
         NSString *message = archiveError.localizedDescription ?: @"Archive contents were invalid.";
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import failed" subtitle:message iconResource:@"error_filled"];
+        SCINotify(kSCINotificationSettingsImport, @"Import failed", message, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         return;
     }
 
@@ -695,7 +695,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
         NSError *galleryCopyError = nil;
         if (!SCICopyItemReplacingDestination(galleryPath, [SCIGalleryPaths galleryDirectory], &galleryCopyError)) {
             if (scoped) [url stopAccessingSecurityScopedResource];
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import failed" subtitle:galleryCopyError.localizedDescription iconResource:@"error_filled"];
+            SCINotify(kSCINotificationSettingsImport, @"Import failed", galleryCopyError.localizedDescription, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
             [[SCIGalleryCoreDataStack shared] reloadPersistentContainer];
             return;
         }
@@ -708,7 +708,7 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     NSString *subtitle = importSettings && importGallery
         ? @"Settings and Gallery media were restored. Reconfigure Gallery lock if needed."
         : (importSettings ? @"Settings were restored." : @"Gallery media were restored. Reconfigure Gallery lock if needed.");
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionSettingsImport duration:3.0 title:@"Import complete" subtitle:subtitle iconResource:@"circle_check_filled"];
+    SCINotify(kSCINotificationSettingsImport, @"Import complete", subtitle, @"circle_check_filled", SCINotificationToneForIconResource(@"circle_check_filled"));
     [SCIUtils showRestartConfirmation];
 }
 

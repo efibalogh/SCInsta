@@ -7,6 +7,7 @@
 #import "../Utils.h"
 #import "../Shared/Gallery/SCIGalleryFile.h"
 #import "../Shared/Gallery/SCIGallerySaveMetadata.h"
+#import "../Shared/Gallery/SCIGalleryViewController.h"
 
 @interface SCIBulkDownloadCoordinator ()
 
@@ -15,7 +16,7 @@
 @property (nonatomic, copy) NSString *actionIdentifier;
 @property (nonatomic, weak, nullable) UIViewController *presenter;
 @property (nonatomic, weak, nullable) UIView *anchorView;
-@property (nonatomic, strong, nullable) SCIFeedbackPillView *progressView;
+@property (nonatomic, strong, nullable) SCINotificationPillView *progressView;
 @property (nonatomic, strong, nullable) SCIDownloadDelegate *currentDownloadDelegate;
 @property (nonatomic, strong) NSMutableArray<NSURL *> *resolvedFileURLs;
 @property (nonatomic, strong) NSMutableArray<SCIBulkDownloadItem *> *resolvedItems;
@@ -85,6 +86,15 @@ static NSString *SCIBulkOperationProgressTitle(SCIBulkDownloadOperation operatio
     }
 }
 
+static NSString *SCIBulkDefaultNotificationIdentifier(SCIBulkDownloadOperation operation) {
+    switch (operation) {
+        case SCIBulkDownloadOperationSaveToPhotos: return kSCINotificationDownloadAllLibrary;
+        case SCIBulkDownloadOperationSaveToGallery: return kSCINotificationDownloadAllGallery;
+        case SCIBulkDownloadOperationShare: return kSCINotificationDownloadAllShare;
+        case SCIBulkDownloadOperationCopyMedia: return kSCINotificationDownloadAllClipboard;
+    }
+}
+
 static NSString *SCIBulkOperationCompletionTitle(SCIBulkDownloadOperation operation, NSUInteger successCount) {
     switch (operation) {
         case SCIBulkDownloadOperationSaveToPhotos:
@@ -96,6 +106,29 @@ static NSString *SCIBulkOperationCompletionTitle(SCIBulkDownloadOperation operat
         case SCIBulkDownloadOperationCopyMedia:
             return [NSString stringWithFormat:@"Copied %lu item%@ to clipboard", (unsigned long)successCount, successCount == 1 ? @"" : @"s"];
     }
+}
+
+static NSString *SCIBulkOperationCompletionSubtitle(SCIBulkDownloadOperation operation, NSUInteger failureCount) {
+    NSString *base = nil;
+    switch (operation) {
+        case SCIBulkDownloadOperationSaveToPhotos:
+            base = @"Tap to open Photos";
+            break;
+        case SCIBulkDownloadOperationSaveToGallery:
+            base = @"Tap to open Gallery";
+            break;
+        case SCIBulkDownloadOperationShare:
+        case SCIBulkDownloadOperationCopyMedia:
+            base = nil;
+            break;
+    }
+
+    if (failureCount == 0) {
+        return base;
+    }
+
+    NSString *failureText = [NSString stringWithFormat:@"%lu failed", (unsigned long)failureCount];
+    return base.length > 0 ? [NSString stringWithFormat:@"%@, %@", base, failureText] : failureText;
 }
 
 static NSString *SCIBulkOperationCancelTitle(SCIBulkDownloadOperation operation) {
@@ -148,6 +181,7 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
         actionIdentifier:(NSString *)actionIdentifier
                presenter:(UIViewController *)presenter
               anchorView:(UIView *)anchorView {
+    NSString *resolvedActionIdentifier = actionIdentifier.length > 0 ? actionIdentifier : SCIBulkDefaultNotificationIdentifier(operation);
     NSMutableArray<SCIBulkDownloadItem *> *validItems = [NSMutableArray array];
     for (SCIBulkDownloadItem *item in items) {
         if (![item isKindOfClass:[SCIBulkDownloadItem class]]) continue;
@@ -156,19 +190,14 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
         }
     }
     if (validItems.count == 0) {
-        [SCIUtils showToastForActionIdentifier:actionIdentifier
-                                      duration:2.0
-                                         title:@"No downloadable media"
-                                      subtitle:nil
-                                  iconResource:@"error_filled"
-                                          tone:SCIFeedbackPillToneError];
+        SCINotify(resolvedActionIdentifier, @"No downloadable media", nil, @"error_filled", SCINotificationToneError);
         return;
     }
 
     SCIBulkDownloadCoordinator *coordinator = [[self alloc] init];
     coordinator.operation = operation;
     coordinator.items = [validItems copy];
-    coordinator.actionIdentifier = actionIdentifier.length > 0 ? actionIdentifier : @"download";
+    coordinator.actionIdentifier = resolvedActionIdentifier;
     coordinator.presenter = presenter;
     coordinator.anchorView = anchorView;
     coordinator.resolvedFileURLs = [NSMutableArray array];
@@ -178,14 +207,13 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
 }
 
 - (void)start {
-    if ([SCIUtils shouldShowFeedbackPillForActionIdentifier:self.actionIdentifier]) {
-        self.progressView = [SCIUtils showProgressPill];
-        __weak typeof(self) weakSelf = self;
-        self.progressView.onCancel = ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            strongSelf.cancelled = YES;
-            [strongSelf.currentDownloadDelegate.downloadManager cancelDownload];
-        };
+    __weak typeof(self) weakSelf = self;
+    self.progressView = SCINotifyProgress(self.actionIdentifier, SCIBulkOperationProgressTitle(self.operation), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        strongSelf.cancelled = YES;
+        [strongSelf.currentDownloadDelegate.downloadManager cancelDownload];
+    });
+    if (self.progressView) {
         [self updateProgress];
     }
     [self processNextItem];
@@ -196,12 +224,12 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
     NSUInteger total = self.items.count;
     NSUInteger completed = MIN(self.currentIndex, total);
     float progress = total > 0 ? (float)completed / (float)total : 0.0f;
-    [self.progressView setProgress:progress animated:YES];
     NSString *title = [NSString stringWithFormat:@"%@ %lu of %lu",
                        SCIBulkOperationProgressTitle(self.operation),
                        (unsigned long)MIN(completed + 1, total),
                        (unsigned long)total];
-    [self.progressView showInfoWithTitle:title subtitle:@"Tap to cancel" icon:[SCIAssetUtils instagramIconNamed:@"download_all" pointSize:18.0]];
+    [self.progressView updateProgressTitle:title subtitle:nil];
+    [self.progressView setProgress:progress animated:YES];
 }
 
 - (void)processNextItem {
@@ -267,6 +295,7 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
 
     NSString *extension = item.fileExtension.length > 0 ? item.fileExtension : (item.video ? @"mp4" : @"jpg");
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:downloadOnly showProgress:NO];
+    delegate.notificationIdentifier = @"";
     self.currentDownloadDelegate = delegate;
     delegate.pendingGallerySaveMetadata = item.galleryMetadata;
     delegate.completionBlock = ^(NSURL *fileURL, NSError *error) {
@@ -323,10 +352,8 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
         return;
     }
 
-    NSString *subtitle = self.failureCount > 0
-        ? [NSString stringWithFormat:@"%lu failed", (unsigned long)self.failureCount]
-        : nil;
-    [self finishWithSuccessTitle:SCIBulkOperationCompletionTitle(self.operation, self.successCount) subtitle:subtitle];
+    [self finishWithSuccessTitle:SCIBulkOperationCompletionTitle(self.operation, self.successCount)
+                         subtitle:SCIBulkOperationCompletionSubtitle(self.operation, self.failureCount)];
 }
 
 - (void)finalizeShareOperation {
@@ -344,10 +371,8 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
     }
     [presenter presentViewController:activityController animated:YES completion:nil];
 
-    NSString *subtitle = self.failureCount > 0
-        ? [NSString stringWithFormat:@"%lu failed", (unsigned long)self.failureCount]
-        : nil;
-    [self finishWithSuccessTitle:SCIBulkOperationCompletionTitle(self.operation, self.successCount) subtitle:subtitle];
+    [self finishWithSuccessTitle:SCIBulkOperationCompletionTitle(self.operation, self.successCount)
+                         subtitle:SCIBulkOperationCompletionSubtitle(self.operation, self.failureCount)];
 }
 
 - (void)finalizeCopyMediaOperation {
@@ -373,52 +398,51 @@ static NSURL *SCIBulkPreparedFileURLForItem(SCIBulkDownloadItem *item, NSURL *fi
     }
 
     [UIPasteboard generalPasteboard].items = pasteboardItems;
-    NSString *subtitle = self.failureCount > 0
-        ? [NSString stringWithFormat:@"%lu failed", (unsigned long)self.failureCount]
-        : nil;
-    [self finishWithSuccessTitle:SCIBulkOperationCompletionTitle(self.operation, pasteboardItems.count) subtitle:subtitle];
+    [self finishWithSuccessTitle:SCIBulkOperationCompletionTitle(self.operation, pasteboardItems.count)
+                         subtitle:SCIBulkOperationCompletionSubtitle(self.operation, self.failureCount)];
 }
 
 - (void)finishCancelled {
     if (self.progressView) {
-        [self.progressView showErrorWithTitle:SCIBulkOperationCancelTitle(self.operation) subtitle:nil icon:[SCIAssetUtils instagramIconNamed:@"error_filled" pointSize:18.0]];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.progressView showErrorWithTitle:SCIBulkOperationCancelTitle(self.operation) subtitle:nil icon:nil];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [self.progressView dismiss];
         });
+    } else {
+        SCINotificationTriggerHaptic(self.actionIdentifier, SCINotificationToneError);
     }
     SCIReleaseBulkCoordinator(self);
 }
 
 - (void)finishWithSuccessTitle:(NSString *)title subtitle:(NSString *)subtitle {
     if (self.progressView) {
-        [self.progressView showSuccessWithTitle:title subtitle:subtitle icon:[SCIAssetUtils instagramIconNamed:@"circle_check_filled" pointSize:18.0 renderingMode:UIImageRenderingModeAlwaysOriginal]];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.progressView showSuccessWithTitle:title subtitle:subtitle icon:nil];
+        if (self.operation == SCIBulkDownloadOperationSaveToPhotos) {
+            self.progressView.onTapWhenCompleted = ^{
+                [SCIUtils openPhotosApp];
+            };
+        } else if (self.operation == SCIBulkDownloadOperationSaveToGallery) {
+            self.progressView.onTapWhenCompleted = ^{
+                [SCIGalleryViewController presentGallery];
+            };
+        }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [self.progressView dismiss];
         });
     } else {
-        [SCIUtils showToastForActionIdentifier:self.actionIdentifier
-                                      duration:1.8
-                                         title:title
-                                      subtitle:subtitle
-                                  iconResource:@"circle_check_filled"
-                                          tone:SCIFeedbackPillToneSuccess];
+        SCINotify(self.actionIdentifier, title, subtitle, @"circle_check_filled", SCINotificationToneSuccess);
     }
     SCIReleaseBulkCoordinator(self);
 }
 
 - (void)finishWithError:(NSString *)message {
     if (self.progressView) {
-        [self.progressView showErrorWithTitle:@"Bulk action failed" subtitle:message icon:[SCIAssetUtils instagramIconNamed:@"error_filled" pointSize:18.0 renderingMode:UIImageRenderingModeAlwaysOriginal]];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.progressView showErrorWithTitle:@"Bulk action failed" subtitle:message icon:nil];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [self.progressView dismiss];
         });
     } else {
-        [SCIUtils showToastForActionIdentifier:self.actionIdentifier
-                                      duration:2.0
-                                         title:@"Bulk action failed"
-                                      subtitle:message
-                                  iconResource:@"error_filled"
-                                          tone:SCIFeedbackPillToneError];
+        SCINotify(self.actionIdentifier, @"Bulk action failed", message, @"error_filled", SCINotificationToneError);
     }
     SCIReleaseBulkCoordinator(self);
 }

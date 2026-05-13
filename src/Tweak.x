@@ -79,13 +79,8 @@ NSString *SCIStoryMediaIdentifier(id media) {
 static void SCIShowPendingRepostFeedbackIfNeeded(SCIActionButtonSource source) {
     NSDictionary<NSString *, NSString *> *feedback = SCIConsumePendingRepostFeedback(source);
     if (!feedback) return;
-    if (![SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIActionRepost]) return;
-
-    [SCIUtils showToastForActionIdentifier:kSCIActionRepost
-                                  duration:1.4
-                                     title:feedback[@"title"] ?: @"Tapped repost button"
-                                  subtitle:nil
-                              iconResource:feedback[@"iconResource"] ?: @"ig_icon_reshare_outline_24"];
+    NSString *iconResource = feedback[@"iconResource"] ?: @"ig_icon_reshare_outline_24";
+    SCINotify(kSCINotificationRepost, feedback[@"title"] ?: @"Tapped repost button", nil, iconResource, SCINotificationToneForIconResource(iconResource));
 }
 
 @interface _UISheetDetent : NSObject

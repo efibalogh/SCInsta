@@ -40,11 +40,7 @@
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
     pasteboard.string = result;
 
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionCopyDescription duration:2.0
-                             title:@"Copied text to clipboard"
-                          subtitle:nil
-                      iconResource:@"circle_check_filled"
-                              tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCINotificationCopyDescription, @"Copied text to clipboard", nil, @"circle_check_filled", SCINotificationToneSuccess);
 }
 %end
 

@@ -1491,20 +1491,17 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
         NSString *title = option.kind == SCIMediaOptionKindPhotoProgressive ? @"Copy URL" : option.kind == SCIMediaOptionKindAudioDash ? @"Copy Audio URL" : @"Copy Video URL";
         [children addObject:[UIAction actionWithTitle:title image:SCIMediaIcon(@"link", kSCIMediaOptionIconPointSize) identifier:nil handler:^(__unused UIAction *action) {
             [UIPasteboard generalPasteboard].string = option.primaryURL.absoluteString;
-            [SCIUtils showToastForDuration:1.5 title:@"URL copied"];
         }]];
     }
 
     if (option.secondaryURL.absoluteString.length > 0) {
         [children addObject:[UIAction actionWithTitle:@"Copy Audio URL" image:SCIMediaIcon(@"audio", kSCIMediaOptionIconPointSize) identifier:nil handler:^(__unused UIAction *action) {
             [UIPasteboard generalPasteboard].string = option.secondaryURL.absoluteString;
-            [SCIUtils showToastForDuration:1.5 title:@"Audio URL copied"];
         }]];
     }
 
     [children addObject:[UIAction actionWithTitle:@"Copy Quality Info" image:SCIMediaIcon(@"copy", kSCIMediaOptionIconPointSize) identifier:nil handler:^(__unused UIAction *action) {
         [UIPasteboard generalPasteboard].string = option.qualityInfo ?: @"";
-        [SCIUtils showToastForDuration:1.5 title:@"Quality info copied"];
     }]];
 
     if (option.kind == SCIMediaOptionKindPhotoProgressive) {
@@ -1523,7 +1520,6 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
             generator.appliesPreferredTrackTransform = YES;
             CGImageRef imageRef = [generator copyCGImageAtTime:CMTimeMakeWithSeconds(MAX(option.duration > 0.5 ? MIN(1.0, option.duration / 3.0) : 0.0, 0.0), 600) actualTime:nil error:nil];
             if (!imageRef) {
-                [SCIUtils showToastForDuration:2.0 title:@"Unable to extract thumbnail"];
                 return;
             }
             UIImage *image = [UIImage imageWithCGImage:imageRef];
@@ -1539,8 +1535,6 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     SCIMediaOption *option = self.sections[indexPath.section].options[indexPath.row];
     if (!option.selectable) {
-        NSString *reason = option.kind == SCIMediaOptionKindAudioDash ? @"Audio-only export is currently limited to Share." : @"This option requires FFmpegKit in the active build.";
-        [SCIUtils showToastForDuration:2.0 title:@"Option unavailable" subtitle:reason];
         return;
     }
     [self dismissViewControllerAnimated:YES completion:^{
@@ -1586,13 +1580,14 @@ static NSString *SCIMediaExtensionForOption(SCIMediaOption *option) {
     }
 }
 
-static NSString *SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL, NSError **errorOut, BOOL showToast) {
+static NSString *SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL, NSError **errorOut, BOOL showToast, NSString *notificationIdentifier) {
+    NSString *identifier = notificationIdentifier.length > 0 ? notificationIdentifier : nil;
     if (!fileURL) {
         if (errorOut) {
             *errorOut = [SCIUtils errorWithDescription:@"Nothing to copy"];
         }
-        if (showToast) {
-            [SCIUtils showToastForDuration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled" tone:SCIFeedbackPillToneError];
+        if (showToast && identifier.length > 0) {
+            SCINotify(identifier, @"Nothing to copy", nil, @"error_filled", SCINotificationToneError);
         }
         return nil;
     }
@@ -1602,8 +1597,8 @@ static NSString *SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL, NSError **err
         NSData *data = [NSData dataWithContentsOfURL:fileURL];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.audio"];
-            if (showToast) {
-                [SCIUtils showToastForDuration:1.5 title:@"Copied audio to clipboard" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
+            if (showToast && identifier.length > 0) {
+                SCINotify(identifier, @"Copied audio to clipboard", nil, @"circle_check_filled", SCINotificationToneSuccess);
             }
             return @"Copied audio to clipboard";
         }
@@ -1611,8 +1606,8 @@ static NSString *SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL, NSError **err
         NSData *data = [NSData dataWithContentsOfURL:fileURL];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
-            if (showToast) {
-                [SCIUtils showToastForDuration:1.5 title:@"Copied video to clipboard" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
+            if (showToast && identifier.length > 0) {
+                SCINotify(identifier, @"Copied video to clipboard", nil, @"circle_check_filled", SCINotificationToneSuccess);
             }
             return @"Copied video to clipboard";
         }
@@ -1621,8 +1616,8 @@ static NSString *SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL, NSError **err
         UIImage *image = imageData ? [UIImage imageWithData:imageData] : nil;
         if (image) {
             [[UIPasteboard generalPasteboard] setImage:image];
-            if (showToast) {
-                [SCIUtils showToastForDuration:1.5 title:@"Copied photo to clipboard" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
+            if (showToast && identifier.length > 0) {
+                SCINotify(identifier, @"Copied photo to clipboard", nil, @"circle_check_filled", SCINotificationToneSuccess);
             }
             return @"Copied photo to clipboard";
         }
@@ -1631,8 +1626,8 @@ static NSString *SCIMediaCopyLocalFileToPasteboard(NSURL *fileURL, NSError **err
     if (errorOut) {
         *errorOut = [SCIUtils errorWithDescription:@"Unable to read the selected file."];
     }
-    if (showToast) {
-        [SCIUtils showToastForDuration:2.0 title:@"Copy failed" subtitle:@"Unable to read the selected file." iconResource:@"error_filled" tone:SCIFeedbackPillToneError];
+    if (showToast && identifier.length > 0) {
+        SCINotify(identifier, @"Copy failed", @"Unable to read the selected file.", @"error_filled", SCINotificationToneError);
     }
     return nil;
 }
@@ -1692,6 +1687,7 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
                                           SCIGallerySaveMetadata *galleryMetadata,
                                           DownloadAction action,
                                           BOOL copyToClipboard,
+                                          NSString *notificationIdentifier,
                                           BOOL showProgress) {
     // #region agent log
     SCILog(@"[DBG ec62e7 H3] option kind=%ld title=%@ vCodec=%@ aCodec=%@ bw=%ld abw=%ld vURL=%@ aURL=%@",
@@ -1716,6 +1712,7 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
 
     DownloadAction resolvedAction = copyToClipboard ? downloadOnly : action;
     SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:resolvedAction showProgress:showProgress];
+    delegate.notificationIdentifier = notificationIdentifier;
     delegate.pendingGallerySaveMetadata = galleryMetadata;
     if (copyToClipboard) {
         __weak SCIDownloadDelegate *weakCopyDelegate = delegate;
@@ -1724,23 +1721,23 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
             if (error || !fileURL) {
                 if (showProgress && strongDelegate.progressView) {
                     [strongDelegate.progressView showErrorWithTitle:@"Copy failed" subtitle:error.localizedDescription icon:nil];
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                         [strongDelegate.progressView dismiss];
                     });
-                } else {
-                    [SCIUtils showToastForDuration:2.0 title:@"Copy failed" subtitle:error.localizedDescription iconResource:@"error_filled" tone:SCIFeedbackPillToneError];
+                } else if (notificationIdentifier.length > 0) {
+                    SCINotify(notificationIdentifier, @"Copy failed", error.localizedDescription, @"error_filled", SCINotificationToneError);
                 }
                 return;
             }
             NSError *copyError = nil;
-            NSString *successTitle = SCIMediaCopyLocalFileToPasteboard(fileURL, &copyError, !showProgress);
+            NSString *successTitle = SCIMediaCopyLocalFileToPasteboard(fileURL, &copyError, !showProgress, notificationIdentifier);
             if (showProgress && strongDelegate.progressView) {
                 if (successTitle.length > 0) {
                     [strongDelegate.progressView showSuccessWithTitle:successTitle subtitle:nil icon:nil];
                 } else {
                     [strongDelegate.progressView showErrorWithTitle:@"Copy failed" subtitle:copyError.localizedDescription icon:nil];
                 }
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                     [strongDelegate.progressView dismiss];
                 });
             }
@@ -1753,7 +1750,9 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
     }
 
     if (option.kind == SCIMediaOptionKindAudioDash && !copyToClipboard && action != share) {
-        [SCIUtils showToastForDuration:2.0 title:@"Audio-only export is only supported for Share"];
+        if (notificationIdentifier.length > 0) {
+            SCINotify(notificationIdentifier, @"Audio-only export is only supported for Share", nil, @"info_filled", SCINotificationToneInfo);
+        }
         return;
     }
 
@@ -1890,7 +1889,6 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
                      videoURL:(NSURL *)videoURL
               galleryMetadata:(SCIGallerySaveMetadata *)galleryMetadata
                 showProgress:(BOOL)showProgress {
-    (void)identifier;
     BOOL includeAudioOptions = (action == share);
     SCIMediaAnalysis *analysis = SCIMediaAnalyze(mediaObject, photoURL, videoURL, action, includeAudioOptions);
     if (analysis.photoOptions.count == 0 && analysis.progressiveVideoOptions.count == 0 && analysis.mergedDashOptions.count == 0 && analysis.videoDashOnlyOptions.count == 0 && analysis.audioDashOptions.count == 0) {
@@ -1904,12 +1902,12 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
 
     SCIMediaOption *resolvedOption = SCIMediaResolveDefaultOption(analysis);
     if (resolvedOption) {
-        SCIMediaPerformOptionDownload(resolvedOption, mediaObject, galleryMetadata, action, NO, showProgress);
+        SCIMediaPerformOptionDownload(resolvedOption, mediaObject, galleryMetadata, action, NO, identifier, showProgress);
         return YES;
     }
 
     SCIMediaPresentOptionsSheet(resolvedPresenter, sourceView, analysis, action, ^(SCIMediaOption *option) {
-        SCIMediaPerformOptionDownload(option, mediaObject, galleryMetadata, action, NO, showProgress);
+        SCIMediaPerformOptionDownload(option, mediaObject, galleryMetadata, action, NO, identifier, showProgress);
     });
     return YES;
 }
@@ -1921,7 +1919,6 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
                                photoURL:(NSURL *)photoURL
                                videoURL:(NSURL *)videoURL
                           showProgress:(BOOL)showProgress {
-    (void)identifier;
     SCIMediaAnalysis *analysis = SCIMediaAnalyze(mediaObject, photoURL, videoURL, downloadOnly, YES);
     if (analysis.photoOptions.count == 0 && analysis.progressiveVideoOptions.count == 0 && analysis.mergedDashOptions.count == 0 && analysis.videoDashOnlyOptions.count == 0 && analysis.audioDashOptions.count == 0) {
         return NO;
@@ -1934,12 +1931,12 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
 
     SCIMediaOption *resolvedOption = SCIMediaResolveDefaultOption(analysis);
     if (resolvedOption) {
-        SCIMediaPerformOptionDownload(resolvedOption, mediaObject, nil, downloadOnly, YES, showProgress);
+        SCIMediaPerformOptionDownload(resolvedOption, mediaObject, nil, downloadOnly, YES, identifier, showProgress);
         return YES;
     }
 
     SCIMediaPresentOptionsSheet(resolvedPresenter, sourceView, analysis, downloadOnly, ^(SCIMediaOption *option) {
-        SCIMediaPerformOptionDownload(option, mediaObject, nil, downloadOnly, YES, showProgress);
+        SCIMediaPerformOptionDownload(option, mediaObject, nil, downloadOnly, YES, identifier, showProgress);
     });
     return YES;
 }

@@ -16,12 +16,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (nullable instancetype)descriptorForIdentifier:(NSString *)identifier;
 + (NSArray<SCIActionDescriptor *> *)availableSectionIconDescriptors;
-+ (NSArray<SCIActionDescriptor *> *)feedbackPillConfigurableDescriptors;
 
 @end
 
 FOUNDATION_EXPORT NSString *SCIActionDescriptorDisplayTitle(NSString *identifier, NSString * _Nullable topicTitle);
 FOUNDATION_EXPORT NSString *SCIActionDescriptorIconName(NSString *identifier);
-FOUNDATION_EXPORT NSString *SCIActionDescriptorFeedbackPillDefaultsKey(NSString *identifier);
 
 NS_ASSUME_NONNULL_END

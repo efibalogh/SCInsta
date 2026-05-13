@@ -2,6 +2,7 @@
 
 #import "../Tweak.h"
 #import "../Utils.h"
+#import "../Shared/UI/SCINotificationCenter.h"
 #import "SCIStartupHooks.h"
 #import "SCIStartupProfiler.h"
 
@@ -145,8 +146,10 @@ static NSDictionary *SCIFeatureDefaults(void) {
         @"story_poll_vote_counts": @(YES),
         @"show_favorites_at_top": @(NO),
         @"remove_user_from_copied_share_link": @(YES),
-        @"hide_create_group_button": @(NO)
+        @"hide_create_group_button": @(NO),
     } mutableCopy];
+
+    [defaults addEntriesFromDictionary:SCINotificationDefaultPreferences()];
 
     id legacyStoryInteraction = [[NSUserDefaults standardUserDefaults] objectForKey:@"story_mark_seen_on_interaction"];
     if ([legacyStoryInteraction respondsToSelector:@selector(boolValue)]) {

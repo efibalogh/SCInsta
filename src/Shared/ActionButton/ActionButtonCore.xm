@@ -16,7 +16,7 @@
 #import "../Gallery/SCIGalleryFile.h"
 #import "../Gallery/SCIGalleryOriginController.h"
 #import "../Gallery/SCIGallerySaveMetadata.h"
-#import "../UI/SCIFeedbackPillPreferences.h"
+#import "../UI/SCINotificationCenter.h"
 
 NSString * const kSCIActionNone = @"none";
 NSString * const kSCIActionDownloadLibrary = @"download_library";
@@ -191,6 +191,30 @@ static SCIGallerySource SCIGallerySourceForActionSource(SCIActionButtonSource so
 		default:
 			return SCIGallerySourceOther;
 	}
+}
+
+static NSString *SCIDownloadURLNounForActionSource(SCIActionButtonSource source) {
+    switch (source) {
+        case SCIActionButtonSourceStories:
+            return @"Story";
+        case SCIActionButtonSourceReels:
+            return @"Reel";
+        case SCIActionButtonSourceFeed:
+        case SCIActionButtonSourceProfile:
+            return @"Post";
+        case SCIActionButtonSourceDirect:
+        default:
+            return @"Media";
+    }
+}
+
+static NSString *SCICopiedDownloadURLTitleForSource(SCIActionButtonSource source, BOOL plural) {
+    NSString *noun = SCIDownloadURLNounForActionSource(source);
+    NSString *urlWord = plural ? @"URLs" : @"URL";
+    if ([noun isEqualToString:@"Media"]) {
+        return [NSString stringWithFormat:@"Download %@ copied", urlWord];
+    }
+    return [NSString stringWithFormat:@"%@ download %@ copied", noun, urlWord];
 }
 
 static BOOL SCIActionMediaLooksLikeReel(id media) {
@@ -1116,15 +1140,11 @@ static UIMenu *SCIBulkActionMenuForContext(SCIActionButtonContext *context,
         }
         if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) {
             if (bulkLinks.count == 0) {
-                [SCIUtils showToastForActionIdentifier:kSCIActionDownloadAllLinks duration:2.0 title:@"No links available" subtitle:nil iconResource:@"link"];
+                SCINotify(kSCIActionDownloadAllLinks, @"No links available", nil, @"error_filled", SCINotificationToneError);
                 return;
             }
             [UIPasteboard generalPasteboard].string = [bulkLinks componentsJoinedByString:@"\n"];
-            [SCIUtils showToastForActionIdentifier:kSCIActionDownloadAllLinks
-                                          duration:1.5
-                                             title:@"Download links copied"
-                                          subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)bulkLinks.count, bulkLinks.count == 1 ? @"" : @"s"]
-                                      iconResource:@"copy_filled"];
+            SCINotify(kSCIActionDownloadAllLinks, SCICopiedDownloadURLTitleForSource(context.source, YES), [NSString stringWithFormat:@"%lu item%@", (unsigned long)bulkLinks.count, bulkLinks.count == 1 ? @"" : @"s"], @"copy_filled", SCINotificationToneForIconResource(@"copy_filled"));
         }
     });
     if (children.count == 0) return nil;
@@ -1137,7 +1157,7 @@ static void SCIPresentBulkActionChooser(SCIActionButtonContext *context,
                                         id media) {
     UIMenu *menu = SCIBulkActionMenuForContext(context, entries, username, media, SCIConfiguredBulkActionIdentifiersForSource(context.source));
     if (!menu) {
-        [SCIUtils showToastForActionIdentifier:kSCIActionDownloadAllLibrary duration:2.0 title:@"No bulk media available" subtitle:nil iconResource:@"download"];
+        SCINotify(kSCIActionDownloadAllLibrary, @"No bulk media available", nil, @"error_filled", SCINotificationToneError);
     }
 }
 
@@ -1288,7 +1308,7 @@ NSDictionary<NSString *, NSString *> *SCIConsumePendingRepostFeedback(SCIActionB
 
 static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIGallerySaveMetadata *metadata, SCIActionButtonContext *context) {
 	if (!videoURL) {
-		[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:nil iconResource:@"photo_filled"];
+		SCINotify(kSCINotificationViewThumbnail, @"Cover unavailable", nil, @"error_filled", SCINotificationToneError);
 		return;
 	}
 
@@ -1302,7 +1322,7 @@ static void SCIShowExtractedVideoCover(NSURL *videoURL, SCIGallerySaveMetadata *
 		CGImageRef imageRef = [generator copyCGImageAtTime:CMTimeMakeWithSeconds(0.0, 600) actualTime:NULL error:&error];
 		if (!imageRef) {
 			dispatch_async(dispatch_get_main_queue(), ^{
-				[SCIUtils showToastForActionIdentifier:kSCIFeedbackActionViewThumbnail duration:2.0 title:@"Cover unavailable" subtitle:error.localizedDescription ?: @"" iconResource:@"photo_filled"];
+				SCINotify(kSCINotificationViewThumbnail, @"Cover unavailable", error.localizedDescription ?: @"", @"error_filled", SCINotificationToneError);
 			});
 			return;
 		}
@@ -1329,7 +1349,7 @@ static BOOL SCIExecuteBulkChildAction(NSString *identifier,
                                       id media) {
     NSArray<SCIResolvedMediaEntry *> *downloadableEntries = SCIDownloadableEntries(entries);
     if (downloadableEntries.count < 2) {
-        [SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No bulk media available" subtitle:nil iconResource:@"download"];
+        SCINotify(identifier, @"No bulk media available", nil, @"error_filled", SCINotificationToneError);
         return YES;
     }
 
@@ -1372,15 +1392,11 @@ static BOOL SCIExecuteBulkChildAction(NSString *identifier,
     if ([identifier isEqualToString:kSCIActionDownloadAllLinks]) {
         NSArray<NSString *> *bulkLinks = SCIBulkDownloadLinksFromEntries(downloadableEntries, media);
         if (bulkLinks.count == 0) {
-            [SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No links available" subtitle:nil iconResource:@"link"];
+            SCINotify(identifier, @"No links available", nil, @"error_filled", SCINotificationToneError);
             return YES;
         }
         [UIPasteboard generalPasteboard].string = [bulkLinks componentsJoinedByString:@"\n"];
-        [SCIUtils showToastForActionIdentifier:identifier
-                                      duration:1.5
-                                         title:@"Download links copied"
-                                      subtitle:[NSString stringWithFormat:@"%lu item%@", (unsigned long)bulkLinks.count, bulkLinks.count == 1 ? @"" : @"s"]
-                                  iconResource:@"copy_filled"];
+        SCINotify(identifier, SCICopiedDownloadURLTitleForSource(context.source, YES), [NSString stringWithFormat:@"%lu item%@", (unsigned long)bulkLinks.count, bulkLinks.count == 1 ? @"" : @"s"], @"copy_filled", SCINotificationToneForIconResource(@"copy_filled"));
         return YES;
     }
 
@@ -1397,7 +1413,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 								   id media) {
 	NSURL *currentURL = currentEntry.videoURL ?: currentEntry.photoURL;
 	BOOL isVideo = (currentEntry.videoURL != nil);
-	BOOL shouldShowFeedbackPill = [SCIUtils shouldShowFeedbackPillForActionIdentifier:identifier];
+	BOOL shouldNotify = SCINotificationIsEnabled(identifier);
 
 	if ([identifier isEqualToString:kSCIActionDownloadAll]) {
 		return YES;
@@ -1410,9 +1426,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		[identifier isEqualToString:kSCIActionDownloadShare] ||
 		[identifier isEqualToString:kSCIActionDownloadGallery]) {
 		if (!currentURL) {
-			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No downloadable media" subtitle:nil iconResource:@"download"];
-			}
+			SCINotify(identifier, @"No downloadable media", nil, @"error_filled", SCINotificationToneError);
 			return YES;
 		}
 
@@ -1431,11 +1445,12 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
                                                 photoURL:currentEntry.photoURL
                                                 videoURL:currentEntry.videoURL
                                          galleryMetadata:meta
-                                           showProgress:shouldShowFeedbackPill]) {
+                                           showProgress:shouldNotify]) {
             return YES;
         }
 
-        SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:shouldShowFeedbackPill];
+        SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:action showProgress:shouldNotify];
+        delegate.notificationIdentifier = identifier;
         delegate.pendingGallerySaveMetadata = meta;
         [delegate downloadFileWithURL:currentURL fileExtension:SCIExtensionForURL(currentURL, isVideo) hudLabel:nil];
 		return YES;
@@ -1446,18 +1461,14 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
         if (!bestURL) {
             id mediaForCopy = currentEntry.metadataObject ?: currentEntry.mediaObject ?: media;
             bestURL = SCIBestDownloadURLForMediaObject(mediaForCopy);
-        }
+		}
 		if (!bestURL) {
-			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No link available" subtitle:nil iconResource:@"link"];
-			}
+			SCINotify(identifier, @"No link available", nil, @"error_filled", SCINotificationToneError);
 			return YES;
 		}
 
 		[UIPasteboard generalPasteboard].string = bestURL.absoluteString ?: @"";
-		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Download link copied" subtitle:nil iconResource:@"copy_filled"];
-		}
+		SCINotify(identifier, SCICopiedDownloadURLTitleForSource(context.source, NO), nil, @"copy_filled", SCINotificationToneForIconResource(@"copy_filled"));
 		return YES;
 	}
 
@@ -1469,14 +1480,12 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
                                                          mediaObject:mediaForCopy
                                                            photoURL:currentEntry.photoURL
                                                            videoURL:currentEntry.videoURL
-                                                      showProgress:shouldShowFeedbackPill]) {
+                                                      showProgress:shouldNotify]) {
             return YES;
         }
 
         if (!currentURL && !currentEntry.photoURL) {
-            if (shouldShowFeedbackPill) {
-                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];
-            }
+            SCINotify(identifier, @"Nothing to copy", nil, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
             return YES;
         }
 
@@ -1485,9 +1494,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
             UIImage *image = imageData ? [UIImage imageWithData:imageData] : nil;
             if (image) {
                 [[UIPasteboard generalPasteboard] setImage:image];
-                if (shouldShowFeedbackPill) {
-                    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5 title:@"Copied photo to clipboard" subtitle:nil iconResource:@"copy_filled"];
-                }
+                SCINotify(identifier, @"Copied photo to clipboard", nil, @"copy_filled", SCINotificationToneForIconResource(@"copy_filled"));
             }
             return YES;
         }
@@ -1495,11 +1502,9 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
         NSData *data = [NSData dataWithContentsOfURL:currentURL];
         if (data) {
             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"public.mpeg-4"];
-            if (shouldShowFeedbackPill) {
-                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:1.5 title:@"Copied video to clipboard" subtitle:nil iconResource:@"copy_filled"];
-            }
-        } else if (shouldShowFeedbackPill) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionMediaPreviewCopy duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];
+            SCINotify(identifier, @"Copied video to clipboard", nil, @"copy_filled", SCINotificationToneForIconResource(@"copy_filled"));
+        } else {
+            SCINotify(identifier, @"Nothing to copy", nil, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         }
         return YES;
     }
@@ -1509,19 +1514,15 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
         NSArray<SCIResolvedMediaEntry *> *bulkEntries = SCIDownloadableEntries(SCIBulkEntriesForContext(context));
         if (bulkEntries.count > previewEntries.count) {
             previewEntries = bulkEntries;
-        }
+		}
 		NSArray<SCIMediaItem *> *playerItems = SCIPlayerItemsFromEntries(previewEntries, context.source, username, media);
 		if (playerItems.count == 0) {
-			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No media to expand" subtitle:nil iconResource:@"expand"];
-			}
+			SCINotify(identifier, @"No media to expand", nil, @"error_filled", SCINotificationToneError);
 			return YES;
 		}
 
 		NSInteger clampedIndex = SCIClampedIndex(resolvedIndex, (NSInteger)playerItems.count);
-		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
-		}
+		SCINotify(identifier, @"Opened media viewer", nil, @"expand", SCINotificationToneForIconResource(@"expand"));
 		[SCIFullScreenMediaPlayer showMediaItems:playerItems
                                 startingAtIndex:clampedIndex
                                        metadata:meta
@@ -1535,9 +1536,7 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 
 	if ([identifier isEqualToString:kSCIActionViewThumbnail]) {
 		if (!currentEntry.videoURL) {
-			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Thumbnail is only available for videos" subtitle:nil iconResource:@"photo_gallery"];
-			}
+			SCINotify(identifier, @"Thumbnail is only available for videos", nil, @"error_filled", SCINotificationToneError);
 			return YES;
 		}
 
@@ -1567,40 +1566,30 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
         } else {
 		    SCIShowExtractedVideoCover(currentEntry.videoURL, thumbnailMeta, context);
         }
-		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened thumbnail" subtitle:nil iconResource:@"photo_gallery"];
-		}
+		SCINotify(identifier, @"Opened thumbnail", nil, @"photo_gallery", SCINotificationToneForIconResource(@"photo_gallery"));
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionCopyCaption]) {
 		NSString *caption = context.captionResolver ? context.captionResolver(context, media, entries, resolvedIndex) : nil;
 		if (caption.length == 0) {
-			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"No caption available" subtitle:nil iconResource:@"copy_filled"];
-			}
+			SCINotify(identifier, @"No caption available", nil, @"error_filled", SCINotificationToneError);
 			return YES;
 		}
 
 		[UIPasteboard generalPasteboard].string = caption;
-		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.5 title:@"Caption copied" subtitle:nil iconResource:@"copy_filled"];
-		}
+		SCINotify(identifier, @"Caption copied", nil, @"copy_filled", SCINotificationToneForIconResource(@"copy_filled"));
 		return YES;
 	}
 
 	if ([identifier isEqualToString:kSCIActionOpenTopicSettings]) {
 		NSString *settingsTitle = SCIResolvedSettingsTitleForContext(context);
 		if (settingsTitle.length == 0) {
-			if (shouldShowFeedbackPill) {
-				[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Settings unavailable" subtitle:nil iconResource:@"settings"];
-			}
+			SCINotify(identifier, @"Settings unavailable", nil, @"error_filled", SCINotificationToneError);
 			return YES;
 		}
 
-		if (shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:1.4 title:@"Opened settings" subtitle:nil iconResource:@"settings"];
-		}
+		SCINotify(identifier, @"Opened settings", nil, @"settings", SCINotificationToneForIconResource(@"settings"));
 		[SCIUtils showSettingsForTopicTitle:settingsTitle];
 		return YES;
 	}
@@ -1613,8 +1602,8 @@ static BOOL SCIExecuteCommonAction(NSString *identifier,
 		if (!handled) {
 			SCIConsumePendingRepostFeedback(context.source);
 		}
-		if (!handled && shouldShowFeedbackPill) {
-			[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Repost unavailable" subtitle:nil iconResource:@"repost"];
+		if (!handled) {
+			SCINotify(identifier, @"Repost unavailable", nil, @"error_filled", SCINotificationToneError);
 		}
 		return YES;
 	}
@@ -1636,7 +1625,7 @@ BOOL SCIExecuteActionIdentifier(NSString *identifier, SCIActionButtonContext *co
         }
     }
 	if (entries.count == 0) {
-		[SCIUtils showToastForActionIdentifier:identifier duration:2.0 title:@"Media not found" subtitle:nil iconResource:@"media"];
+		SCINotify(identifier, @"Media not found", nil, @"error_filled", SCINotificationToneError);
 		return NO;
 	}
 

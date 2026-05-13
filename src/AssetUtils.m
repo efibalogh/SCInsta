@@ -167,6 +167,7 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
             @"mention": @{@"candidates": @[@"ig_icon_story_mention_pano_outline_24"]},
             @"messages": @{@"candidates": @[@"ig_icon_direct_prism_outline_24"]},
             @"more": @{@"candidates": @[@"ig_icon_more_horizontal_outline_24"]},
+            @"notification": @{@"candidates": @[@"ig_icon_alert_pano_outline_24", @"ig_icon_alert_outline_24"]},
             @"photo": @{@"candidates": @[@"ig_icon_photo_outline_24"]},
             @"photo_filled": @{@"candidates": @[@"ig_icon_photo_filled_24"]},
             @"photo_reels": @{@"candidates": @[@"ig_icon_photo_outline_44"]},
@@ -193,6 +194,8 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
             @"users": @{@"candidates": @[@"ig_icon_users_prism_outline_24"]},
             @"video": @{@"candidates": @[@"ig_icon_video_chat_pano_outline_24", @"ig_icon_video_chat_outline_24"]},
             @"video_filled": @{@"candidates": @[@"ig_icon_video_chat_pano_filled_24"]},
+            @"warning": @{@"candidates": @[@"ig_icon_warning_pano_outline_24", @"ig_icon_warning_outline_24"]},
+            @"warning_filled": @{@"candidates": @[@"ig_icon_warning_pano_filled_24", @"ig_icon_warning_filled_24"]},
             @"xmark": @{@"candidates": @[@"ig_icon_x_pano_outline_24"]}
         };
     });

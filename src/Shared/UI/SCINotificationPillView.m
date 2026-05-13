@@ -1,17 +1,14 @@
-#import "SCIFeedbackPillView.h"
+#import "SCINotificationPillView.h"
 #import <math.h>
 #import "../../AssetUtils.h"
 
 @interface SCIUtils : NSObject
 + (UIColor *)SCIColor_Primary;
++ (BOOL)getBoolPref:(NSString *)key;
 @end
 
-static CGFloat const kPillHeight     = 56.0;
-static CGFloat const kToastTallHeight = 72.0;
-static CGFloat const kPillMarginTop  = 8.0;
 static CGFloat const kPillCorner     = 28.0;
 static CGFloat const kHorizontalPad  = 16.0;
-static CGFloat const kPillWidth      = 296.0;
 static CGFloat const kDynamicMinWidth = 200.0;
 static CGFloat const kDynamicMaxWidth = 320.0;
 static CGFloat const kRingLineWidth   = 2.5;
@@ -27,9 +24,9 @@ static CGAffineTransform SCIPillEntranceTransform(void) {
     return CGAffineTransformConcat(translate, scale);
 }
 
-typedef NS_ENUM(NSUInteger, SCIFeedbackPillMode) {
-    SCIFeedbackPillModeProgress = 0,
-    SCIFeedbackPillModeToast = 1
+typedef NS_ENUM(NSUInteger, SCINotificationPillMode) {
+    SCINotificationPillModeProgress = 0,
+    SCINotificationPillModeToast = 1
 };
 
 typedef NS_ENUM(NSUInteger, SCIPillVisualTone) {
@@ -38,9 +35,7 @@ typedef NS_ENUM(NSUInteger, SCIPillVisualTone) {
     SCIPillVisualToneInfo = 2
 };
 
-static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
-
-@interface SCIFeedbackPillView () <UIGestureRecognizerDelegate>
+@interface SCINotificationPillView () <UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIVisualEffectView *blurView;
 @property (nonatomic, strong) UIView             *chromeOverlayView;
 @property (nonatomic, strong) CAGradientLayer    *chromeGradientLayer;
@@ -55,9 +50,8 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 @property (nonatomic, strong) UIButton           *closeButton;
 @property (nonatomic, assign) float              currentProgress;
 @property (nonatomic, assign) BOOL               isCompleted;
-@property (nonatomic, assign) SCIFeedbackPillMode mode;
+@property (nonatomic, assign) SCINotificationPillMode mode;
 @property (nonatomic, assign) SCIPillVisualTone tone;
-@property (nonatomic, assign) SCIFeedbackPillStyle style;
 @property (nonatomic, strong) NSLayoutConstraint *textCenterYConstraint;
 @property (nonatomic, strong) NSLayoutConstraint *topConstraint;
 @property (nonatomic, strong) NSLayoutConstraint *heightConstraint;
@@ -74,9 +68,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 @property (nonatomic, strong) UIPanGestureRecognizer *panGesture;
 @property (nonatomic, assign) CGPoint panOriginCenter;
 
-+ (SCIFeedbackPillView *)presentPillInView:(UIView *)view
-                                      mode:(SCIFeedbackPillMode)mode
-                                 configure:(void(^)(SCIFeedbackPillView *pill))configure;
 - (void)applyCurrentVisualStyleAnimated:(BOOL)animated;
 - (void)sci_applyProgressModeInfoIcon;
 - (CGFloat)sci_subtitleRowLayoutHeight;
@@ -89,74 +80,18 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 - (void)handlePan:(UIPanGestureRecognizer *)pan;
 @end
 
-@implementation SCIFeedbackPillView
+@implementation SCINotificationPillView
 
 #pragma mark - Factory
 
-+ (instancetype)showInView:(UIView *)view {
-    return [self presentPillInView:view
-                              mode:SCIFeedbackPillModeProgress
-                         configure:^(SCIFeedbackPillView *pill) {
-        [pill configureForProgressMode];
-    }];
-}
-
-+ (instancetype)showToastInView:(UIView *)view
-                       duration:(NSTimeInterval)duration
-                          title:(NSString *)title
-                       subtitle:(NSString *)subtitle
-                           icon:(UIImage *)icon
-                           tone:(SCIFeedbackPillTone)tone {
-    SCIFeedbackPillView *pill = [self presentPillInView:view
-                                                   mode:SCIFeedbackPillModeToast
-                                              configure:^(SCIFeedbackPillView *pill) {
-        [pill configureForToastModeWithTitle:title subtitle:subtitle icon:icon tone:tone];
-    }];
-
-    NSTimeInterval safeDuration = MAX(0.8, duration);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(safeDuration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (pill.superview) {
-            [pill dismiss];
-        }
-    });
-
-    return pill;
-}
-
-+ (void)setDefaultStyle:(SCIFeedbackPillStyle)style {
-    sDefaultPillStyle = style;
-}
-
-+ (SCIFeedbackPillStyle)defaultStyle {
-    return sDefaultPillStyle;
-}
-
-+ (void)dismissPillsInView:(UIView *)view matchingMode:(SCIFeedbackPillMode)mode {
-    for (UIView *subview in [view.subviews copy]) {
-        if (![subview isKindOfClass:[SCIFeedbackPillView class]]) {
-            continue;
-        }
-
-        SCIFeedbackPillView *pill = (SCIFeedbackPillView *)subview;
-        if (pill.mode == mode) {
-            [pill dismiss];
-        }
-    }
-}
-
-+ (SCIFeedbackPillView *)buildPillInView:(UIView *)view {
-    SCIFeedbackPillView *pill = [[SCIFeedbackPillView alloc] init];
-    pill.style = [self defaultStyle];
++ (SCINotificationPillView *)detachedPill {
+    SCINotificationPillView *pill = [[SCINotificationPillView alloc] init];
     [pill applyCurrentVisualStyleAnimated:NO];
     pill.translatesAutoresizingMaskIntoConstraints = NO;
-    [view addSubview:pill];
 
-    pill.topConstraint = [pill.topAnchor constraintEqualToAnchor:view.safeAreaLayoutGuide.topAnchor constant:-(kToastTallHeight + 10.0)];
-    pill.heightConstraint = [pill.heightAnchor constraintEqualToConstant:kPillHeight];
-    pill.widthConstraint = [pill.widthAnchor constraintEqualToConstant:kPillWidth];
+    pill.heightConstraint = [pill.heightAnchor constraintEqualToConstant:kDynamicPillHeight];
+    pill.widthConstraint = [pill.widthAnchor constraintEqualToConstant:kDynamicMinWidth];
     [NSLayoutConstraint activateConstraints:@[
-        pill.topConstraint,
-        [pill.centerXAnchor constraintEqualToAnchor:view.centerXAnchor],
         pill.widthConstraint,
         pill.heightConstraint
     ]];
@@ -164,33 +99,23 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     return pill;
 }
 
-+ (SCIFeedbackPillView *)presentPillInView:(UIView *)view
-                                      mode:(SCIFeedbackPillMode)mode
-                                 configure:(void(^)(SCIFeedbackPillView *pill))configure {
-    [self dismissPillsInView:view matchingMode:mode];
-    SCIFeedbackPillView *pill = [self buildPillInView:view];
-    if (configure) {
-        configure(pill);
-    }
-    [self animatePillIn:pill hostView:view];
++ (instancetype)progressPill {
+    SCINotificationPillView *pill = [self detachedPill];
+    [pill configureForProgressMode];
     return pill;
 }
 
-+ (void)animatePillIn:(SCIFeedbackPillView *)pill hostView:(UIView *)hostView {
-    [hostView layoutIfNeeded];
-    pill.alpha = 0.0;
-    pill.transform = SCIPillEntranceTransform();
-    pill.iconBadgeView.transform = CGAffineTransformMakeScale(0.78, 0.78);
-    pill.closeButton.transform = CGAffineTransformMakeScale(0.84, 0.84);
-    pill.topConstraint.constant = kPillMarginTop;
-    [UIView animateWithDuration:0.55 delay:0 usingSpringWithDamping:0.78 initialSpringVelocity:0.85 options:UIViewAnimationOptionCurveEaseOut animations:^{
-        [hostView layoutIfNeeded];
-        pill.alpha = 1.0;
-        pill.transform = CGAffineTransformIdentity;
-        pill.iconBadgeView.transform = CGAffineTransformIdentity;
-        pill.closeButton.transform = CGAffineTransformIdentity;
-    } completion:^(BOOL finished) {
-    }];
++ (instancetype)toastPillWithTitle:(NSString *)title
+                           subtitle:(NSString *)subtitle
+                               icon:(UIImage *)icon
+                               tone:(SCINotificationTone)tone {
+    SCINotificationPillView *pill = [self detachedPill];
+    [pill configureForToastModeWithTitle:title subtitle:subtitle icon:icon tone:tone];
+    return pill;
+}
+
+- (void)setPresentationTopConstraint:(NSLayoutConstraint *)constraint {
+    self.topConstraint = constraint;
 }
 
 #pragma mark - Init
@@ -392,143 +317,44 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     // Update ring path when icon badge bounds change
     [self sci_updateRingPath];
 
-    // Dynamic: keep corner radius = half-height for perfect capsule shape
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        CGFloat effectiveCorner = CGRectGetHeight(self.bounds) / 2.0;
-        self.layer.cornerRadius = effectiveCorner;
-        self.blurView.layer.cornerRadius = effectiveCorner;
-        self.chromeOverlayView.layer.cornerRadius = effectiveCorner;
-        self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.bounds
-                                                          cornerRadius:effectiveCorner].CGPath;
-    }
+    CGFloat effectiveCorner = CGRectGetHeight(self.bounds) / 2.0;
+    self.layer.cornerRadius = effectiveCorner;
+    self.blurView.layer.cornerRadius = effectiveCorner;
+    self.chromeOverlayView.layer.cornerRadius = effectiveCorner;
+    self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.bounds
+                                                      cornerRadius:effectiveCorner].CGPath;
 }
 
 - (NSArray<UIColor *> *)chromeColorsForTone:(SCIPillVisualTone)tone {
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        (void)tone;
-        return @[
-            [UIColor colorWithWhite:0.0 alpha:0.0],
-            [UIColor colorWithWhite:0.0 alpha:0.0]
-        ];
-    }
-
-    if (self.style == SCIFeedbackPillStyleClean) {
-        (void)tone;
-        return @[
-            [UIColor colorWithWhite:1.0 alpha:0.20],
-            [UIColor colorWithWhite:0.85 alpha:0.14]
-        ];
-    }
-
-    switch (tone) {
-        case SCIPillVisualToneSuccess:
-            return @[
-                [UIColor colorWithRed:0.12 green:0.35 blue:0.29 alpha:0.46],
-                [UIColor colorWithRed:0.11 green:0.29 blue:0.24 alpha:0.38]
-            ];
-        case SCIPillVisualToneError:
-            return @[
-                [UIColor colorWithRed:0.42 green:0.14 blue:0.20 alpha:0.45],
-                [UIColor colorWithRed:0.32 green:0.10 blue:0.13 alpha:0.38]
-            ];
-        case SCIPillVisualToneInfo:
-        default:
-            return @[
-                [UIColor colorWithRed:0.06 green:0.35 blue:0.75 alpha:0.42],
-                [UIColor colorWithRed:0.04 green:0.25 blue:0.55 alpha:0.35]
-            ];
-    }
+    (void)tone;
+    return @[
+        [UIColor colorWithWhite:0.0 alpha:0.0],
+        [UIColor colorWithWhite:0.0 alpha:0.0]
+    ];
 }
 
 - (NSArray<UIColor *> *)badgeColorsForTone:(SCIPillVisualTone)tone {
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        switch (tone) {
-            case SCIPillVisualToneSuccess:
-                return @[
-                    [UIColor colorWithRed:0.22 green:0.80 blue:0.55 alpha:0.30],
-                    [UIColor colorWithRed:0.16 green:0.60 blue:0.42 alpha:0.25]
-                ];
-            case SCIPillVisualToneError:
-                return @[
-                    [UIColor colorWithRed:0.90 green:0.30 blue:0.38 alpha:0.30],
-                    [UIColor colorWithRed:0.70 green:0.18 blue:0.25 alpha:0.25]
-                ];
-            case SCIPillVisualToneInfo:
-            default:
-                return @[
-                    [UIColor colorWithRed:0.30 green:0.65 blue:0.95 alpha:0.28],
-                    [UIColor colorWithRed:0.20 green:0.50 blue:0.80 alpha:0.22]
-                ];
-        }
-    }
-
-    if (self.style == SCIFeedbackPillStyleClean) {
-        switch (tone) {
-            case SCIPillVisualToneError:
-                return @[
-                    [UIColor colorWithRed:1.00 green:0.83 blue:0.86 alpha:0.96],
-                    [UIColor colorWithRed:0.87 green:0.53 blue:0.59 alpha:0.94]
-                ];
-            case SCIPillVisualToneInfo:
-                return @[
-                    [UIColor colorWithRed:0.80 green:0.92 blue:0.99 alpha:0.96],
-                    [UIColor colorWithRed:0.50 green:0.78 blue:0.96 alpha:0.94]
-                ];
-            case SCIPillVisualToneSuccess:
-            default:
-                return @[
-                    [UIColor colorWithRed:0.96 green:0.98 blue:0.97 alpha:0.95],
-                    [UIColor colorWithRed:0.75 green:0.87 blue:0.81 alpha:0.92]
-                ];
-        }
-    }
-
     switch (tone) {
         case SCIPillVisualToneSuccess:
             return @[
-                [UIColor colorWithRed:0.35 green:0.96 blue:0.70 alpha:0.95],
-                [UIColor colorWithRed:0.20 green:0.63 blue:0.46 alpha:0.95]
+                [UIColor colorWithRed:0.22 green:0.80 blue:0.55 alpha:0.30],
+                [UIColor colorWithRed:0.16 green:0.60 blue:0.42 alpha:0.25]
             ];
         case SCIPillVisualToneError:
             return @[
-                [UIColor colorWithRed:1.00 green:0.53 blue:0.58 alpha:0.94],
-                [UIColor colorWithRed:0.83 green:0.26 blue:0.36 alpha:0.94]
+                [UIColor colorWithRed:0.90 green:0.30 blue:0.38 alpha:0.30],
+                [UIColor colorWithRed:0.70 green:0.18 blue:0.25 alpha:0.25]
             ];
         case SCIPillVisualToneInfo:
-            return @[
-                [UIColor colorWithRed:0.50 green:0.85 blue:1.00 alpha:0.95],
-                [UIColor colorWithRed:0.25 green:0.65 blue:0.90 alpha:0.95]
-            ];
         default:
             return @[
-                [UIColor colorWithRed:0.35 green:0.96 blue:0.70 alpha:0.95],
-                [UIColor colorWithRed:0.20 green:0.63 blue:0.46 alpha:0.95]
+                [UIColor colorWithRed:0.30 green:0.65 blue:0.95 alpha:0.28],
+                [UIColor colorWithRed:0.20 green:0.50 blue:0.80 alpha:0.22]
             ];
     }
 }
 
 - (NSArray<UIColor *> *)progressColorsForTone:(SCIPillVisualTone)tone {
-    if (self.style == SCIFeedbackPillStyleClean) {
-        switch (tone) {
-            case SCIPillVisualToneError:
-                return @[
-                    [UIColor colorWithRed:1.00 green:0.80 blue:0.82 alpha:1.0],
-                    [UIColor colorWithRed:0.90 green:0.40 blue:0.47 alpha:1.0]
-                ];
-            case SCIPillVisualToneInfo:
-                return @[
-                    [UIColor colorWithRed:0.60 green:0.88 blue:0.98 alpha:1.0],
-                    [UIColor colorWithRed:0.20 green:0.68 blue:0.90 alpha:1.0]
-                ];
-            case SCIPillVisualToneSuccess:
-            default:
-                return @[
-                    [UIColor colorWithRed:0.75 green:0.97 blue:0.88 alpha:1.0],
-                    [UIColor colorWithRed:0.38 green:0.78 blue:0.60 alpha:1.0]
-                ];
-        }
-    }
-
     switch (tone) {
         case SCIPillVisualToneSuccess:
             return @[
@@ -554,39 +380,23 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (UIColor *)titleColorForCurrentStyle {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.95]
-        : [UIColor colorWithWhite:1.0 alpha:0.98];
+    return [UIColor colorWithWhite:1.0 alpha:0.98];
 }
 
 - (UIColor *)subtitleColorForCurrentStyle {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.76]
-        : [UIColor colorWithWhite:1.0 alpha:0.82];
+    return [UIColor colorWithWhite:1.0 alpha:0.82];
 }
 
 - (UIColor *)pillBorderColorForCurrentStyle {
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        return [UIColor colorWithWhite:1.0 alpha:0.10];
-    }
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.12]
-        : [UIColor colorWithWhite:1.0 alpha:0.18];
+    return [UIColor colorWithWhite:1.0 alpha:0.10];
 }
 
 - (UIColor *)iconBadgeBorderColorForCurrentStyle {
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        return [UIColor colorWithWhite:1.0 alpha:0.12];
-    }
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.18]
-        : [UIColor colorWithWhite:1.0 alpha:0.24];
+    return [UIColor colorWithWhite:1.0 alpha:0.12];
 }
 
 - (UIColor *)closeButtonBorderColorForCurrentStyle {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.16]
-        : [UIColor colorWithWhite:1.0 alpha:0.22];
+    return [UIColor colorWithWhite:1.0 alpha:0.22];
 }
 
 - (void)updateProgressViewColorsForTone:(SCIPillVisualTone)tone {
@@ -598,9 +408,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (UIColor *)progressTrackBackgroundColorForCurrentStyle {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [[UIColor whiteColor] colorWithAlphaComponent:0.24]
-        : [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+    return [[UIColor whiteColor] colorWithAlphaComponent:0.18];
 }
 
 - (NSArray *)gradientColorsFrom:(NSArray<UIColor *> *)colors {
@@ -630,43 +438,16 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (UIColor *)iconTintForTone:(SCIPillVisualTone)tone {
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        return [UIColor colorWithWhite:1.0 alpha:0.95];
-    }
-
-    if (self.style == SCIFeedbackPillStyleClean) {
-        switch (tone) {
-            case SCIPillVisualToneSuccess:
-                return [UIColor colorWithRed:0.18 green:0.43 blue:0.34 alpha:1.0];
-            case SCIPillVisualToneError:
-                return [UIColor colorWithRed:0.52 green:0.14 blue:0.21 alpha:1.0];
-            case SCIPillVisualToneInfo:
-            default:
-                return [UIColor colorWithRed:0.08 green:0.35 blue:0.60 alpha:1.0];
-        }
-    }
-
-    switch (tone) {
-        case SCIPillVisualToneSuccess:
-            return [UIColor colorWithRed:0.12 green:0.29 blue:0.22 alpha:1.0];
-        case SCIPillVisualToneError:
-            return [UIColor colorWithRed:0.40 green:0.08 blue:0.15 alpha:1.0];
-        case SCIPillVisualToneInfo:
-        default:
-            return [UIColor colorWithRed:0.05 green:0.30 blue:0.60 alpha:1.0];
-    }
+    (void)tone;
+    return [UIColor colorWithWhite:1.0 alpha:0.95];
 }
 
 - (UIColor *)cancelButtonTintColor {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.90]
-        : [UIColor colorWithWhite:1.0 alpha:0.83];
+    return [UIColor colorWithWhite:1.0 alpha:0.83];
 }
 
 - (UIColor *)cancelButtonBackgroundColor {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithWhite:1.0 alpha:0.10]
-        : [UIColor colorWithWhite:1.0 alpha:0.14];
+    return [UIColor colorWithWhite:1.0 alpha:0.14];
 }
 
 - (UIColor *)retryButtonTintColor {
@@ -674,14 +455,10 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (UIColor *)retryButtonBackgroundColor {
-    return (self.style == SCIFeedbackPillStyleClean)
-        ? [UIColor colorWithRed:0.90 green:0.30 blue:0.39 alpha:0.22]
-        : [UIColor colorWithRed:0.95 green:0.33 blue:0.44 alpha:0.24];
+    return [UIColor colorWithRed:0.95 green:0.33 blue:0.44 alpha:0.24];
 }
 
 - (void)applyCurrentVisualStyleAnimated:(BOOL)animated {
-    BOOL isDynamic = (self.style == SCIFeedbackPillStyleDynamic);
-
     void (^applyColors)(void) = ^{
         self.layer.borderColor = [self pillBorderColorForCurrentStyle].CGColor;
         self.iconBadgeView.layer.borderColor = [self iconBadgeBorderColorForCurrentStyle].CGColor;
@@ -692,55 +469,35 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.titleLabel.textColor = [self titleColorForCurrentStyle];
         self.subtitleLabel.textColor = [self subtitleColorForCurrentStyle];
 
-        // Dynamic: glow shadow + ring coloring
-        if (isDynamic) {
-            self.clipsToBounds = NO;
+        self.clipsToBounds = NO;
 
-            // Subviews must self-clip since the parent no longer clips for them
-            CGFloat effectiveCorner = CGRectGetHeight(self.bounds) / 2.0;
-            if (effectiveCorner < 1.0) effectiveCorner = kPillCorner; // fallback before layout
-            self.layer.cornerRadius = effectiveCorner;
-            self.blurView.layer.cornerRadius = effectiveCorner;
-            self.blurView.layer.cornerCurve = kCACornerCurveContinuous;
-            self.blurView.clipsToBounds = YES;
-            self.chromeOverlayView.layer.cornerRadius = effectiveCorner;
-            self.chromeOverlayView.layer.cornerCurve = kCACornerCurveContinuous;
-            self.chromeOverlayView.clipsToBounds = YES;
+        CGFloat effectiveCorner = CGRectGetHeight(self.bounds) / 2.0;
+        if (effectiveCorner < 1.0) effectiveCorner = kPillCorner;
+        self.layer.cornerRadius = effectiveCorner;
+        self.blurView.layer.cornerRadius = effectiveCorner;
+        self.blurView.layer.cornerCurve = kCACornerCurveContinuous;
+        self.blurView.clipsToBounds = YES;
+        self.chromeOverlayView.layer.cornerRadius = effectiveCorner;
+        self.chromeOverlayView.layer.cornerCurve = kCACornerCurveContinuous;
+        self.chromeOverlayView.clipsToBounds = YES;
 
-            self.chromeGradientLayer.opacity = 0.0;
-            UIColor *glowColor = [self sci_glowColorForTone:self.tone];
-            self.layer.shadowColor = glowColor.CGColor;
-            self.layer.shadowOpacity = 0.50;
-            self.layer.shadowRadius = 20.0;
-            self.layer.shadowOffset = CGSizeMake(0.0, 4.0);
-            self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.bounds
-                                                              cornerRadius:effectiveCorner].CGPath;
+        self.chromeGradientLayer.opacity = 0.0;
+        BOOL glowEnabled = [SCIUtils getBoolPref:@"notification_pill_glow_enabled"];
+        UIColor *glowColor = [self sci_glowColorForTone:self.tone];
+        self.layer.shadowColor = glowColor.CGColor;
+        self.layer.shadowOpacity = glowEnabled ? 0.50 : 0.0;
+        self.layer.shadowRadius = glowEnabled ? 20.0 : 0.0;
+        self.layer.shadowOffset = CGSizeMake(0.0, glowEnabled ? 4.0 : 0.0);
+        self.layer.shadowPath = glowEnabled
+            ? [UIBezierPath bezierPathWithRoundedRect:self.bounds cornerRadius:effectiveCorner].CGPath
+            : nil;
 
-            NSArray<UIColor *> *progressColors = [self progressColorsForTone:self.tone];
-            self.progressRingLayer.strokeColor = (progressColors.count > 0)
-                ? progressColors[0].CGColor
-                : [UIColor whiteColor].CGColor;
+        NSArray<UIColor *> *progressColors = [self progressColorsForTone:self.tone];
+        self.progressRingLayer.strokeColor = (progressColors.count > 0)
+            ? progressColors[0].CGColor
+            : [UIColor whiteColor].CGColor;
 
-            self.panGesture.enabled = YES;
-        } else {
-            self.clipsToBounds = YES;
-
-            // Reset per-subview clipping (parent handles it)
-            self.layer.cornerRadius = kPillCorner;
-            self.blurView.layer.cornerRadius = 0.0;
-            self.blurView.clipsToBounds = NO;
-            self.chromeOverlayView.layer.cornerRadius = 0.0;
-            self.chromeOverlayView.clipsToBounds = NO;
-
-            self.chromeGradientLayer.opacity = 0.9;
-            self.layer.shadowColor = [UIColor clearColor].CGColor;
-            self.layer.shadowOpacity = 0.0;
-            self.layer.shadowRadius = 0.0;
-            self.layer.shadowPath = nil;
-            self.panGesture.enabled = NO;
-            self.progressRingLayer.hidden = YES;
-            self.progressRingTrackLayer.hidden = YES;
-        }
+        self.panGesture.enabled = YES;
     };
 
     if (!animated) {
@@ -777,32 +534,14 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)setProgressVisible:(BOOL)visible {
-    BOOL isDynamic = (self.style == SCIFeedbackPillStyleDynamic);
-
-    if (isDynamic) {
-        // Dynamic: always hide horizontal bar, show ring instead
-        self.progressRowContainer.hidden = YES;
-        self.progressView.hidden = YES;
-        self.progressRowHeightConstraint.constant = 0.0;
-        self.progressHeightConstraint.constant = 0.0;
-        self.progressRingTrackLayer.hidden = !visible;
-        self.progressRingLayer.hidden = !visible;
-        if (!visible) {
-            self.progressRingLayer.strokeEnd = 0.0;
-        }
-    } else {
-        self.progressRingTrackLayer.hidden = YES;
-        self.progressRingLayer.hidden = YES;
-        self.progressRowContainer.hidden = !visible;
-        self.progressView.hidden = !visible;
-        if (visible) {
-            self.progressRowHeightConstraint.constant = [self sci_subtitleRowLayoutHeight];
-            self.progressHeightConstraint.constant = [self sci_progressBarHeightMatchingSubtitle];
-        } else {
-            self.progressRowHeightConstraint.constant = 0.0;
-            self.progressHeightConstraint.constant = 0.0;
-            self.progressView.layer.cornerRadius = 0.0;
-        }
+    self.progressRowContainer.hidden = YES;
+    self.progressView.hidden = YES;
+    self.progressRowHeightConstraint.constant = 0.0;
+    self.progressHeightConstraint.constant = 0.0;
+    self.progressRingTrackLayer.hidden = !visible;
+    self.progressRingLayer.hidden = !visible;
+    if (!visible) {
+        self.progressRingLayer.strokeEnd = 0.0;
     }
 }
 
@@ -828,50 +567,11 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         return;
     }
 
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        [self sci_updateDynamicWidthForTitle:title subtitle:subtitle hasButton:!self.closeButton.hidden];
-        return;
-    }
-
-    if (subtitle.length > 0 || title.length == 0) {
-        self.widthConstraint.constant = kPillWidth;
-        return;
-    }
-
-    UIFont *font = self.titleLabel.font ?: [UIFont systemFontOfSize:13.5 weight:UIFontWeightSemibold];
-    CGSize textSize = [title boundingRectWithSize:CGSizeMake(CGFLOAT_MAX, font.lineHeight)
-                                          options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading
-                                       attributes:@{NSFontAttributeName: font}
-                                          context:nil].size;
-
-    CGFloat fixedWidth = kHorizontalPad + kIconBadgeSize + 10.0 + kHorizontalPad + 20.0;
-    CGFloat compactWidth = ceil(textSize.width) + fixedWidth;
-    self.widthConstraint.constant = MIN(kPillWidth, MAX(188.0, compactWidth));
-}
-
-- (void)triggerHapticForVisualTone:(SCIPillVisualTone)tone {
-    switch (tone) {
-        case SCIPillVisualToneSuccess: {
-            UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-            [haptic notificationOccurred:UINotificationFeedbackTypeSuccess];
-            break;
-        }
-        case SCIPillVisualToneError: {
-            UINotificationFeedbackGenerator *haptic = [[UINotificationFeedbackGenerator alloc] init];
-            [haptic notificationOccurred:UINotificationFeedbackTypeError];
-            break;
-        }
-        case SCIPillVisualToneInfo:
-        default: {
-            UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
-            [haptic impactOccurred];
-            break;
-        }
-    }
+    [self sci_updateDynamicWidthForTitle:title subtitle:subtitle hasButton:!self.closeButton.hidden];
 }
 
 - (void)configureForProgressMode {
-    self.mode = SCIFeedbackPillModeProgress;
+    self.mode = SCINotificationPillModeProgress;
     self.isCompleted = NO;
     self.isErrorState = NO;
     self.tone = SCIPillVisualToneInfo;
@@ -881,15 +581,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.titleLabel.text = @"Downloading...";
     self.progressView.progress = 0.0f;
 
-    BOOL isDynamic = (self.style == SCIFeedbackPillStyleDynamic);
-    if (isDynamic) {
-        self.heightConstraint.constant = kDynamicPillHeight;
-        [self sci_updateDynamicWidthForTitle:self.titleLabel.text subtitle:nil hasButton:YES];
-        self.progressRingLayer.strokeEnd = 0.0;
-    } else {
-        self.heightConstraint.constant = kToastTallHeight;
-        self.widthConstraint.constant = kPillWidth;
-    }
+    self.heightConstraint.constant = kDynamicPillHeight;
+    [self sci_updateDynamicWidthForTitle:self.titleLabel.text subtitle:nil hasButton:YES];
+    self.progressRingLayer.strokeEnd = 0.0;
 
     [self setProgressVisible:YES];
     [self setCloseButtonVisible:YES];
@@ -900,13 +594,13 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     [self layoutIfNeeded];
 }
 
-- (SCIPillVisualTone)visualToneFromPublicTone:(SCIFeedbackPillTone)tone {
+- (SCIPillVisualTone)visualToneFromPublicTone:(SCINotificationTone)tone {
     switch (tone) {
-        case SCIFeedbackPillToneError:
+        case SCINotificationToneError:
             return SCIPillVisualToneError;
-        case SCIFeedbackPillToneSuccess:
+        case SCINotificationToneSuccess:
             return SCIPillVisualToneSuccess;
-        case SCIFeedbackPillToneInfo:
+        case SCINotificationToneInfo:
         default:
             return SCIPillVisualToneInfo;
     }
@@ -915,8 +609,8 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 - (void)configureForToastModeWithTitle:(NSString *)title
                               subtitle:(NSString *)subtitle
                                   icon:(UIImage *)icon
-                                  tone:(SCIFeedbackPillTone)tone {
-    self.mode = SCIFeedbackPillModeToast;
+                                  tone:(SCINotificationTone)tone {
+    self.mode = SCINotificationPillModeToast;
     self.isCompleted = NO;
     self.isErrorState = NO;
     self.onCancel = nil;
@@ -928,20 +622,17 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.subtitleLabel.hidden = (subtitle.length == 0);
     [self updateToastWidthForTitle:self.titleLabel.text subtitle:subtitle];
 
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kDynamicPillHeight : kDynamicTallHeight;
-    } else {
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
-    }
+    self.heightConstraint.constant = self.subtitleLabel.hidden ? kDynamicPillHeight : kDynamicTallHeight;
     [self setProgressVisible:NO];
     [self setCloseButtonVisible:NO];
 
     SCIPillVisualTone visualTone = [self visualToneFromPublicTone:tone];
-    UIImage *resolvedIcon = icon ?: [self defaultIconForTone:visualTone];
+    UIImage *resolvedIcon = (visualTone == SCIPillVisualToneInfo)
+        ? (icon ?: [self defaultIconForTone:visualTone])
+        : [self defaultIconForTone:visualTone];
     self.iconView.image = resolvedIcon;
     self.iconView.tintColor = [self iconTintForTone:visualTone];
     [self applyTone:visualTone animated:YES];
-    [self triggerHapticForVisualTone:visualTone];
 
     [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
         [self layoutIfNeeded];
@@ -975,7 +666,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)setProgress:(float)progress animated:(BOOL)animated {
-    if (self.mode != SCIFeedbackPillModeProgress) {
+    if (self.mode != SCINotificationPillModeProgress) {
         [self configureForProgressMode];
     }
 
@@ -987,11 +678,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         self.titleLabel.text = @"Downloading...";
         self.subtitleLabel.text = nil;
         self.subtitleLabel.hidden = YES;
-        if (self.style == SCIFeedbackPillStyleDynamic) {
-            self.heightConstraint.constant = kDynamicPillHeight;
-        } else {
-            self.heightConstraint.constant = kToastTallHeight;
-        }
+        self.heightConstraint.constant = kDynamicPillHeight;
         [self setCloseButtonVisible:YES];
         [self setProgressVisible:YES];
 
@@ -1005,33 +692,22 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self sci_applyProgressModeInfoIcon];
     }
 
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        // Drive ring strokeEnd
-        if (animated) {
-            [CATransaction begin];
-            [CATransaction setAnimationDuration:0.3];
-            [CATransaction setAnimationTimingFunction:[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut]];
-            self.progressRingLayer.strokeEnd = (CGFloat)self.currentProgress;
-            [CATransaction commit];
-        } else {
-            [CATransaction begin];
-            [CATransaction setDisableActions:YES];
-            self.progressRingLayer.strokeEnd = (CGFloat)self.currentProgress;
-            [CATransaction commit];
-        }
+    if (animated) {
+        [CATransaction begin];
+        [CATransaction setAnimationDuration:0.3];
+        [CATransaction setAnimationTimingFunction:[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut]];
+        self.progressRingLayer.strokeEnd = (CGFloat)self.currentProgress;
+        [CATransaction commit];
     } else {
-        if (animated) {
-            [UIView animateWithDuration:0.3 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-                self.progressView.progress = self.currentProgress;
-            } completion:nil];
-        } else {
-            self.progressView.progress = self.currentProgress;
-        }
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        self.progressRingLayer.strokeEnd = (CGFloat)self.currentProgress;
+        [CATransaction commit];
     }
 }
 
 - (void)updateProgressTitle:(NSString *)title subtitle:(NSString *)subtitle {
-    if (self.mode != SCIFeedbackPillModeProgress) {
+    if (self.mode != SCINotificationPillModeProgress) {
         [self configureForProgressMode];
     }
 
@@ -1041,12 +717,8 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.subtitleLabel.text = subtitle;
     self.subtitleLabel.hidden = (subtitle.length == 0);
 
-    if (self.style == SCIFeedbackPillStyleDynamic) {
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kDynamicPillHeight : kDynamicTallHeight;
-        [self sci_updateDynamicWidthForTitle:self.titleLabel.text subtitle:subtitle hasButton:YES];
-    } else {
-        self.heightConstraint.constant = self.subtitleLabel.hidden ? kPillHeight : kToastTallHeight;
-    }
+    self.heightConstraint.constant = self.subtitleLabel.hidden ? kDynamicPillHeight : kDynamicTallHeight;
+    [self sci_updateDynamicWidthForTitle:self.titleLabel.text subtitle:subtitle hasButton:YES];
 
     [self setProgressVisible:YES];
     [self setCloseButtonVisible:YES];
@@ -1064,7 +736,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)showSuccessWithTitle:(NSString *)title subtitle:(NSString *)subtitle icon:(UIImage *)icon {
-    if (self.mode != SCIFeedbackPillModeProgress) {
+    if (self.mode != SCINotificationPillModeProgress) {
         [self configureForProgressMode];
     }
 
@@ -1074,9 +746,11 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.onRetry = nil;
     [self applyCancelButtonStyle];
 
-    [self triggerHapticForVisualTone:SCIPillVisualToneSuccess];
+    if (self.onTonePresented) {
+        self.onTonePresented(SCINotificationToneSuccess);
+    }
 
-    UIImage *checkImage = icon ?: [self defaultIconForTone:SCIPillVisualToneSuccess];
+    UIImage *checkImage = [self defaultIconForTone:SCIPillVisualToneSuccess];
     [self applyTone:SCIPillVisualToneSuccess animated:YES];
     [UIView transitionWithView:self duration:0.32 options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowAnimatedContent animations:^{
         self.iconView.image = checkImage;
@@ -1088,8 +762,8 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self setCloseButtonVisible:NO];
         [self setProgressVisible:NO];
         self.heightConstraint.constant = self.subtitleLabel.hidden
-            ? (self.style == SCIFeedbackPillStyleDynamic ? kDynamicPillHeight : kPillHeight)
-            : (self.style == SCIFeedbackPillStyleDynamic ? kDynamicTallHeight : kToastTallHeight);
+            ? kDynamicPillHeight
+            : kDynamicTallHeight;
         [self layoutIfNeeded];
     } completion:nil];
     [self animateIconPulse];
@@ -1100,7 +774,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)showErrorWithTitle:(NSString *)title subtitle:(NSString *)subtitle icon:(UIImage *)icon {
-    if (self.mode != SCIFeedbackPillModeProgress) {
+    if (self.mode != SCINotificationPillModeProgress) {
         [self configureForProgressMode];
     }
 
@@ -1115,9 +789,11 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         resolvedSubtitle = @"Tap to retry";
     }
 
-    [self triggerHapticForVisualTone:SCIPillVisualToneError];
+    if (self.onTonePresented) {
+        self.onTonePresented(SCINotificationToneError);
+    }
 
-    UIImage *errorImage = icon ?: [self defaultIconForTone:SCIPillVisualToneError];
+    UIImage *errorImage = [self defaultIconForTone:SCIPillVisualToneError];
     [self applyTone:SCIPillVisualToneError animated:YES];
     [UIView transitionWithView:self duration:0.32 options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowAnimatedContent animations:^{
         self.iconView.image = errorImage;
@@ -1129,15 +805,15 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self setCloseButtonVisible:YES];
         [self setProgressVisible:NO];
         self.heightConstraint.constant = self.subtitleLabel.hidden
-            ? (self.style == SCIFeedbackPillStyleDynamic ? kDynamicPillHeight : kPillHeight)
-            : (self.style == SCIFeedbackPillStyleDynamic ? kDynamicTallHeight : kToastTallHeight);
+            ? kDynamicPillHeight
+            : kDynamicTallHeight;
         [self layoutIfNeeded];
     } completion:nil];
     [self animateIconPulse];
 }
 
 - (void)showInfoWithTitle:(NSString *)title subtitle:(NSString *)subtitle icon:(UIImage *)icon {
-    if (self.mode != SCIFeedbackPillModeProgress) {
+    if (self.mode != SCINotificationPillModeProgress) {
         [self configureForProgressMode];
     }
 
@@ -1147,7 +823,9 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
     self.onRetry = nil;
     [self applyCancelButtonStyle];
 
-    [self triggerHapticForVisualTone:SCIPillVisualToneInfo];
+    if (self.onTonePresented) {
+        self.onTonePresented(SCINotificationToneInfo);
+    }
 
     UIImage *infoImage = icon ?: [self defaultIconForTone:SCIPillVisualToneInfo];
     [self applyTone:SCIPillVisualToneInfo animated:YES];
@@ -1161,8 +839,8 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
         [self setCloseButtonVisible:NO];
         [self setProgressVisible:NO];
         self.heightConstraint.constant = self.subtitleLabel.hidden
-            ? (self.style == SCIFeedbackPillStyleDynamic ? kDynamicPillHeight : kPillHeight)
-            : (self.style == SCIFeedbackPillStyleDynamic ? kDynamicTallHeight : kToastTallHeight);
+            ? kDynamicPillHeight
+            : kDynamicTallHeight;
         [self layoutIfNeeded];
     } completion:nil];
     [self animateIconPulse];
@@ -1214,7 +892,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)handleTap {
-    if (self.mode == SCIFeedbackPillModeToast) {
+    if (self.mode == SCINotificationPillModeToast) {
         [self dismissWithCompletion:nil];
         return;
     }
@@ -1236,7 +914,7 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)closeTapped {
-    if (self.mode == SCIFeedbackPillModeToast) {
+    if (self.mode == SCINotificationPillModeToast) {
         [self dismissWithCompletion:nil];
         return;
     }
@@ -1340,8 +1018,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
-    if (self.style != SCIFeedbackPillStyleDynamic) return;
-
     CGPoint translation = [pan translationInView:self.superview];
 
     switch (pan.state) {
@@ -1395,7 +1071,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     [super touchesBegan:touches withEvent:event];
-    if (self.style != SCIFeedbackPillStyleDynamic) return;
 
     [UIView animateWithDuration:0.15
                           delay:0
@@ -1407,7 +1082,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     [super touchesEnded:touches withEvent:event];
-    if (self.style != SCIFeedbackPillStyleDynamic) return;
 
     [UIView animateWithDuration:0.3
                           delay:0
@@ -1421,7 +1095,6 @@ static SCIFeedbackPillStyle sDefaultPillStyle = SCIFeedbackPillStyleClean;
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     [super touchesCancelled:touches withEvent:event];
-    if (self.style != SCIFeedbackPillStyleDynamic) return;
 
     [UIView animateWithDuration:0.3
                           delay:0

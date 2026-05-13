@@ -446,11 +446,7 @@ static void SCIMarkCurrentStoryAsSeenFromOverlayWithAdvancePref(UIView *overlayV
     id media = nil;
     BOOL resolved = SCIResolveStoryContextFromOverlay(overlayView, &markTarget, &sectionController, &media);
     if (!markTarget || !sectionController || !media) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionStoryMarkSeen duration:1.5
-                                 title:@"Unable to mark story as seen"
-                              subtitle:nil
-                          iconResource:@"error_filled"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationStoryMarkSeen, @"Unable to mark story as seen", nil, @"error_filled", SCINotificationToneError);
         return;
     }
 
@@ -468,11 +464,7 @@ static void SCIMarkCurrentStoryAsSeenFromOverlayWithAdvancePref(UIView *overlayV
         SCIAdvanceStoryAfterManualSeenIfNeeded(overlayView, advancePrefKey);
     }
 
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionStoryMarkSeen duration:1.5
-                             title:@"Marked story as seen"
-                          subtitle:nil
-                      iconResource:@"circle_check_filled"
-                              tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCINotificationStoryMarkSeen, @"Marked story as seen", nil, @"circle_check_filled", SCINotificationToneSuccess);
 }
 
 static void SCIMarkCurrentStoryAsSeenFromOverlay(UIView *overlayView) {
@@ -754,11 +746,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
 
     id message = SCIDirectCurrentMessageFromController(controller);
     if (!message) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
-                                 title:@"Message not found"
-                              subtitle:nil
-                          iconResource:@"error_filled"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationDirectVisualMarkSeen, @"Message not found", nil, @"error_filled", SCINotificationToneError);
         return;
     }
 
@@ -794,11 +782,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
         SCIPendingDirectVisualMessageToMarkSeen = nil;
     }
     if (!dispatched) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
-                                 title:@"Unable to mark as seen"
-                              subtitle:nil
-                          iconResource:@"error_filled"
-                                  tone:SCIFeedbackPillToneError];
+        SCINotify(kSCINotificationDirectVisualMarkSeen, @"Unable to mark as seen", nil, @"error_filled", SCINotificationToneError);
         return;
     }
 
@@ -809,11 +793,7 @@ static void SCIMarkDirectVisualMessageAsSeen(UIViewController *controller) {
         });
     }
 
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionDirectVisualMarkSeen duration:1.5
-                             title:@"Marked as seen"
-                          subtitle:nil
-                      iconResource:@"circle_check_filled"
-                              tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCINotificationDirectVisualMarkSeen, @"Marked as seen", nil, @"circle_check_filled", SCINotificationToneSuccess);
 }
 
 static void SCIInstallDirectSeenButton(UIViewController *controller) {
@@ -945,11 +925,7 @@ static void SCIInstallDirectSeenButton(UIViewController *controller) {
     if ([nearestVC isKindOfClass:%c(IGDirectThreadViewController)]) {
         [(IGDirectThreadViewController *)nearestVC markLastMessageAsSeen];
 
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionThreadMessagesMarkSeen duration:2.5
-                                 title:@"Marked messages as seen"
-                              subtitle:nil
-                          iconResource:@"circle_check_filled"
-                                  tone:SCIFeedbackPillToneSuccess];
+        SCINotify(kSCINotificationThreadMessagesMarkSeen, @"Marked messages as seen", nil, @"circle_check_filled", SCINotificationToneSuccess);
     }
 }
 %end

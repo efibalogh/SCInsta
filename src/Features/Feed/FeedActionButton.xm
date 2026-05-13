@@ -527,7 +527,7 @@ static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecogni
 		if (items.count > 0) {
 			NSInteger index = SCIFeedCarouselPageIndexFromView(view);
 			if (index < 0 || index >= (NSInteger)items.count) index = 0;
-			[SCIUtils showToastForActionIdentifier:kSCIActionExpand duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
+			SCINotify(kSCIActionExpand, @"Opened media viewer", nil, @"expand", SCINotificationToneForIconResource(@"expand"));
 			[SCIFullScreenMediaPlayer showMediaItems:items
 								startingAtIndex:index
 									   metadata:metadata
@@ -551,7 +551,7 @@ static void SCIHandleFeedExpandLongPress(UIView *view, UILongPressGestureRecogni
 	item.sourceMediaObject = media;
 	if (username.length > 0) item.title = username;
 
-	[SCIUtils showToastForActionIdentifier:kSCIActionExpand duration:1.4 title:@"Opened media viewer" subtitle:nil iconResource:@"expand"];
+	SCINotify(kSCIActionExpand, @"Opened media viewer", nil, @"expand", SCINotificationToneForIconResource(@"expand"));
 	[SCIFullScreenMediaPlayer showMediaItems:@[item]
 						startingAtIndex:0
 							   metadata:metadata

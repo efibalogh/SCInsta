@@ -954,11 +954,11 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
 
 - (void)copyTapped {
     if (_textView.text.length == 0) {
-        [SCIUtils showToastForDuration:1.5 title:@"Nothing to copy"];
+        SCINotify(kSCINotificationMediaEncodingLogs, @"Nothing to copy", nil, @"error_filled", SCINotificationToneError);
         return;
     }
     [UIPasteboard generalPasteboard].string = _textView.text;
-    [SCIUtils showToastForDuration:1.5 title:@"Log copied" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCINotificationMediaEncodingLogs, @"Log copied", nil, @"circle_check_filled", SCINotificationToneSuccess);
 }
 
 - (void)shareTapped {
@@ -1013,7 +1013,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
 - (void)shareAllTapped {
     NSString *exportPath = SCIFFmpegExportLogsFile();
     if (exportPath.length == 0) {
-        [SCIUtils showToastForDuration:1.5 title:@"No encoding logs" subtitle:@"FFmpeg runs will appear here after merge attempts." iconResource:@"info_filled"];
+        SCINotify(kSCINotificationMediaEncodingLogs, @"No encoding logs", @"FFmpeg runs will appear here after merge attempts.", @"info_filled", SCINotificationToneInfo);
         return;
     }
     [SCIUtils showShareVC:[NSURL fileURLWithPath:exportPath]];
@@ -1026,7 +1026,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
         [fileManager removeItemAtPath:path error:nil];
     }
     [self reloadFiles];
-    [SCIUtils showToastForDuration:1.5 title:@"Logs cleared" subtitle:nil iconResource:@"circle_check_filled" tone:SCIFeedbackPillToneSuccess];
+    SCINotify(kSCINotificationMediaEncodingLogs, @"Logs cleared", nil, @"circle_check_filled", SCINotificationToneSuccess);
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
@@ -1102,7 +1102,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
         files = SCIFFmpegSortedLogFiles();
     }
     if (files.count == 0) {
-        [SCIUtils showToastForDuration:1.8 title:@"No encoding logs" subtitle:@"FFmpeg runs will appear here after merge attempts." iconResource:@"info_filled"];
+        SCINotify(kSCINotificationMediaEncodingLogs, @"No encoding logs", @"FFmpeg runs will appear here after merge attempts.", @"info_filled", SCINotificationToneInfo);
         return;
     }
 

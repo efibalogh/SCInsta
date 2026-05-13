@@ -5,7 +5,7 @@
 #import "../Utils.h"
 
 #import "Manager.h"
-#import "../Shared/UI/SCIFeedbackPillView.h"
+#import "../Shared/UI/SCINotificationCenter.h"
 #import "../Shared/MediaPreview/SCIFullScreenMediaPlayer.h"
 
 @class SCIGallerySaveMetadata;
@@ -25,7 +25,8 @@ typedef NS_ENUM(NSUInteger, DownloadAction) {
 @property (nonatomic, readonly) BOOL showProgress;
 
 @property (nonatomic, strong) SCIDownloadManager *downloadManager;
-@property (nonatomic, strong) SCIFeedbackPillView *progressView;
+@property (nonatomic, strong) SCINotificationPillView *progressView;
+@property (nonatomic, copy, nullable) NSString *notificationIdentifier;
 /// Set immediately before `downloadFileWithURL:` to name and annotate the completed file; consumed when the download finishes.
 @property (nonatomic, strong, nullable) SCIGallerySaveMetadata *pendingGallerySaveMetadata;
 @property (nonatomic, copy, nullable) SCIDownloadCompletionBlock completionBlock;

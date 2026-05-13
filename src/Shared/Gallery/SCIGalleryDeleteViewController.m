@@ -259,11 +259,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryDeleteSection) {
     req.predicate = predicate;
     NSArray<SCIGalleryFile *> *files = [ctx executeFetchRequest:req error:nil] ?: @[];
     if (files.count == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:2.0
-                                 title:@"No files to delete"
-                              subtitle:nil
-                          iconResource:@"info_filled"
-                                  tone:SCIFeedbackPillToneInfo];
+        SCINotify(kSCINotificationGalleryBulkDelete, @"No files to delete", nil, @"error_filled", SCINotificationToneError);
         return;
     }
 
@@ -292,11 +288,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryDeleteSection) {
         if (self.onDidDelete) {
             self.onDidDelete();
         }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryBulkDelete duration:2.0
-                                 title:successTitle
-                              subtitle:nil
-                          iconResource:@"circle_check_filled"
-                                  tone:SCIFeedbackPillToneSuccess];
+        SCINotify(kSCINotificationGalleryBulkDelete, successTitle, nil, @"circle_check_filled", SCINotificationToneSuccess);
     }],
     ]];
 }

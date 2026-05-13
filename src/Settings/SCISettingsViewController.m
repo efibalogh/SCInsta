@@ -8,6 +8,30 @@
 static char rowStaticRef[] = "row";
 static NSInteger const kSCIUINavigationItemSearchBarPlacementStacked = 2;
 
+static double SCINormalizedStepperValue(SCISetting *row, double value) {
+    if (!row) return value;
+
+    if (row.max >= row.min) {
+        value = MIN(row.max, MAX(row.min, value));
+    }
+
+    if (row.step > 0.0) {
+        double origin = row.min;
+        double stepCount = round((value - origin) / row.step);
+        value = origin + (stepCount * row.step);
+        if (row.max >= row.min) {
+            value = MIN(row.max, MAX(row.min, value));
+        }
+    }
+
+    double nearestInteger = round(value);
+    if (fabs(value - nearestInteger) < 0.0000001) {
+        value = nearestInteger;
+    }
+
+    return value;
+}
+
 @interface SCISettingsViewController () <UITableViewDataSource, UITableViewDelegate, UITableViewDragDelegate, UITableViewDropDelegate, UISearchResultsUpdating>
 
 @property (nonatomic, strong) UITableView *tableView;
@@ -338,7 +362,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             stepper.minimumValue = row.min;
             stepper.maximumValue = row.max;
             stepper.stepValue = row.step;
-            stepper.value = [[NSUserDefaults standardUserDefaults] doubleForKey:row.defaultsKey];
+            stepper.value = SCINormalizedStepperValue(row, [[NSUserDefaults standardUserDefaults] doubleForKey:row.defaultsKey]);
             
             objc_setAssociatedObject(stepper, rowStaticRef, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             
@@ -348,7 +372,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             
             // Template subtitle
             if (row.subtitle.length) {
-                cellContentConfig.secondaryText = [self formatString:row.subtitle withValue:stepper.value label:row.label singularLabel:row.singularLabel];
+                cellContentConfig.secondaryText = [self formatString:row.subtitle withValue:stepper.value step:row.step label:row.label singularLabel:row.singularLabel];
             }
             
             cell.accessoryView = stepper;
@@ -661,9 +685,11 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
 
 - (void)stepperChanged:(UIStepper *)sender {
     SCISetting *row = objc_getAssociatedObject(sender, rowStaticRef);
-    [[NSUserDefaults standardUserDefaults] setDouble:sender.value forKey:row.defaultsKey];
+    double normalizedValue = SCINormalizedStepperValue(row, sender.value);
+    sender.value = normalizedValue;
+    [[NSUserDefaults standardUserDefaults] setDouble:normalizedValue forKey:row.defaultsKey];
     
-    NSLog(@"Stepper changed: %f", sender.value);
+    NSLog(@"Stepper changed: %f", normalizedValue);
     
     [self reloadCellForView:sender];
 }
@@ -688,7 +714,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
 
 // MARK: - Helper
 
-- (NSString *)formatString:(NSString *)template withValue:(double)value label:(NSString *)label singularLabel:(NSString *)singularLabel {
+- (NSString *)formatString:(NSString *)template withValue:(double)value step:(double)step label:(NSString *)label singularLabel:(NSString *)singularLabel {
     // Singular or plural labels
     NSString *applicableLabel = fabs(value - 1.0) < 0.00001 ? singularLabel : label;
     
@@ -701,7 +727,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
     formatter.numberStyle = NSNumberFormatterDecimalStyle;
     formatter.minimumFractionDigits = 0;
-    formatter.maximumFractionDigits = [SCIUtils decimalPlacesInDouble:value];
+    formatter.maximumFractionDigits = step > 0.0 ? [SCIUtils decimalPlacesInDouble:step] : [SCIUtils decimalPlacesInDouble:value];
 
     NSString *stringValue = [formatter stringFromNumber:@(value)];
 

@@ -300,10 +300,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryImportMainSection) {
             [srcURL stopAccessingSecurityScopedResource];
         }
         NSString *reason = err.localizedDescription ?: @"Copy failed";
-        [SCIUtils showToastForDuration:2.8
-                                 title:@"Couldn’t add file"
-                              subtitle:reason
-                          iconResource:@"error_filled"];
+        SCINotify(kSCINotificationGalleryImport, @"Couldn’t add file", reason, @"error_filled", SCINotificationToneError);
         return;
     }
     if (scoped) {
@@ -361,10 +358,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryImportMainSection) {
         NSString *subtitle = lastErr.length
             ? [NSString stringWithFormat:@"%lu couldn’t be saved · %@", (unsigned long)failures, lastErr]
             : [NSString stringWithFormat:@"%lu couldn’t be saved", (unsigned long)failures];
-        [SCIUtils showToastForDuration:3.2
-                                 title:@"Import incomplete"
-                              subtitle:subtitle
-                          iconResource:@"error_filled"];
+        SCINotify(kSCINotificationGalleryImport, @"Import incomplete", subtitle, @"error_filled", SCINotificationToneError);
         return;
     }
 
@@ -373,10 +367,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryImportMainSection) {
         NSString *subtitle = imported == 1 ? @"1 file saved to gallery"
                                            : [NSString stringWithFormat:@"%lu files saved to gallery",
                                               (unsigned long)imported];
-        [SCIUtils showToastForDuration:1.8
-                                 title:@"Imported"
-                              subtitle:subtitle
-                          iconResource:@"circle_check_filled"];
+        SCINotify(kSCINotificationGalleryImport, @"Imported", subtitle, @"circle_check_filled", SCINotificationToneSuccess);
         [self.navigationController popViewControllerAnimated:YES];
     }
 }

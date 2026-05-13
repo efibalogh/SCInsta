@@ -186,6 +186,14 @@ static NSURL *SCIShareURLFromViewHierarchy(UIView *view) {
     return SCIShareURLFromObjectAtDepth(controller, 0);
 }
 
+static NSString *SCICopiedShareLinkTitleForURL(NSURL *url) {
+    NSString *path = url.path.lowercaseString ?: @"";
+    if ([path containsString:@"/stories/"]) return @"Copied story link";
+    if ([path containsString:@"/reel/"] || [path containsString:@"/reels/"]) return @"Copied reel link";
+    if ([path containsString:@"/p/"]) return @"Copied post link";
+    return @"Copied link";
+}
+
 static void SCICopyShareURLForView(UIView *view) {
     if (!SCIShareLongPressCopyEnabled()) return;
     NSURL *url = SCIShareURLFromViewHierarchy(view);
@@ -193,11 +201,11 @@ static void SCICopyShareURLForView(UIView *view) {
         url = [SCIUtils sanitizedInstagramShareURL:url] ?: url;
     }
     if (url.absoluteString.length == 0) {
-        [SCIUtils showToastForDuration:1.5 title:@"No link found"];
+        SCINotify(kSCINotificationShareLongPressCopyLink, @"No link found", nil, @"error_filled", SCINotificationToneError);
         return;
     }
     UIPasteboard.generalPasteboard.string = url.absoluteString;
-    [SCIUtils showToastForDuration:1.5 title:@"Copied link"];
+    SCINotify(kSCINotificationShareLongPressCopyLink, SCICopiedShareLinkTitleForURL(url), nil, @"copy_filled", SCINotificationToneSuccess);
 }
 
 static void SCIUpdateShareLongPressRecognizerStates(void) {

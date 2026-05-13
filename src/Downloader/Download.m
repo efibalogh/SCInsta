@@ -6,8 +6,6 @@
 
 @implementation SCIDownloadDelegate
 
-static NSTimeInterval const kSCIDownloadCompletionPillDuration = 1.8;
-
 static NSCountedSet *SCIActiveDownloadDelegates(void) {
     static NSCountedSet *delegates = nil;
     static dispatch_once_t onceToken;
@@ -44,6 +42,19 @@ static NSError *SCIDownloadErrorWithDescription(NSString *description, NSInteger
     return [NSError errorWithDomain:@"SCInsta.Download"
                                code:code
                            userInfo:@{NSLocalizedDescriptionKey: description ?: @"Download failed"}];
+}
+
+static NSString *SCIDownloadDefaultNotificationIdentifier(DownloadAction action) {
+    switch (action) {
+        case share:
+            return kSCINotificationDownloadShare;
+        case saveToGallery:
+            return kSCINotificationDownloadGallery;
+        case saveToPhotos:
+        case downloadOnly:
+        default:
+            return kSCINotificationDownloadLibrary;
+    }
 }
 
 + (BOOL)isVideoFileAtURL:(NSURL *)fileURL {
@@ -88,17 +99,19 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
                                        error:error];
 }
 
-- (void)showCompletionPillWithSubtitle:(NSString *)subtitle
+- (void)showCompletionPillWithTitle:(NSString *)title
+                            subtitle:(NSString *)subtitle
                     completionImmediately:(BOOL)completionImmediately
                               completion:(void(^)(void))completion {
     if (!self.progressView) {
+        SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneSuccess);
         if (completion) {
             completion();
         }
         return;
     }
 
-    [self.progressView showSuccessWithTitle:@"Download complete" subtitle:subtitle icon:nil];
+    [self.progressView showSuccessWithTitle:title ?: @"Download complete" subtitle:subtitle icon:nil];
     self.progressView.onTapWhenCompleted = nil;
     self.progressView.onCancel = nil;
 
@@ -106,7 +119,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
         completion();
     }
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kSCIDownloadCompletionPillDuration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SCINotificationPillDuration() * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self.progressView dismiss];
         if (!completionImmediately && completion) {
             completion();
@@ -120,6 +133,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
     if (self) {
         _action = action;
         _showProgress = showProgress;
+        _notificationIdentifier = SCIDownloadDefaultNotificationIdentifier(action);
 
         self.downloadManager = [[SCIDownloadManager alloc] initWithDelegate:self];
     }
@@ -133,15 +147,13 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
 
     if (self.showProgress) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.progressView = [SCIUtils showProgressPill];
-            
             __weak typeof(self) weakSelf = self;
             NSURL *retryURL = [url copy];
             NSString *retryExtension = [fileExtension copy];
             NSString *retryHudLabel = [hudLabel copy];
-            self.progressView.onCancel = ^{
+            self.progressView = SCINotifyProgress(self.notificationIdentifier, @"Downloading...", ^{
                 [weakSelf.downloadManager cancelDownload];
-            };
+            });
             self.progressView.onRetry = ^{
                 [weakSelf downloadFileWithURL:retryURL fileExtension:retryExtension hudLabel:retryHudLabel];
             };
@@ -163,12 +175,11 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
 
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!self.progressView) {
-            self.progressView = [SCIUtils showProgressPill];
+            __weak typeof(self) weakSelf = self;
+            self.progressView = SCINotifyProgress(self.notificationIdentifier, title ?: @"Preparing", ^{
+                [weakSelf cancelCustomOperation];
+            });
         }
-        __weak typeof(self) weakSelf = self;
-        self.progressView.onCancel = ^{
-            [weakSelf cancelCustomOperation];
-        };
         self.progressView.onRetry = nil;
         [self.progressView updateProgressTitle:title subtitle:subtitle];
         [self.progressView setProgress:0.02f animated:NO];
@@ -182,7 +193,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
 
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!self.progressView) {
-            self.progressView = [SCIUtils showProgressPill];
+            self.progressView = SCINotifyProgress(self.notificationIdentifier, title ?: @"Working", nil);
         }
         [self.progressView updateProgressTitle:title subtitle:subtitle];
         [self.progressView setProgress:progress animated:YES];
@@ -193,6 +204,8 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.showProgress && self.progressView) {
             [self.progressView showErrorWithTitle:title subtitle:subtitle icon:nil];
+        } else {
+            SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneError);
         }
         SCIInvokeDownloadCompletion(self, nil, SCIDownloadErrorWithDescription(subtitle.length > 0 ? subtitle : title, 50));
         SCIReleaseActiveDownloadDelegate(self);
@@ -262,6 +275,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
                 SCIInvokeDownloadCompletion(self, nil, error);
                 return;
             }
+            SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneError);
         }
 
         if (error) {
@@ -296,8 +310,10 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
         if ([fileManager fileExistsAtPath:newURL.path] && ![fileManager removeItemAtURL:newURL error:&removeError]) {
             NSLog(@"[SCInsta] Download: Failed removing existing file at \"%@\": %@", newURL.path, removeError);
             dispatch_async(dispatch_get_main_queue(), ^{
-                if (self.showProgress) {
+                if (self.showProgress && self.progressView) {
                     [self.progressView showError:@"Failed to prepare file"];
+                } else {
+                    SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneError);
                 }
                 SCIInvokeDownloadCompletion(self, nil, SCIDownloadErrorWithDescription(@"Failed to prepare file", 1));
             });
@@ -309,8 +325,10 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
         if (![fileManager moveItemAtURL:fileURL toURL:newURL error:&moveError]) {
             NSLog(@"[SCInsta] Download: Failed renaming downloaded file to \"%@\": %@", newURL.path, moveError);
             dispatch_async(dispatch_get_main_queue(), ^{
-                if (self.showProgress) {
+                if (self.showProgress && self.progressView) {
                     [self.progressView showError:@"Failed to finalize file"];
+                } else {
+                    SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneError);
                 }
                 SCIInvokeDownloadCompletion(self, nil, SCIDownloadErrorWithDescription(@"Failed to finalize file", 2));
             });
@@ -334,7 +352,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
         if (self.action == share) {
             [self.progressView updateProgressTitle:@"Preparing share" subtitle:nil];
             [self.progressView setProgress:0.98f animated:YES];
-            [self showCompletionPillWithSubtitle:@"Shared successfully" completionImmediately:YES completion:^{
+            [self showCompletionPillWithTitle:@"Share ready" subtitle:nil completionImmediately:YES completion:^{
                 [SCIUtils showShareVC:newURL];
                 SCIInvokeDownloadCompletion(self, newURL, nil);
                 SCIReleaseActiveDownloadDelegate(self);
@@ -347,7 +365,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
             [self.progressView setProgress:0.98f animated:YES];
             [[self class] saveFileURLToPhotos:newURL completion:^(BOOL success, NSError *error) {
                 if (success) {
-                    [self showCompletionPillWithSubtitle:@"Saved to Photos successfully" completionImmediately:NO completion:^{
+                    [self showCompletionPillWithTitle:@"Saved to Photos" subtitle:@"Tap to open Photos" completionImmediately:NO completion:^{
                         SCIInvokeDownloadCompletion(self, newURL, nil);
                         SCIReleaseActiveDownloadDelegate(self);
                     }];
@@ -359,6 +377,8 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
                 } else {
                     if (self.progressView) {
                         [self.progressView showError:@"Failed to save"];
+                    } else {
+                        SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneError);
                     }
                     SCIInvokeDownloadCompletion(self, nil, error ?: SCIDownloadErrorWithDescription(@"Failed to save", 3));
                     SCIReleaseActiveDownloadDelegate(self);
@@ -373,7 +393,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
             NSError *error;
             SCIGalleryFile *file = [[self class] saveFileURLToGallery:newURL metadata:galleryMeta error:&error];
             if (file) {
-                [self showCompletionPillWithSubtitle:@"Saved to Gallery successfully" completionImmediately:NO completion:^{
+                [self showCompletionPillWithTitle:@"Saved to Gallery" subtitle:@"Tap to open Gallery" completionImmediately:NO completion:^{
                     SCIInvokeDownloadCompletion(self, newURL, nil);
                     SCIReleaseActiveDownloadDelegate(self);
                 }];
@@ -385,6 +405,8 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
             } else {
                 if (self.progressView) {
                     [self.progressView showError:@"Failed to save to Gallery"];
+                } else {
+                    SCINotificationTriggerHaptic(self.notificationIdentifier, SCINotificationToneError);
                 }
                 SCIInvokeDownloadCompletion(self, nil, error ?: SCIDownloadErrorWithDescription(@"Failed to save to Gallery", 4));
                 SCIReleaseActiveDownloadDelegate(self);
@@ -392,7 +414,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
             return;
         }
 
-        [self showCompletionPillWithSubtitle:@"Opened successfully" completionImmediately:YES completion:^{
+        [self showCompletionPillWithTitle:@"Opened media" subtitle:nil completionImmediately:YES completion:^{
             [SCIFullScreenMediaPlayer showFileURL:newURL];
             SCIInvokeDownloadCompletion(self, newURL, nil);
         }];

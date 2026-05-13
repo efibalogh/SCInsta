@@ -136,11 +136,7 @@ static void SCIFlexShowMissingPill(NSString *trigger) {
         }
 
         SCILog(@"FLEX show requested by %@ but unavailable: %@", trigger, subtitle);
-        [SCIUtils showToastForDuration:2.4
-                                 title:@"FLEX unavailable"
-                              subtitle:subtitle
-                          iconResource:@"info_filled"
-                                  tone:SCIFeedbackPillToneInfo];
+        SCINotify(kSCINotificationFlexUnavailable, @"FLEX unavailable", subtitle, @"info_filled", SCINotificationToneInfo);
     });
 }
 

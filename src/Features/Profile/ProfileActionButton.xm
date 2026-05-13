@@ -189,11 +189,11 @@ static NSString *SCIProfilePrivacyText(id user) {
 
 static void SCIProfileCopyValue(NSString *value, NSString *successTitle) {
     if (value.length == 0) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:2.0 title:@"Nothing to copy" subtitle:nil iconResource:@"error_filled"];
+        SCINotify(kSCINotificationProfileCopyInfo, @"Nothing to copy", nil, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         return;
     }
     UIPasteboard.generalPasteboard.string = value;
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileCopyInfo duration:1.6 title:successTitle subtitle:nil iconResource:@"circle_check_filled"];
+    SCINotify(kSCINotificationProfileCopyInfo, successTitle, nil, @"circle_check_filled", SCINotificationToneForIconResource(@"circle_check_filled"));
 }
 
 static void SCIProfileExecuteCopyInfoAction(id user, NSString *identifier) {
@@ -220,10 +220,11 @@ static SCIGallerySaveMetadata *SCIProfilePictureMetadata(id user) {
 static void SCIProfileSharePicture(id user) {
     NSURL *url = SCIProfilePictureURL(user);
     if (!url) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileSharePicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
+        SCINotify(kSCINotificationProfileSharePicture, @"Picture not found", nil, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         return;
     }
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionProfileSharePicture]];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:share showProgress:SCINotificationIsEnabled(kSCINotificationProfileSharePicture)];
+    delegate.notificationIdentifier = kSCINotificationProfileSharePicture;
     delegate.pendingGallerySaveMetadata = SCIProfilePictureMetadata(user);
     [delegate downloadFileWithURL:url fileExtension:SCIProfilePictureExtension(url) hudLabel:nil];
 }
@@ -231,11 +232,12 @@ static void SCIProfileSharePicture(id user) {
 static void SCIProfileSavePictureToGallery(id user) {
     NSURL *url = SCIProfilePictureURL(user);
     if (!url) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileGalleryPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
+        SCINotify(kSCINotificationProfileGalleryPicture, @"Picture not found", nil, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         return;
     }
 
-    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:[SCIUtils shouldShowFeedbackPillForActionIdentifier:kSCIFeedbackActionProfileGalleryPicture]];
+    SCIDownloadDelegate *delegate = [[SCIDownloadDelegate alloc] initWithAction:saveToGallery showProgress:SCINotificationIsEnabled(kSCINotificationProfileGalleryPicture)];
+    delegate.notificationIdentifier = kSCINotificationProfileGalleryPicture;
     delegate.pendingGallerySaveMetadata = SCIProfilePictureMetadata(user);
     [delegate downloadFileWithURL:url fileExtension:SCIProfilePictureExtension(url) hudLabel:nil];
 }
@@ -275,13 +277,13 @@ static UIViewController *SCIProfileSourceController(id sourceObject, UIView *sou
 static void SCIProfileViewPicture(id user, id sourceObject) {
     NSURL *url = SCIProfilePictureURL(user);
     if (!url) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:2.0 title:@"Picture not found" subtitle:nil iconResource:@"error_filled"];
+        SCINotify(kSCINotificationProfileViewPicture, @"Picture not found", nil, @"error_filled", SCINotificationToneForIconResource(@"error_filled"));
         return;
     }
 
     UIView *sourceView = SCIProfileSourceView(sourceObject);
     UIViewController *sourceController = SCIProfileSourceController(sourceObject, sourceView);
-    [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileViewPicture duration:1.4 title:@"Opened profile picture" subtitle:nil iconResource:@"photo"];
+    SCINotify(kSCINotificationProfileViewPicture, @"Opened profile picture", nil, @"photo", SCINotificationToneForIconResource(@"photo"));
     [SCIFullScreenMediaPlayer showRemoteImageURL:url
                                         metadata:SCIProfilePictureMetadata(user)
                                   playbackSource:SCIFullScreenPlaybackSourceProfile
@@ -411,7 +413,7 @@ static UIMenu *SCIProfileActionMenu(id sourceObject) {
     }]];
 
     [items addObject:[UIAction actionWithTitle:@"Profile Settings" image:SCIProfileMenuIcon(@"settings") identifier:nil handler:^(__unused UIAction *action) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings"];
+        SCINotify(kSCINotificationProfileOpenSettings, @"Opened profile settings", nil, @"settings", SCINotificationToneForIconResource(@"settings"));
         [SCIUtils showSettingsForTopicTitle:@"Profile"];
     }]];
 
@@ -453,7 +455,7 @@ static void SCIExecuteProfileDefaultAction(SCIProfileHeaderActionButton *button)
     } else if ([identifier isEqualToString:kSCIProfileActionSavePictureToGallery]) {
         SCIProfileSavePictureToGallery(user);
     } else if ([identifier isEqualToString:kSCIProfileActionOpenSettings]) {
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionProfileOpenSettings duration:1.4 title:@"Opened profile settings" subtitle:nil iconResource:@"settings"];
+        SCINotify(kSCINotificationProfileOpenSettings, @"Opened profile settings", nil, @"settings", SCINotificationToneForIconResource(@"settings"));
         [SCIUtils showSettingsForTopicTitle:@"Profile"];
     }
 }

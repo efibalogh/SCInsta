@@ -734,11 +734,7 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 }
 
 - (void)showGalleryOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
-    [SCIUtils showToastForActionIdentifier:actionIdentifier duration:2.0
-                             title:title
-                          subtitle:@"The original content may no longer exist."
-                      iconResource:@"error_filled"
-                              tone:SCIFeedbackPillToneError];
+    SCINotify(actionIdentifier, title, @"The original content may no longer exist.", @"error_filled", SCINotificationToneError);
 }
 
 - (void)dismissGalleryForOriginOpenWithCompletion:(void (^)(void))completion {
@@ -756,28 +752,20 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
 - (void)openOriginalPostForFile:(SCIGalleryFile *)file {
     if ([SCIGalleryOriginController openOriginalPostForGalleryFile:file]) {
         [self dismissGalleryForOriginOpenWithCompletion:^{
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenOriginal duration:1.4
-                                             title:@"Opened original post"
-                                          subtitle:nil
-                                      iconResource:@"external_link"
-                                              tone:SCIFeedbackPillToneInfo];
+            SCINotify(kSCINotificationGalleryOpenOriginal, @"Opened original post", nil, @"external_link", SCINotificationToneInfo);
         }];
     } else {
-        [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCIFeedbackActionGalleryOpenOriginal];
+        [self showGalleryOpenFailureMessage:@"Unable to open original post" actionIdentifier:kSCINotificationGalleryOpenOriginal];
     }
 }
 
 - (void)openProfileForFile:(SCIGalleryFile *)file {
     if ([SCIGalleryOriginController openProfileForGalleryFile:file]) {
         [self dismissGalleryForOriginOpenWithCompletion:^{
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryOpenProfile duration:1.4
-                                             title:@"Opened profile"
-                                          subtitle:nil
-                                      iconResource:@"profile"
-                                              tone:SCIFeedbackPillToneInfo];
+            SCINotify(kSCINotificationGalleryOpenProfile, @"Opened profile", nil, @"profile", SCINotificationToneInfo);
         }];
     } else {
-        [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCIFeedbackActionGalleryOpenProfile];
+        [self showGalleryOpenFailureMessage:@"Unable to open profile" actionIdentifier:kSCINotificationGalleryOpenProfile];
     }
 }
 
@@ -962,18 +950,10 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
             }
         }
         if (firstError) {
-            [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryDeleteSelected duration:2.0
-                                     title:@"Failed to delete"
-                                  subtitle:firstError.localizedDescription
-                              iconResource:@"error_filled"
-                                      tone:SCIFeedbackPillToneError];
+            SCINotify(kSCINotificationGalleryDeleteSelected, @"Failed to delete", firstError.localizedDescription, @"error_filled", SCINotificationToneError);
             return;
         }
-        [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryDeleteSelected duration:1.5
-                                         title:@"Deleted selected files"
-                                      subtitle:nil
-                                  iconResource:@"circle_check_filled"
-                                          tone:SCIFeedbackPillToneSuccess];
+        SCINotify(kSCINotificationGalleryDeleteSelected, @"Deleted selected files", nil, @"circle_check_filled", SCINotificationToneSuccess);
         [self exitSelectionMode];
     }],
     ]];
@@ -1067,17 +1047,9 @@ typedef NS_ENUM(NSInteger, SCIGalleryViewMode) {
             NSError *err;
             [file removeWithError:&err];
             if (err) {
-                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryDeleteFile duration:2.0
-                                         title:@"Failed to delete"
-                                      subtitle:err.localizedDescription
-                                  iconResource:@"error_filled"
-                                          tone:SCIFeedbackPillToneError];
+                SCINotify(kSCINotificationGalleryDeleteFile, @"Failed to delete", err.localizedDescription, @"error_filled", SCINotificationToneError);
             } else {
-                [SCIUtils showToastForActionIdentifier:kSCIFeedbackActionGalleryDeleteFile duration:1.5
-                                                 title:@"Deleted from Gallery"
-                                              subtitle:nil
-                                          iconResource:@"circle_check_filled"
-                                                  tone:SCIFeedbackPillToneSuccess];
+                SCINotify(kSCINotificationGalleryDeleteFile, @"Deleted from Gallery", nil, @"circle_check_filled", SCINotificationToneSuccess);
             }
         }],
         ]];
