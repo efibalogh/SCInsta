@@ -122,8 +122,8 @@ static NSArray *SCIManageSettingsDataSections(void) {
 + (SCISetting *)rootSetting {
     BOOL flexInstalled = SCIFlexIsBundled();
     NSString *flexFooter = flexInstalled
-        ? @"The first time FLEX is opened in a session it can take a moment to initialize (especially with \"Open on App Focus\", which fires immediately at launch). Subsequent opens are instant."
-        : @"FLEX not installed. Rebuild with --with-flex or install libFLEX.dylib to enable these options.";
+        ? @"The first time FLEX is opened in a session it can take a moment to initialize."
+        : @"FLEX not installed. Rebuild with \"--flex\" flag or install libFLEX.dylib to enable these options.";
     SCISetting *flexGesture = [SCISetting switchCellWithTitle:@"Enable 3-Finger FLEX Gesture" subtitle:@"Hold three fingers anywhere for 1.5 seconds to open the FLEX explorer" defaultsKey:@"flex_instagram"];
     SCISetting *flexLaunch = [SCISetting switchCellWithTitle:@"Open FLEX on App Launch" subtitle:@"Automatically opens the FLEX explorer when the app launches" defaultsKey:@"flex_app_launch"];
     SCISetting *flexFocus = [SCISetting switchCellWithTitle:@"Open FLEX on App Focus" subtitle:@"Automatically opens the FLEX explorer when the app is focused" defaultsKey:@"flex_app_start"];

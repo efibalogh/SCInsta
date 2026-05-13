@@ -27,22 +27,83 @@ static dispatch_queue_t SCIFlexLoaderQueue(void) {
     return queue;
 }
 
+static void SCIAppendFlexPath(NSMutableArray<NSString *> *paths, NSString *path) {
+    if (path.length == 0) {
+        return;
+    }
+
+    if (![paths containsObject:path]) {
+        [paths addObject:path];
+    }
+}
+
+static NSString *SCIDylibDirectory(void) {
+    Dl_info info;
+    if (dladdr((void *)SCIDylibDirectory, &info) && info.dli_fname) {
+        return [@(info.dli_fname) stringByDeletingLastPathComponent];
+    }
+    return nil;
+}
+
+static void SCIAppendLiveContainerApplicationFlexPaths(NSMutableArray<NSString *> *paths) {
+    NSString *dylibDirectory = SCIDylibDirectory();
+    if (dylibDirectory.length == 0) {
+        return;
+    }
+
+    NSString *documentsPath = nil;
+    NSRange tweaksRange = [dylibDirectory rangeOfString:@"/Documents/Tweaks/" options:NSBackwardsSearch];
+    if (tweaksRange.location != NSNotFound) {
+        documentsPath = [dylibDirectory substringToIndex:tweaksRange.location + @"/Documents".length];
+    } else {
+        NSRange documentsRange = [dylibDirectory rangeOfString:@"/Documents/" options:NSBackwardsSearch];
+        if (documentsRange.location != NSNotFound) {
+            documentsPath = [dylibDirectory substringToIndex:documentsRange.location + @"/Documents".length];
+        }
+    }
+
+    if (documentsPath.length == 0) {
+        return;
+    }
+
+    NSString *applicationsPath = [documentsPath stringByAppendingPathComponent:@"Applications"];
+    NSArray<NSString *> *entries = [NSFileManager.defaultManager contentsOfDirectoryAtPath:applicationsPath error:nil];
+    for (NSString *entry in entries) {
+        if (![entry.pathExtension isEqualToString:@"app"]) {
+            continue;
+        }
+
+        NSString *candidate = [[[applicationsPath stringByAppendingPathComponent:entry]
+            stringByAppendingPathComponent:@"Frameworks"]
+            stringByAppendingPathComponent:@"libFLEX.dylib"];
+        SCIAppendFlexPath(paths, candidate);
+    }
+}
+
 static NSArray<NSString *> *SCIFlexCandidatePaths(void) {
     NSMutableArray<NSString *> *paths = [NSMutableArray array];
     NSString *bundlePath = [NSBundle mainBundle].bundlePath;
     if (bundlePath.length > 0) {
-        [paths addObject:[bundlePath stringByAppendingPathComponent:@"Frameworks/libFLEX.dylib"]];
+        SCIAppendFlexPath(paths, [bundlePath stringByAppendingPathComponent:@"Frameworks/libFLEX.dylib"]);
     }
 
     NSString *executablePath = NSProcessInfo.processInfo.arguments.firstObject;
     NSString *executableDirectory = executablePath.stringByDeletingLastPathComponent;
     if (executableDirectory.length > 0) {
-        [paths addObject:[executableDirectory stringByAppendingPathComponent:@"Frameworks/libFLEX.dylib"]];
+        SCIAppendFlexPath(paths, [executableDirectory stringByAppendingPathComponent:@"Frameworks/libFLEX.dylib"]);
     }
 
+    NSString *dylibDirectory = SCIDylibDirectory();
+    if (dylibDirectory.length > 0) {
+        SCIAppendFlexPath(paths, [dylibDirectory stringByAppendingPathComponent:@"libFLEX.dylib"]);
+        SCIAppendFlexPath(paths, [dylibDirectory stringByAppendingPathComponent:@"libflex.dylib"]);
+    }
+
+    SCIAppendLiveContainerApplicationFlexPaths(paths);
+
     // Jailbreak package locations.
-    [paths addObject:@"/var/jb/Library/MobileSubstrate/DynamicLibraries/libFLEX.dylib"];
-    [paths addObject:@"/Library/MobileSubstrate/DynamicLibraries/libFLEX.dylib"];
+    SCIAppendFlexPath(paths, @"/var/jb/Library/MobileSubstrate/DynamicLibraries/libFLEX.dylib");
+    SCIAppendFlexPath(paths, @"/Library/MobileSubstrate/DynamicLibraries/libFLEX.dylib");
 
     return paths;
 }
