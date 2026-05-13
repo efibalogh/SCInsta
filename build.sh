@@ -438,7 +438,7 @@ else
     echo 'Usage: ./build.sh <sideload|rootless|rootful>'
     echo
     echo '  sideload   - Build a patched IPA; flags (combine as needed):'
-    echo '    --release   equivalent to --inject --fmpeg --patch'
+    echo '    --release   equivalent to --inject --ffmpeg --patch'
     echo '    --inject    include SCInsta.dylib'
     echo '    --ffmpeg    include FFmpegKit frameworks'
     echo '    --flex      include libFLEX.dylib'
