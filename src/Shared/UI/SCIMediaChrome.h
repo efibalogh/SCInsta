@@ -16,7 +16,6 @@ UIImage *SCIMediaChromeBottomIcon(NSString *resourceName);
 UIImage *SCIMediaChromeTopBarIcon(NSString *resourceName);
 UIBarButtonItem *SCIMediaChromeTopBarButtonItem(NSString *resourceName, id target, SEL action);
 UIBarButtonItem *SCIMediaChromeTopBarButtonItemWithTint(NSString *resourceName, id target, SEL action, UIColor *_Nullable tintColor, NSString *_Nullable accessibilityLabel);
-UINavigationBar *SCIMediaChromeEmbeddedNavigationBar(void);
 void SCIMediaChromeSetLeadingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items);
 void SCIMediaChromeSetTrailingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items);
 

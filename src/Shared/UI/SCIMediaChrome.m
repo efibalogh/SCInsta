@@ -88,31 +88,6 @@ UIBarButtonItem *SCIMediaChromeTopBarButtonItemWithTint(NSString *resourceName, 
     return item;
 }
 
-UINavigationBar *SCIMediaChromeEmbeddedNavigationBar(void) {
-    UINavigationBar *bar = [[UINavigationBar alloc] initWithFrame:CGRectZero];
-    bar.translatesAutoresizingMaskIntoConstraints = NO;
-    bar.prefersLargeTitles = NO;
-    bar.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
-    bar.translucent = YES;
-    bar.backgroundColor = [UIColor clearColor];
-    bar.clipsToBounds = YES;
-
-    UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
-    [appearance configureWithTransparentBackground];
-    appearance.backgroundColor = [UIColor clearColor];
-    appearance.backgroundEffect = nil;
-    appearance.shadowColor = [UIColor clearColor];
-    appearance.titleTextAttributes = @{
-        NSForegroundColorAttributeName: [UIColor labelColor],
-        NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]
-    };
-    bar.standardAppearance = appearance;
-    bar.compactAppearance = appearance;
-    bar.scrollEdgeAppearance = appearance;
-    bar.compactScrollEdgeAppearance = appearance;
-    return bar;
-}
-
 void SCIMediaChromeSetLeadingTopBarItems(UINavigationItem *navigationItem, NSArray<UIBarButtonItem *> *items) {
     if (!navigationItem) {
         return;

@@ -7,6 +7,8 @@
 #pragma clang diagnostic ignored "-Wundeclared-selector"
 
 typedef BOOL (*SCI_BOOL_MSG)(id self, SEL _cmd);
+typedef void (*SCI_VOID_MSG)(id self, SEL _cmd);
+typedef void (*SCI_SET_CGFLOAT_MSG)(id self, SEL _cmd, CGFloat value);
 
 static SCI_BOOL_MSG orig_liquidGlass_class_isEnabled;
 static BOOL hook_liquidGlass_class_isEnabled(id self, SEL _cmd) {
@@ -51,6 +53,68 @@ static BOOL hook_videoCam_isLiquidGlass(id self, SEL _cmd) {
 static SCI_BOOL_MSG orig_alert_enableLiquidGlass;
 static BOOL hook_alert_enableLiquidGlass(id self, SEL _cmd) {
     return [SCIUtils sci_liquidGlassHookPrefKey:@"liquid_glass_alert_dialog_actions" orig:(SCILiquidGlassBoolMsg)orig_alert_enableLiquidGlass selfPtr:self sel:_cmd];
+}
+
+static Class SCIDirectInboxNavigationHeaderViewClass(void) {
+    Class cls = objc_getClass("IGDirectInboxNavigationHeaderView");
+    if (!cls) {
+        cls = objc_getClass("IGDirectInboxNavigationHeaderView.IGDirectInboxNavigationHeaderView");
+    }
+    return cls;
+}
+
+static UIView *SCIDirectInboxHeaderSeparatorView(id headerView) {
+    if (![headerView isKindOfClass:UIView.class]) {
+        return nil;
+    }
+
+    NSArray<UIView *> *subviews = [(UIView *)headerView subviews];
+    if (subviews.count <= 1) {
+        return nil;
+    }
+
+    UIView *candidate = subviews[1];
+    if (![candidate isKindOfClass:UIView.class]) {
+        return nil;
+    }
+
+    CGFloat height = MAX(candidate.bounds.size.height, candidate.frame.size.height);
+    if (subviews.count == 2 || height <= 3.0) {
+        return candidate;
+    }
+
+    return nil;
+}
+
+static void SCIRemoveDirectInboxHeaderSeparator(id headerView) {
+    UIView *separator = SCIDirectInboxHeaderSeparatorView(headerView);
+    separator.alpha = 0.0;
+    separator.hidden = YES;
+    [separator removeFromSuperview];
+}
+
+static SCI_VOID_MSG orig_directInboxHeader_layoutSubviews;
+static void hook_directInboxHeader_layoutSubviews(id self, SEL _cmd) {
+    if (orig_directInboxHeader_layoutSubviews) {
+        orig_directInboxHeader_layoutSubviews(self, _cmd);
+    }
+    SCIRemoveDirectInboxHeaderSeparator(self);
+}
+
+static SCI_VOID_MSG orig_directInboxHeader_didMoveToWindow;
+static void hook_directInboxHeader_didMoveToWindow(id self, SEL _cmd) {
+    if (orig_directInboxHeader_didMoveToWindow) {
+        orig_directInboxHeader_didMoveToWindow(self, _cmd);
+    }
+    SCIRemoveDirectInboxHeaderSeparator(self);
+}
+
+static SCI_SET_CGFLOAT_MSG orig_directInboxHeader_setSeparatorAlpha;
+static void hook_directInboxHeader_setSeparatorAlpha(id self, SEL _cmd, CGFloat alpha) {
+    if (orig_directInboxHeader_setSeparatorAlpha) {
+        orig_directInboxHeader_setSeparatorAlpha(self, _cmd, 0.0);
+    }
+    SCIRemoveDirectInboxHeaderSeparator(self);
 }
 
 %group SCILiquidGlassHooks
@@ -194,6 +258,24 @@ extern "C" void SCIInstallLiquidGlassHooksIfEnabled(void) {
         Method m = class_getInstanceMethod(c, @selector(enableLiquidGlass));
         if (m) {
             MSHookMessageEx(c, @selector(enableLiquidGlass), (IMP)hook_alert_enableLiquidGlass, (IMP *)&orig_alert_enableLiquidGlass);
+        }
+    }
+
+    c = SCIDirectInboxNavigationHeaderViewClass();
+    if (c) {
+        Method m = class_getInstanceMethod(c, @selector(layoutSubviews));
+        if (m) {
+            MSHookMessageEx(c, @selector(layoutSubviews), (IMP)hook_directInboxHeader_layoutSubviews, (IMP *)&orig_directInboxHeader_layoutSubviews);
+        }
+
+        m = class_getInstanceMethod(c, @selector(didMoveToWindow));
+        if (m) {
+            MSHookMessageEx(c, @selector(didMoveToWindow), (IMP)hook_directInboxHeader_didMoveToWindow, (IMP *)&orig_directInboxHeader_didMoveToWindow);
+        }
+
+        m = class_getInstanceMethod(c, @selector(setSeparatorAlpha:));
+        if (m) {
+            MSHookMessageEx(c, @selector(setSeparatorAlpha:), (IMP)hook_directInboxHeader_setSeparatorAlpha, (IMP *)&orig_directInboxHeader_setSeparatorAlpha);
         }
     }
     });

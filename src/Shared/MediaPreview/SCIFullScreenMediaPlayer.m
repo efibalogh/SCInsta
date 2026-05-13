@@ -31,6 +31,8 @@ static CGFloat const kDismissMinimumDuration = 0.12;
 static CGFloat const kDismissFinalBackdropAlpha = 0.1;
 static NSTimeInterval const kPresentationFadeDuration = 0.22;
 static NSTimeInterval const kDismissFadeDuration = 0.18;
+static NSTimeInterval const kPreviewChromeAnimationDuration = 0.25;
+static CGFloat const kVideoPlayerControlBottomInset = 48.0;
 static CGFloat const kGalleryPreviewMenuIconPointSize = 22.0;
 
 static UIImage *SCIGalleryPreviewMenuIcon(NSString *resourceName) {
@@ -105,10 +107,6 @@ static CGPoint SCICenterForBounds(CGRect bounds) {
 
 @property (nonatomic, strong) UIPageViewController *pageViewController;
 
-@property (nonatomic, strong) UIView *topToolbar;
-@property (nonatomic, strong) UILabel *counterLabel;
-@property (nonatomic, strong) UINavigationBar *topNavigationBar;
-@property (nonatomic, strong) UINavigationItem *topNavigationItem;
 @property (nonatomic, strong) UIBarButtonItem *topFavoriteItem;
 
 @property (nonatomic, strong) UIView *bottomBar;
@@ -376,12 +374,16 @@ fromViewController:(UIViewController *)presenter {
     _isToolbarVisible = YES;
 
     [self beginPreviewPlaybackSuppressionIfNeeded];
-    self.modalPresentationStyle = [self shouldUseLifecycleSuppressingPresentation]
+    UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:self];
+    navigationController.navigationBar.prefersLargeTitles = NO;
+    navigationController.navigationBar.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+    navigationController.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    navigationController.modalPresentationStyle = [self shouldUseLifecycleSuppressingPresentation]
         ? UIModalPresentationFullScreen
         : UIModalPresentationOverFullScreen;
-    self.modalPresentationCapturesStatusBarAppearance = YES;
-    self.transitioningDelegate = self;
-    [presenter presentViewController:self animated:YES completion:nil];
+    navigationController.modalPresentationCapturesStatusBarAppearance = YES;
+    navigationController.transitioningDelegate = self;
+    [presenter presentViewController:navigationController animated:YES completion:nil];
 }
 
 #pragma mark - Lifecycle
@@ -389,10 +391,12 @@ fromViewController:(UIViewController *)presenter {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    self.edgesForExtendedLayout = UIRectEdgeAll;
+    self.extendedLayoutIncludesOpaqueBars = YES;
     self.view.backgroundColor = [UIColor clearColor];
     [self setupPresentationBackdrop];
 
-    [self setupTopToolbar];
+    [self setupTopNavigationItems];
     [self setupBottomBar];
     [self setupPageViewController];
     [self setupDismissGesture];
@@ -432,26 +436,15 @@ fromViewController:(UIViewController *)presenter {
     [self.view sendSubviewToBack:_presentationBackdropView];
 }
 
-#pragma mark - Top Toolbar
+#pragma mark - Top Navigation
 
-- (void)setupTopToolbar {
-    _topToolbar = [[UIView alloc] initWithFrame:CGRectZero];
-    _topToolbar.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:_topToolbar];
-
-    _topNavigationBar = SCIMediaChromeEmbeddedNavigationBar();
-    [_topToolbar addSubview:_topNavigationBar];
-
-    _topNavigationItem = [[UINavigationItem alloc] initWithTitle:@""];
-    _topNavigationItem.leftBarButtonItem = SCIMediaChromeTopBarButtonItemWithTint(@"xmark",
-                                                                                  self,
-                                                                                  @selector(closeTapped),
-                                                                                  [UIColor labelColor],
-                                                                                  @"Close");
-
-    _counterLabel = SCIMediaChromeTitleLabel(@"");
-    _counterLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _topNavigationItem.titleView = _counterLabel;
+- (void)setupTopNavigationItems {
+    UIBarButtonItem *closeItem = SCIMediaChromeTopBarButtonItemWithTint(@"xmark",
+                                                                        self,
+                                                                        @selector(closeTapped),
+                                                                        [UIColor labelColor],
+                                                                        @"Close");
+    SCIMediaChromeSetLeadingTopBarItems(self.navigationItem, @[ closeItem ]);
 
     if (_isFromGallery) {
         _topFavoriteItem = SCIMediaChromeTopBarButtonItemWithTint(@"heart",
@@ -459,23 +452,10 @@ fromViewController:(UIViewController *)presenter {
                                                                   @selector(favoriteTapped),
                                                                   [UIColor labelColor],
                                                                   @"Favorite");
-        _topNavigationItem.rightBarButtonItem = _topFavoriteItem;
     } else {
         _topFavoriteItem = nil;
     }
-    [_topNavigationBar setItems:@[_topNavigationItem] animated:NO];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [_topToolbar.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [_topToolbar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [_topToolbar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [_topToolbar.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:SCIMediaChromeTopBarContentHeight],
-
-        [_topNavigationBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [_topNavigationBar.leadingAnchor constraintEqualToAnchor:_topToolbar.leadingAnchor],
-        [_topNavigationBar.trailingAnchor constraintEqualToAnchor:_topToolbar.trailingAnchor],
-        [_topNavigationBar.heightAnchor constraintEqualToConstant:SCIMediaChromeTopBarContentHeight],
-    ]];
+    [self updateFavoriteButton];
 }
 
 #pragma mark - Bottom Bar
@@ -609,6 +589,7 @@ fromViewController:(UIViewController *)presenter {
     }
 
     if ([controller isKindOfClass:[SCIFullScreenVideoViewController class]]) {
+        [self updatePlayerControlInsetsForVideoController:(SCIFullScreenVideoViewController *)controller animated:NO];
         [(SCIFullScreenVideoViewController *)controller prepareForDisplay];
     } else if ([controller isKindOfClass:[SCIFullScreenImageViewController class]]) {
         [(SCIFullScreenImageViewController *)controller preloadContent];
@@ -644,6 +625,26 @@ fromViewController:(UIViewController *)presenter {
         }
         [self.controllerCache removeObjectForKey:cachedIndex];
     }
+}
+
+- (SCIFullScreenVideoViewController *)currentVideoViewController {
+    UIViewController *currentVC = self.pageViewController.viewControllers.firstObject;
+    return [currentVC isKindOfClass:[SCIFullScreenVideoViewController class]]
+        ? (SCIFullScreenVideoViewController *)currentVC
+        : nil;
+}
+
+- (void)updatePlayerControlInsetsForVideoController:(SCIFullScreenVideoViewController *)videoController animated:(BOOL)animated {
+    UIEdgeInsets insets = self.isToolbarVisible
+        ? UIEdgeInsetsMake(0.0, 0.0, kVideoPlayerControlBottomInset, 0.0)
+        : UIEdgeInsetsZero;
+    [videoController setPlayerControlOverlayInsets:insets animated:animated];
+}
+
+- (void)updateCurrentVideoPlayerControlInsetsAnimated:(BOOL)animated {
+    SCIFullScreenVideoViewController *videoController = [self currentVideoViewController];
+    if (!videoController) return;
+    [self updatePlayerControlInsetsForVideoController:videoController animated:animated];
 }
 
 #pragma mark - UIPageViewControllerDataSource
@@ -704,14 +705,12 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)updateCounter {
     if (_isSingleItemMode) {
-        _counterLabel.text = @"";
-        [_counterLabel sizeToFit];
+        self.title = nil;
         return;
     }
-    _counterLabel.text = [NSString stringWithFormat:@"%ld of %lu",
-                          (long)_currentIndex + 1,
-                          (unsigned long)_items.count];
-    [_counterLabel sizeToFit];
+    self.title = [NSString stringWithFormat:@"%ld of %lu",
+                  (long)_currentIndex + 1,
+                  (unsigned long)_items.count];
 }
 
 - (void)updateFavoriteButton {
@@ -724,14 +723,14 @@ fromViewController:(UIViewController *)presenter {
         : SCIMediaChromeTopBarIcon(@"heart");
 
     if (!item.galleryFile) {
-        _topNavigationItem.rightBarButtonItem = nil;
+        SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[]);
         return;
     }
 
     _topFavoriteItem.image = img;
     _topFavoriteItem.tintColor = isFav ? [UIColor systemPinkColor] : [UIColor labelColor];
     _topFavoriteItem.accessibilityLabel = isFav ? @"Unfavorite" : @"Favorite";
-    _topNavigationItem.rightBarButtonItem = _topFavoriteItem;
+    SCIMediaChromeSetTrailingTopBarItems(self.navigationItem, @[ _topFavoriteItem ]);
 }
 
 - (void)showGalleryOpenFailureMessage:(NSString *)title actionIdentifier:(NSString *)actionIdentifier {
@@ -739,7 +738,8 @@ fromViewController:(UIViewController *)presenter {
 }
 
 - (void)dismissGalleryFlowForOriginOpenWithCompletion:(void (^)(void))completion {
-    UIViewController *galleryPresenter = self.presentingViewController;
+    UIViewController *previewContainer = self.navigationController ?: self;
+    UIViewController *galleryPresenter = previewContainer.presentingViewController;
     UIViewController *galleryContainer = galleryPresenter.navigationController ?: galleryPresenter;
 
     if (self.isFromGallery && galleryContainer) {
@@ -748,7 +748,7 @@ fromViewController:(UIViewController *)presenter {
         if ([SCIGalleryManager sharedManager].isLockEnabled) {
             [[SCIGalleryManager sharedManager] lockGallery];
         }
-        [self dismissViewControllerAnimated:NO completion:^{
+        [previewContainer dismissViewControllerAnimated:NO completion:^{
             [galleryContainer dismissViewControllerAnimated:YES completion:^{
                 if ([self.delegate respondsToSelector:@selector(fullScreenMediaPlayerDidDismiss)]) {
                     [self.delegate fullScreenMediaPlayerDidDismiss];
@@ -761,7 +761,7 @@ fromViewController:(UIViewController *)presenter {
         return;
     }
 
-    [self dismissViewControllerAnimated:YES completion:^{
+    [previewContainer dismissViewControllerAnimated:YES completion:^{
         [self cleanupAll];
         dispatch_async(dispatch_get_main_queue(), ^{
             [self restorePreviewPlaybackIfNeeded];
@@ -885,11 +885,22 @@ fromViewController:(UIViewController *)presenter {
 
 - (void)toggleToolbar {
     _isToolbarVisible = !_isToolbarVisible;
-    [UIView animateWithDuration:0.25 animations:^{
+    UINavigationController *navigationController = self.navigationController;
+    if (_isToolbarVisible) {
+        navigationController.navigationBar.alpha = 1.0;
+    }
+    [navigationController setNavigationBarHidden:!_isToolbarVisible animated:YES];
+    [self updateCurrentVideoPlayerControlInsetsAnimated:YES];
+    [UIView animateWithDuration:kPreviewChromeAnimationDuration
+                          delay:0.0
+                        options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionBeginFromCurrentState
+                     animations:^{
         [self setNeedsStatusBarAppearanceUpdate];
+        [navigationController setNeedsStatusBarAppearanceUpdate];
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
-        self->_topToolbar.alpha = alpha;
         if (self->_bottomBar) self->_bottomBar.alpha = alpha;
+    } completion:^(__unused BOOL finished) {
+        [self updateCurrentVideoPlayerControlInsetsAnimated:NO];
     }];
 }
 
@@ -1046,7 +1057,8 @@ fromViewController:(UIViewController *)presenter {
 #pragma mark - Actions
 
 - (void)closeTapped {
-    [self dismissViewControllerAnimated:YES completion:^{
+    UIViewController *dismissTarget = self.navigationController ?: self;
+    [dismissTarget dismissViewControllerAnimated:YES completion:^{
         [self cleanupAll];
         dispatch_async(dispatch_get_main_queue(), ^{
             [self restorePreviewPlaybackIfNeeded];
@@ -1549,7 +1561,7 @@ fromViewController:(UIViewController *)presenter {
                 [UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState animations:^{
                     self->_pageViewController.view.center = CGPointMake(self.interactiveDismissAnchorPoint.x, finalCenterY);
                     self.presentationBackdropView.alpha = 0.0;
-                    self->_topToolbar.alpha = 0.0;
+                    self.navigationController.navigationBar.alpha = 0.0;
                     if (self->_bottomBar) self->_bottomBar.alpha = 0.0;
                 } completion:^(BOOL finished) {
                     [self finishInteractiveDismissal];
@@ -1561,7 +1573,7 @@ fromViewController:(UIViewController *)presenter {
                     self->_pageViewController.view.center = self.interactiveDismissAnchorPoint;
                     self.presentationBackdropView.alpha = 1.0;
                     CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
-                    self->_topToolbar.alpha = alpha;
+                    self.navigationController.navigationBar.alpha = alpha;
                     if (self->_bottomBar) self->_bottomBar.alpha = alpha;
                 } completion:^(BOOL finished) {
                     UIViewController *currentVC = self->_pageViewController.viewControllers.firstObject;
@@ -1601,7 +1613,7 @@ fromViewController:(UIViewController *)presenter {
         self->_pageViewController.view.center = SCICenterForBounds(self.view.bounds);
         self.presentationBackdropView.alpha = 1.0;
         CGFloat alpha = self->_isToolbarVisible ? 1.0 : 0.0;
-        self->_topToolbar.alpha = alpha;
+        self.navigationController.navigationBar.alpha = alpha;
         if (self->_bottomBar) self->_bottomBar.alpha = alpha;
     };
     if (animated) {
@@ -1618,7 +1630,8 @@ fromViewController:(UIViewController *)presenter {
 
     self.interactiveDismissalInProgress = YES;
     self.interactiveDismissAnchorPoint = self.pageViewController.view.center;
-    [self dismissViewControllerAnimated:YES completion:nil];
+    UIViewController *dismissTarget = self.navigationController ?: self;
+    [dismissTarget dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)updateInteractiveDismissalWithVerticalDelta:(CGFloat)verticalDelta backdropAlpha:(CGFloat)backdropAlpha {
@@ -1639,7 +1652,7 @@ fromViewController:(UIViewController *)presenter {
                                                       self.interactiveDismissAnchorPoint.y + verticalDelta);
     self.presentationBackdropView.alpha = backdropAlpha;
     CGFloat fade = (self.isToolbarVisible ? 1.0 : 0.0) * backdropAlpha;
-    self.topToolbar.alpha = MAX(0.0, fade);
+    self.navigationController.navigationBar.alpha = MAX(0.0, fade);
     if (self.bottomBar) self.bottomBar.alpha = MAX(0.0, fade);
 }
 

@@ -4,6 +4,8 @@
 #import <AVFoundation/AVFoundation.h>
 #import "../../Utils.h"
 
+static NSTimeInterval const kPlayerControlOverlayInsetAnimationDuration = 0.25;
+
 @interface SCIFullScreenVideoViewController () <AVPlayerViewControllerDelegate>
 
 @property (nonatomic, strong) AVPlayer *player;
@@ -18,6 +20,7 @@
 @property (nonatomic, assign) BOOL hasStartedPlayback;
 @property (nonatomic, assign) BOOL isLoadingThumbnail;
 @property (nonatomic, assign) BOOL isObservingPlayerItemStatus;
+@property (nonatomic, assign) UIEdgeInsets playerControlOverlayInsets;
 @property (nonatomic, assign) NSInteger loadGeneration;
 
 @end
@@ -28,6 +31,7 @@
     self = [super init];
     if (self) {
         _mediaItem = item;
+        _playerControlOverlayInsets = UIEdgeInsetsZero;
     }
     return self;
 }
@@ -73,10 +77,11 @@
     _playerViewController.view.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view insertSubview:_playerViewController.view atIndex:0];
     [_playerViewController didMoveToParentViewController:self];
+    _playerViewController.additionalSafeAreaInsets = self.playerControlOverlayInsets;
 
     [NSLayoutConstraint activateConstraints:@[
-        [_playerViewController.view.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:44.0],
-        [_playerViewController.view.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-44.0],
+        [_playerViewController.view.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_playerViewController.view.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [_playerViewController.view.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_playerViewController.view.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];
@@ -91,11 +96,38 @@
     [self.view addSubview:_thumbnailView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [_thumbnailView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:44.0],
-        [_thumbnailView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-44.0],
+        [_thumbnailView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_thumbnailView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [_thumbnailView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_thumbnailView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
     ]];
+}
+
+- (void)setPlayerControlOverlayInsets:(UIEdgeInsets)insets animated:(BOOL)animated {
+    if (UIEdgeInsetsEqualToEdgeInsets(_playerControlOverlayInsets, insets) &&
+        (!_playerViewController || UIEdgeInsetsEqualToEdgeInsets(_playerViewController.additionalSafeAreaInsets, insets))) {
+        return;
+    }
+
+    _playerControlOverlayInsets = insets;
+    if (!_playerViewController) {
+        return;
+    }
+
+    _playerViewController.additionalSafeAreaInsets = insets;
+
+    void (^layout)(void) = ^{
+        [self->_playerViewController.view layoutIfNeeded];
+    };
+    if (animated && self.isViewLoaded && _playerViewController) {
+        [UIView animateWithDuration:kPlayerControlOverlayInsetAnimationDuration
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionBeginFromCurrentState
+                         animations:layout
+                         completion:nil];
+    } else {
+        layout();
+    }
 }
 
 - (void)setupLoadingIndicator {
