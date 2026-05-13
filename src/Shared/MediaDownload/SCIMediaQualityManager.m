@@ -821,6 +821,21 @@ static SCIMediaOption *SCIMediaTieredOption(NSArray<SCIMediaOption *> *options, 
     return nil;
 }
 
+static SCIMediaOption *SCIMediaFirstSelectableOption(NSArray<SCIMediaOption *> *options) {
+    for (SCIMediaOption *option in options ?: @[]) {
+        if (option.selectable) {
+            return option;
+        }
+    }
+    return nil;
+}
+
+static SCIMediaOption *SCIMediaFFmpegFreeHighOption(SCIMediaAnalysis *analysis) {
+    return analysis.progressiveVideoOptions.firstObject
+        ?: SCIMediaFirstSelectableOption(analysis.videoDashOnlyOptions)
+        ?: SCIMediaFirstSelectableOption(analysis.mergedDashOptions);
+}
+
 static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) {
     NSString *preferenceKey = analysis.isVideo ? @"media_video_quality_default" : @"media_photo_quality_default";
     NSString *quality = [SCIUtils getStringPref:preferenceKey];
@@ -828,12 +843,22 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
         quality = analysis.isVideo ? @"always_ask" : @"high";
     }
 
-    if ([quality isEqualToString:@"always_ask"]) {
-        return nil;
+    if (!analysis.isVideo) {
+        if ([quality isEqualToString:@"always_ask"]) {
+            return nil;
+        }
+        return SCIMediaTieredOption(analysis.photoOptions, quality) ?: analysis.photoOptions.firstObject;
     }
 
-    if (!analysis.isVideo) {
-        return SCIMediaTieredOption(analysis.photoOptions, quality) ?: analysis.photoOptions.firstObject;
+    if (!analysis.ffmpegAvailable) {
+        if (![quality isEqualToString:@"high_ignore_dash"]) {
+            [[NSUserDefaults standardUserDefaults] setObject:@"high_ignore_dash" forKey:preferenceKey];
+        }
+        return SCIMediaFFmpegFreeHighOption(analysis);
+    }
+
+    if ([quality isEqualToString:@"always_ask"]) {
+        return nil;
     }
 
     if ([quality isEqualToString:@"high_ignore_dash"]) {
@@ -1439,7 +1464,7 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
     (void)tableView;
     SCIMediaOptionSection *infoSection = self.sections[section];
     if ([infoSection.title isEqualToString:@"Merge Video + Audio (DASH)"] && !self.analysis.ffmpegAvailable) {
-        return @"FFmpegKit is not available in the active build, so merged DASH rows are disabled. View Encoding Logs includes the loader failure details.";
+        return @"FFmpegKit is not available in the active build, so merged DASH rows are disabled.";
     }
     return nil;
 }

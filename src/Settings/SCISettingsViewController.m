@@ -281,6 +281,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     cellContentConfig.textProperties.numberOfLines = 0;
     cellContentConfig.secondaryTextProperties.numberOfLines = 0;
     cellContentConfig.secondaryTextProperties.lineBreakMode = NSLineBreakByWordWrapping;
+    BOOL rowEnabled = row.userInfo[@"enabled"] ? [row.userInfo[@"enabled"] boolValue] : YES;
     
     cellContentConfig.text = SCITitleCaseString(row.title);
     
@@ -332,7 +333,6 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             
         case SCITableCellSwitch: {
             SCISwitch *toggle = [SCISwitch new];
-            BOOL rowEnabled = row.userInfo[@"enabled"] ? [row.userInfo[@"enabled"] boolValue] : YES;
             NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
             id storedValue = [defaults objectForKey:row.defaultsKey];
             NSNumber *defaultValue = row.userInfo[@"defaultValue"];
@@ -390,6 +390,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             [menuButton setTitle:@"•••" forState:UIControlStateNormal];
             menuButton.menu = [row menuForButton:menuButton];
             menuButton.showsMenuAsPrimaryAction = YES;
+            menuButton.enabled = rowEnabled;
             menuButton.titleLabel.font = [UIFont systemFontOfSize:[UIFont preferredFontForTextStyle:UIFontTextStyleBody].pointSize
                                                            weight:UIFontWeightMedium];
             menuButton.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
@@ -399,7 +400,11 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
             UIButtonConfiguration *config = menuButton.configuration ?: [UIButtonConfiguration plainButtonConfiguration];
             config.contentInsets = NSDirectionalEdgeInsetsMake(8, 8, 8, 8);
             menuButton.configuration = config;
-            menuButton.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
+            menuButton.tintColor = rowEnabled ? [SCIUtils SCIColor_InstagramPrimaryText] : [SCIUtils SCIColor_InstagramTertiaryText];
+            if (!rowEnabled) {
+                cellContentConfig.textProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
+                cellContentConfig.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramTertiaryText];
+            }
 
             [menuButton sizeToFit];
             
@@ -409,7 +414,12 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
         }
             
         case SCITableCellNavigation: {
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.accessoryType = rowEnabled ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
+            if (!rowEnabled) {
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
+                cellContentConfig.textProperties.color = [SCIUtils SCIColor_InstagramSecondaryText];
+                cellContentConfig.secondaryTextProperties.color = [SCIUtils SCIColor_InstagramTertiaryText];
+            }
             break;
         }
     }
@@ -442,6 +452,11 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     SCISetting *row = self.sections[indexPath.section][@"rows"][indexPath.row];
     if (!row) return;
+    BOOL rowEnabled = row.userInfo[@"enabled"] ? [row.userInfo[@"enabled"] boolValue] : YES;
+    if (!rowEnabled) {
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+        return;
+    }
 
     if (row.type == SCITableCellLink) {
         [[UIApplication sharedApplication] openURL:row.url options:@{} completionHandler:nil];
