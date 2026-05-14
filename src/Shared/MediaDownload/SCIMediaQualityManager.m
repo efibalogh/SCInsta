@@ -1,4 +1,5 @@
 #import "SCIMediaQualityManager.h"
+#include <UIKit/UIKit.h>
 
 #import "SCIDashParser.h"
 #import "SCIMediaFFmpeg.h"
@@ -1374,7 +1375,10 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
         [self.tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [self.tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor]
     ]];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(closeTapped)];
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[SCIAssetUtils instagramIconNamed:@"xmark"]
+                                                                             style:UIBarButtonItemStylePlain
+                                                                            target:self
+                                                                            action:@selector(closeTapped)];
 }
 
 - (NSArray<SCIMediaOptionSection *> *)sections {
