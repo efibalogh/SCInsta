@@ -184,8 +184,6 @@ static char kSCISectionEditSwitchAssocKey;
         } else {
             NSString *kind = [self bulkEditorKindForCurrentSection];
             config.text = [kind isEqualToString:@"copy"] ? @"Configure Copy All Menu" : @"Configure Download All Menu";
-            config.image = SCISettingsIcon([kind isEqualToString:@"copy"] ? @"copy" : @"download");
-            config.imageProperties.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         }
@@ -205,7 +203,7 @@ static char kSCISectionEditSwitchAssocKey;
         NSString *owner = [self.configuration sectionIdentifierForAction:identifier];
         if ([owner isEqualToString:section.identifier]) {
             cell.accessoryType = UITableViewCellAccessoryCheckmark;
-            config.secondaryText = @"In this section";
+            config.secondaryText = nil;
         } else if (owner.length > 0) {
             SCIActionMenuSection *ownerSection = [self.configuration sectionWithIdentifier:owner];
             config.secondaryText = ownerSection.title;

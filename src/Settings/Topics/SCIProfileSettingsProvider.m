@@ -70,19 +70,19 @@ static UIMenu *SCIProfileDefaultCopyInfoMenu(void) {
 + (SCISetting *)rootSetting {
     return SCITopicNavigationSetting(@"Profile", @"profile", 24.0, @[
         SCITopicSection(@"Action Button", @[
-            [SCISetting switchCellWithTitle:@"Enable Action Button" subtitle:@"Adds an action button to profile pages" defaultsKey:@"action_button_profile_enabled"],
-            [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Tap runs this profile tool. Long press opens the full menu" menu:SCIProfileActionDefaultMenu()],
+            [SCISetting switchCellWithTitle:@"Profile Action Button" subtitle:@"" defaultsKey:@"action_button_profile_enabled"],
+            [SCISetting menuCellWithTitle:@"Default Tap Action" subtitle:@"Long press to open the full menu" menu:SCIProfileActionDefaultMenu()],
             [SCISetting menuCellWithTitle:@"Copy Info Default" subtitle:@"When Default Tap Action is set to Copy Info, choose what gets copied" menu:SCIProfileDefaultCopyInfoMenu()]
         ], nil),
         SCITopicSection(@"Profile Picture", @[
-            [SCISetting switchCellWithTitle:@"Long Press to Expand Photo" subtitle:@"When enabled, long-pressing a profile picture opens the full-size expanded view" defaultsKey:@"profile_photo_zoom"]
+            [SCISetting switchCellWithTitle:@"Long Press to Expand" subtitle:@"Long press a profile picture to open it expanded" defaultsKey:@"profile_photo_zoom"]
         ], nil),
         SCITopicSection(@"Indicators", @[
-            [SCISetting switchCellWithTitle:@"Show Following Indicator" subtitle:@"Shows whether the profile user follows you" defaultsKey:@"follow_indicator"]
+            [SCISetting switchCellWithTitle:@"Show Following Indicator" subtitle:@"" defaultsKey:@"follow_indicator"]
         ], nil),
         SCITopicSection(@"Confirmation", @[
-            [SCISetting switchCellWithTitle:@"Confirm Follow" subtitle:@"Shows an alert when you tap Follow to confirm the action" defaultsKey:@"follow_confirm"],
-            [SCISetting switchCellWithTitle:@"Confirm Unfollow" subtitle:@"Shows an alert when you unfollow to confirm the action" defaultsKey:@"unfollow_confirm"]
+            [SCISetting switchCellWithTitle:@"Confirm Follow" subtitle:@"" defaultsKey:@"follow_confirm"],
+            [SCISetting switchCellWithTitle:@"Confirm Unfollow" subtitle:@"" defaultsKey:@"unfollow_confirm"]
         ], nil)
     ]);
 }

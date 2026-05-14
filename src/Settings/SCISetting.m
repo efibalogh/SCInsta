@@ -187,6 +187,22 @@
     return setting;
 }
 
++ (instancetype)menuCellWithTitle:(NSString *)title
+                         subtitle:(NSString *)subtitle
+                             icon:(nullable UIImage *)icon
+                             menu:(UIMenu *)menu
+{
+    SCISetting *setting = [[self alloc] initWithType:SCITableCellMenu];
+    
+    setting.title = title;
+    setting.subtitle = subtitle;
+    
+    setting.icon = icon;
+    setting.baseMenu = menu;
+    
+    return setting;
+}
+
 // MARK: - + navigationCellWithTitle
 
 + (instancetype)navigationCellWithTitle:(NSString *)title

@@ -100,6 +100,11 @@ typedef NS_ENUM(NSInteger, SCITableCell) {
                          subtitle:(NSString *)subtitle
                              menu:(UIMenu *)menu;
 
++ (instancetype)menuCellWithTitle:(NSString *)title
+                         subtitle:(NSString *)subtitle
+                             icon:(nullable UIImage *)icon
+                             menu:(UIMenu *)menu;
+
 + (instancetype)navigationCellWithTitle:(NSString *)title
                                subtitle:(NSString *)subtitle
                                    icon:(nullable UIImage *)icon

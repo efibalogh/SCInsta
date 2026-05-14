@@ -8,18 +8,14 @@
 #import "../UI/SCIIGAlertPresenter.h"
 #import "../UI/SCISwitch.h"
 #import "../../Utils.h"
+#import "../../AssetUtils.h"
 
 static NSString * const kFavoritesAtTopKey = @"show_favorites_at_top";
 static NSString * const kGalleryLongPressTabKey = @"gallery_long_press_tab";
-static NSString * const kNavigationIconOrderingKey = @"nav_icon_ordering";
-
-static BOOL SCIGalleryUsesClassicTabOrdering(void) {
-    return [[[NSUserDefaults standardUserDefaults] stringForKey:kNavigationIconOrderingKey] isEqualToString:@"classic"];
-}
 
 static NSString *SCIGalleryResolvedShortcutTabIdentifier(NSString *identifier) {
     NSString *resolved = identifier.length > 0 ? identifier : @"direct-inbox-tab";
-    BOOL usesClassic = SCIGalleryUsesClassicTabOrdering();
+    BOOL usesClassic = [SCIUtils tabOrderSetTo:@"classic"];
     if (usesClassic && [resolved isEqualToString:@"direct-inbox-tab"]) return @"camera-tab";
     if (!usesClassic && [resolved isEqualToString:@"camera-tab"]) return @"direct-inbox-tab";
     return resolved;
@@ -31,7 +27,7 @@ static NSArray<NSDictionary *> *SCIGalleryShortcutTargetItems(void) {
         @{@"title": @"Reels", @"value": @"reels-tab"}
     ] mutableCopy];
 
-    if (SCIGalleryUsesClassicTabOrdering()) {
+    if ([SCIUtils tabOrderSetTo:@"classic"]) {
         [items addObject:@{@"title": @"Create", @"value": @"camera-tab"}];
     } else {
         [items addObject:@{@"title": @"Messages", @"value": @"direct-inbox-tab"}];
@@ -48,14 +44,13 @@ static NSString *SCIGalleryShortcutTargetTitle(NSString *identifier) {
             return item[@"title"];
         }
     }
-    return SCIGalleryUsesClassicTabOrdering() ? @"Create" : @"Messages";
+    return [SCIUtils tabOrderSetTo:@"classic"] ? @"Create" : @"Messages";
 }
 
 typedef NS_ENUM(NSInteger, SCIGalleryStatsRow) {
-    SCIGalleryStatsRowTotal = 0,
-    SCIGalleryStatsRowImages,
+    SCIGalleryStatsRowImages = 0,
     SCIGalleryStatsRowVideos,
-    SCIGalleryStatsRowSize,
+    SCIGalleryStatsRowTotal,
     SCIGalleryStatsRowCount
 };
 
@@ -153,13 +148,13 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     switch (section) {
         case SCIGallerySettingsSectionBrowsing:
-            return @"When enabled, favorites are pinned above other files inside the current sort and folder context.";
+            return @"Pin favorites above other files inside the current sort and folder context.";
         case SCIGallerySettingsSectionLock:
-            return @"When enabled, the Gallery requires a passcode or biometrics to open.";
+            return @"Lock the Gallery with a passcode or biometrics.";
         case SCIGallerySettingsSectionShortcuts:
-            return @"Choose which tab opens Gallery on long press. Requires app restart to take effect.";
+            return @"Choose which tab opens Gallery on long press.";
         case SCIGallerySettingsSectionImport:
-            return @"Import from the Files app with full metadata (username, shortcode, URLs) so Open profile / Open original behave like saves from Instagram. Batch: set shared fields, Add files, then edit or merge per row.";
+            return @"Import from the Files app with full editable metadata.";
         default:
             return nil;
     }
@@ -183,12 +178,14 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
     return 0;
 }
 
-- (UITableViewCell *)valueCellWithTitle:(NSString *)title value:(NSString *)value {
+- (UITableViewCell *)valueCellWithTitle:(NSString *)title icon:(UIImage *)icon value:(NSString *)value {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     cell.backgroundColor = [SCIUtils SCIColor_InstagramSecondaryBackground];
     cell.selectedBackgroundView = [self selectionBackgroundView];
     cell.textLabel.text = title;
+    cell.imageView.image = icon;
+    cell.imageView.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.textLabel.textColor = [SCIUtils SCIColor_InstagramPrimaryText];
     cell.detailTextLabel.text = value;
     cell.detailTextLabel.textColor = [SCIUtils SCIColor_InstagramSecondaryText];
@@ -198,20 +195,20 @@ typedef NS_ENUM(NSInteger, SCIGallerySettingsSection) {
 - (UITableViewCell *)statsCellForRow:(NSInteger)row {
     switch (row) {
         case SCIGalleryStatsRowTotal:
-            return [self valueCellWithTitle:@"Total Files" value:[NSString stringWithFormat:@"%ld", (long)self.stats.totalFiles]];
+            return [self valueCellWithTitle:@"Total" icon:[SCIAssetUtils instagramIconNamed:@"info" pointSize:24.0] value:[NSString stringWithFormat:@"%ld files • %@", (long)self.stats.totalFiles, [self formattedSize:self.stats.totalSize]]];
         case SCIGalleryStatsRowImages:
-            return [self valueCellWithTitle:@"Images" value:[NSString stringWithFormat:@"%ld", (long)self.stats.imageCount]];
+            return [self valueCellWithTitle:@"Images" icon:[SCIAssetUtils instagramIconNamed:@"photo" pointSize:24.0] value:[NSString stringWithFormat:@"%ld", (long)self.stats.imageCount]];
         case SCIGalleryStatsRowVideos:
-            return [self valueCellWithTitle:@"Videos" value:[NSString stringWithFormat:@"%ld", (long)self.stats.videoCount]];
-        case SCIGalleryStatsRowSize:
-            return [self valueCellWithTitle:@"Total Size" value:[self formattedSize:self.stats.totalSize]];
+            return [self valueCellWithTitle:@"Videos" icon:[SCIAssetUtils instagramIconNamed:@"video" pointSize:24.0] value:[NSString stringWithFormat:@"%ld", (long)self.stats.videoCount]];
     }
-    return [self valueCellWithTitle:@"" value:@""];
+    return [self valueCellWithTitle:@"" icon:nil value:@""];
 }
 
 - (void)configureBrowsingCell:(UITableViewCell *)cell {
     cell.textLabel.text = @"Show Favorites at Top";
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    cell.imageView.image = [SCIAssetUtils instagramIconNamed:@"heart" pointSize:24.0];
+    cell.imageView.tintColor = [SCIUtils SCIColor_InstagramPrimaryText];
 
     SCISwitch *sw = [[SCISwitch alloc] init];
     sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:kFavoritesAtTopKey];

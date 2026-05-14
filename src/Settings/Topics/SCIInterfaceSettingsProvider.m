@@ -44,8 +44,8 @@
                                     navSections:[SCINotificationSettingsProvider sections]]
         ], nil),
         SCITopicSection(@"Tabs", @[
-            [SCISetting menuCellWithTitle:@"Icon Order" subtitle:@"The order of the icons on the tab bar" menu:SCINavigationIconOrderingMenu()],
-            [SCISetting menuCellWithTitle:@"Swipe Between Tabs" subtitle:@"Lets you swipe to switch between tabs" menu:SCISwipeBetweenTabsMenu()],
+            [SCISetting menuCellWithTitle:@"Tab Icon Order" subtitle:@"" menu:SCINavigationIconOrderingMenu()],
+            [SCISetting menuCellWithTitle:@"Swipe Between Tabs" subtitle:@"" menu:SCISwipeBetweenTabsMenu()],
             [SCISetting switchCellWithTitle:@"Hide Feed Tab" subtitle:@"" defaultsKey:@"hide_feed_tab" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Hide Explore Tab" subtitle:@"" defaultsKey:@"hide_explore_tab" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Hide Messages Tab" subtitle:@"" defaultsKey:@"hide_messages_tab" requiresRestart:YES],
@@ -53,8 +53,8 @@
             [SCISetting switchCellWithTitle:@"Hide Create Tab" subtitle:@"" defaultsKey:@"hide_create_tab" requiresRestart:YES]
         ], nil),
         SCITopicSection(@"Explore & Search", @[
-            [SCISetting switchCellWithTitle:@"Hide Explore Posts Grid" subtitle:@"Hides the grid of suggested posts on the explore and search tab" defaultsKey:@"hide_explore_grid"],
-            [SCISetting switchCellWithTitle:@"Hide Trending Searches" subtitle:@"Hides the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"],
+            [SCISetting switchCellWithTitle:@"Hide Explore Posts Grid" subtitle:@"Hide the grid of suggested posts on the explore tab" defaultsKey:@"hide_explore_grid"],
+            [SCISetting switchCellWithTitle:@"Hide Trending Searches" subtitle:@"Hide the trending searches under the explore search bar" defaultsKey:@"hide_trending_searches"],
             [SCISetting switchCellWithTitle:@"Open Clipboard Link" subtitle:@"Long press the Explore tab to open the current clipboard URL" defaultsKey:@"search_bar_open_clipboard_link"]
         ], nil)
     ]);

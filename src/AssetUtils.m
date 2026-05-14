@@ -135,6 +135,8 @@ static NSDictionary<NSString *, SCIAssetDescriptor *> *SCIAssetOverrides(void) {
             @"circle": @{@"candidates": @[@"ig_icon_circle_outline_24"]},
             @"circle_check": @{@"candidates": @[@"ig_icon_circle_check_outline_24"]},
             @"circle_check_filled": @{@"candidates": @[@"ig_icon_circle_check_pano_filled_24", @"ig_icon_circle_check_filled_24"]},
+            @"clock": @{@"candidates": @[@"ig_icon_clock_pano_outline_24", @"ig_icon_clock_outline_24"]},
+            @"cloud": @{@"candidates": @[@"ig_icon_app_icloud_outline_24"]},
             @"copy": @{@"candidates": @[@"ig_icon_copy_outline_24"]},
             @"copy_filled": @{@"candidates": @[@"ig_icon_copy_filled_24"]},
             @"download": @{@"candidates": @[@"ig_icon_download_outline_24"]},

@@ -20,7 +20,7 @@ on:
                 type: boolean
             with_flex:
                 description: "Include libflex"
-                default: true
+                default: false
                 required: false
                 type: boolean
   

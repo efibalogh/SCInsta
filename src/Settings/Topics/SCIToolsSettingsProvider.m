@@ -124,9 +124,9 @@ static NSArray *SCIManageSettingsDataSections(void) {
     NSString *flexFooter = flexInstalled
         ? @"The first time FLEX is opened in a session it can take a moment to initialize."
         : @"FLEX not installed. Rebuild with \"--flex\" flag or install libFLEX.dylib to enable these options.";
-    SCISetting *flexGesture = [SCISetting switchCellWithTitle:@"Enable 3-Finger FLEX Gesture" subtitle:@"Hold three fingers anywhere for 1.5 seconds to open the FLEX explorer" defaultsKey:@"flex_instagram"];
-    SCISetting *flexLaunch = [SCISetting switchCellWithTitle:@"Open FLEX on App Launch" subtitle:@"Automatically opens the FLEX explorer when the app launches" defaultsKey:@"flex_app_launch"];
-    SCISetting *flexFocus = [SCISetting switchCellWithTitle:@"Open FLEX on App Focus" subtitle:@"Automatically opens the FLEX explorer when the app is focused" defaultsKey:@"flex_app_start"];
+    SCISetting *flexGesture = [SCISetting switchCellWithTitle:@"Three-finger Gesture" subtitle:@"Hold three fingers anywhere for 1.5 seconds" defaultsKey:@"flex_instagram"];
+    SCISetting *flexLaunch = [SCISetting switchCellWithTitle:@"Open on App Launch" subtitle:@"" defaultsKey:@"flex_app_launch"];
+    SCISetting *flexFocus = [SCISetting switchCellWithTitle:@"Open on App Focus" subtitle:@"" defaultsKey:@"flex_app_start"];
     if (!flexInstalled) {
         flexGesture.userInfo = @{@"enabled": @NO};
         flexLaunch.userInfo = @{@"enabled": @NO};
@@ -134,9 +134,9 @@ static NSArray *SCIManageSettingsDataSections(void) {
     }
     NSMutableArray *sections = [NSMutableArray arrayWithArray:@[
         SCITopicSection(@"FLEX", @[flexGesture, flexLaunch, flexFocus], flexFooter),
-        SCITopicSection(@"SCInsta", @[
-            [SCISetting switchCellWithTitle:@"Enable Tweak Settings Quick Access" subtitle:@"Allows you to long-press the home tab to open SCInsta settings" defaultsKey:@"settings_shortcut" requiresRestart:YES],
-            [SCISetting switchCellWithTitle:@"Show Tweak Settings on App Launch" subtitle:@"Automatically opens the SCInsta settings when the app launches" defaultsKey:@"tweak_settings_app_launch"],
+        SCITopicSection(@"Tweak", @[
+            [SCISetting switchCellWithTitle:@"Quick Settings Access" subtitle:@"Long press the home tab" defaultsKey:@"settings_shortcut" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Show Settings on App Launch" subtitle:@"" defaultsKey:@"tweak_settings_app_launch"],
             [SCISetting buttonCellWithTitle:@"Reset Onboarding Completion State" subtitle:@"" icon:nil action:^(void) {
                 [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"SCInstaFirstRun"];
                 [SCIUtils showRestartConfirmation];
@@ -146,7 +146,7 @@ static NSArray *SCIManageSettingsDataSections(void) {
             [SCISetting switchCellWithTitle:@"Disable Safe Mode" subtitle:@"Makes Instagram not reset settings after subsequent crashes, at your own risk" defaultsKey:@"disable_safe_mode"]
         ], nil),
         SCITopicSection(@"Backup & Transfer", @[
-            [SCISetting navigationCellWithTitle:@"Manage Settings & Data" subtitle:@"Export or import settings, Gallery media, or both" icon:nil navSections:SCIManageSettingsDataSections()]
+            [SCISetting navigationCellWithTitle:@"Manage Settings & Data" subtitle:@"" icon:[SCIAssetUtils instagramIconNamed:@"cloud" pointSize:24.0] navSections:SCIManageSettingsDataSections()]
         ], nil),
         SCITopicSection(@"Liquid Glass", @[
             [SCISetting switchCellWithTitle:@"Enable Liquid Glass Buttons" subtitle:@"Enables experimental liquid glass buttons within the app" defaultsKey:@"liquid_glass_buttons" requiresRestart:YES],

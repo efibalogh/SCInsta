@@ -25,6 +25,7 @@
 + (NSString *)getStringPref:(NSString *)key;
 
 // Misc
++ (BOOL)tabOrderSetTo:(NSString *)ordering;
 + (NSString *)IGVersionString;
 + (BOOL)isNotch;
 

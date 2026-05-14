@@ -135,11 +135,11 @@ static char kSCIActionsListSwitchAssocKey;
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Menu Sections";
     if (section == 1) return @"Unassigned Actions";
-    return @"Possible Actions";
+    return @"Available Actions";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) return @"Drag to reorder sections. Tap a section to edit its title, icon, collapsible state, and actions.";
+    if (section == 0) return @"Long press and drag to reorder sections.";
     if (section == 1) return @"Actions here are supported but do not appear in the runtime menu.";
     if (section == 2) return @"Disabled actions are hidden even if they remain assigned to a section.";
     return nil;

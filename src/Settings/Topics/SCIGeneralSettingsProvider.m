@@ -4,6 +4,7 @@
 #import "../../Shared/MediaDownload/SCIMediaFFmpeg.h"
 #import "../../Shared/MediaDownload/SCIMediaQualityManager.h"
 #import "../../Utils.h"
+#import "../../AssetUtils.h"
 
 @implementation SCIGeneralSettingsProvider
 
@@ -30,15 +31,19 @@
                                                     viewController:[SCIMediaFFmpeg logsViewController]];
     encodingLogs.userInfo = @{@"enabled": @(ffmpegAvailable)};
 
-    NSString *qualityFooter = ffmpegAvailable ? @"\"High\" merges DASH files for best quality. \"High (Ignore Dash)\" uses ready-to-play files. \"Always Ask\" prompts for selection." : @"FFmpegKit is required video quality options and encoding features.";
+    NSString *qualityFooter = ffmpegAvailable ? @"\"High\" merges DASH files for best quality. \"High (Ignore Dash)\" uses ready-to-play files. \"Always Ask\" prompts for selection." : @"FFmpegKit is required for video quality options and encoding features.";
 
     return SCITopicNavigationSetting(@"General", @"settings", 24.0, @[
-        SCITopicSection(@"Privacy & Links", @[
+        SCITopicSection(@"Behavior", @[
             [SCISetting switchCellWithTitle:@"Copy Description" subtitle:@"Long press on text fields" defaultsKey:@"copy_description"],
             [SCISetting switchCellWithTitle:@"Do Not Save Recent Searches" subtitle:@"Search bars will no longer save recent searches" defaultsKey:@"no_recent_searches"],
-            [SCISetting switchCellWithTitle:@"Remove User from Copied Link" subtitle:@"Copy links without the username path or tracking parameters" defaultsKey:@"remove_user_from_copied_share_link"],
-            [SCISetting switchCellWithTitle:@"Long Press Send to Copy Link" subtitle:@"Long press supported paperplane/send buttons to copy the current Instagram link" defaultsKey:@"share_button_long_press_copy_link"]
+            [SCISetting switchCellWithTitle:@"Remove User from Copied Link" subtitle:@"Copy links without tracking parameters" defaultsKey:@"remove_user_from_copied_share_link"],
+            [SCISetting switchCellWithTitle:@"Long Press Send to Copy Post Link" subtitle:@"" defaultsKey:@"share_button_long_press_copy_link"],
         ], nil),
+        SCITopicSection(@"", @[
+            [SCISetting switchCellWithTitle:@"Hide Create Group Button" subtitle:@"" defaultsKey:@"hide_create_group_button"],
+            [SCISetting switchCellWithTitle:@"Confirm Create Group Button" subtitle:@"" defaultsKey:@"confirm_create_group_button"],
+    ], nil),
         SCITopicSection(@"Recommendations", @[
             [SCISetting switchCellWithTitle:@"Hide Ads" subtitle:@"" defaultsKey:@"hide_ads"],
             [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the Meta AI buttons and related functionality" defaultsKey:@"hide_meta_ai"],
@@ -52,14 +57,14 @@
             encodingLogs
         ], qualityFooter),
         SCITopicSection(@"Storage", @[
-            [SCISetting buttonCellWithTitle:@"Clear Cache Now" subtitle:@"Remove temporary caches immediately" icon:nil action:^(void) {
+            [SCISetting buttonCellWithTitle:@"Clear Cache" subtitle:@"" icon:[SCIAssetUtils instagramIconNamed:@"trash" pointSize:24.0] action:^(void) {
                 [SCIUtils cleanCache];
                 SCINotify(kSCINotificationSettingsClearCache, @"Cache cleared", nil, @"circle_check_filled", SCINotificationToneForIconResource(@"circle_check_filled"));
             }],
-            [SCISetting menuCellWithTitle:@"Auto Clear Cache" subtitle:@"Choose when cache should be cleared automatically while using Instagram" menu:SCICacheAutoClearMenu()]
-        ], @"Automatic clearing is checked whenever Instagram becomes active. \"Always\" clears on every foreground; the other modes clear only after enough time has elapsed."),
+            [SCISetting menuCellWithTitle:@"Auto Clear Cache" subtitle:@"" icon:[SCIAssetUtils instagramIconNamed:@"clock" pointSize:24.0] menu:SCICacheAutoClearMenu()]
+        ], @"Automatic clearing is checked whenever Instagram becomes active."),
         SCITopicSection(@"App", @[
-            [SCISetting switchCellWithTitle:@"Enable Teen App Icons" subtitle:@"Hold down on the Instagram logo to change the app icon" defaultsKey:@"teen_app_icons" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Change App Icon" subtitle:@"Hold down on the Instagram logo to bring up the app icon selection menu" defaultsKey:@"teen_app_icons" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Disable App Haptics" subtitle:@"Disables haptics and vibrations within the app" defaultsKey:@"disable_haptics"]
         ], nil),
     ]);

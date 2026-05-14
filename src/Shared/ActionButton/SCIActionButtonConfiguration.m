@@ -171,7 +171,7 @@ NSArray<SCIActionMenuSection *> *SCIActionButtonDefaultSectionsForSource(SCIActi
                                                             actions:downloadActions]];
     [sections addObject:[SCIActionMenuSection sectionWithIdentifier:@"copy"
                                                               title:@"Copy"
-                                                           iconName:@"link"
+                                                           iconName:@"copy"
                                                         collapsible:YES
                                                             actions:copyActions]];
     [sections addObject:[SCIActionMenuSection sectionWithIdentifier:@"more"

@@ -98,9 +98,9 @@ static NSString *SCIBulkDefaultNotificationIdentifier(SCIBulkDownloadOperation o
 static NSString *SCIBulkOperationCompletionTitle(SCIBulkDownloadOperation operation, NSUInteger successCount) {
     switch (operation) {
         case SCIBulkDownloadOperationSaveToPhotos:
-            return [NSString stringWithFormat:@"Saved %lu item%@ to Photos", (unsigned long)successCount, successCount == 1 ? @"" : @"s"];
+            return [NSString stringWithFormat:@"Saved %lu item%@! Tap to open in Photos", (unsigned long)successCount, successCount == 1 ? @"" : @"s"];
         case SCIBulkDownloadOperationSaveToGallery:
-            return [NSString stringWithFormat:@"Saved %lu item%@ to Gallery", (unsigned long)successCount, successCount == 1 ? @"" : @"s"];
+            return [NSString stringWithFormat:@"Saved %lu item%@! Tap to open in Gallery", (unsigned long)successCount, successCount == 1 ? @"" : @"s"];
         case SCIBulkDownloadOperationShare:
             return @"Opened share sheet";
         case SCIBulkDownloadOperationCopyMedia:
@@ -112,11 +112,7 @@ static NSString *SCIBulkOperationCompletionSubtitle(SCIBulkDownloadOperation ope
     NSString *base = nil;
     switch (operation) {
         case SCIBulkDownloadOperationSaveToPhotos:
-            base = @"Tap to open Photos";
-            break;
         case SCIBulkDownloadOperationSaveToGallery:
-            base = @"Tap to open Gallery";
-            break;
         case SCIBulkDownloadOperationShare:
         case SCIBulkDownloadOperationCopyMedia:
             base = nil;

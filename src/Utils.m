@@ -483,6 +483,9 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 }
 
 // MARK: Misc
++ (BOOL)tabOrderSetTo:(NSString *)ordering {
+    return [[[NSUserDefaults standardUserDefaults] stringForKey:@"nav_icon_ordering"] isEqualToString:ordering];
+};
 
 + (NSString *)IGVersionString {
     return [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];

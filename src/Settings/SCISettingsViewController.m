@@ -249,7 +249,7 @@ static BOOL SCISettingsRowMatchesQuery(SCISetting *row, NSString *query, NSStrin
     self.searchController.searchResultsUpdater = self;
     self.searchController.obscuresBackgroundDuringPresentation = NO;
     self.searchController.hidesNavigationBarDuringPresentation = NO;
-    self.searchController.searchBar.placeholder = self.searchesAllSettings ? @"Search settings" : [NSString stringWithFormat:@"Search %@", self.title ?: @"settings"];
+    self.searchController.searchBar.placeholder = self.searchesAllSettings ? @"Search..." : [NSString stringWithFormat:@"Search %@", self.title ?: @"settings"];
     self.navigationItem.searchController = self.searchController;
     self.navigationItem.hidesSearchBarWhenScrolling = YES;
     if (@available(iOS 26.0, *)) {

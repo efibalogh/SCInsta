@@ -87,8 +87,8 @@
         ], nil),
         SCITopicSection(@"Haptics", @[
             [SCISetting navigationCellWithTitle:@"Haptics"
-                                       subtitle:@"Feature-specific haptic feedback"
-                                           icon:SCISettingsIcon(@"notification")
+                                       subtitle:@""
+                                           icon:nil
                                     navSections:[self sci_featureSectionsForHaptics:YES]]
         ], nil)
     ]];

@@ -352,7 +352,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
         if (self.action == share) {
             [self.progressView updateProgressTitle:@"Preparing share" subtitle:nil];
             [self.progressView setProgress:0.98f animated:YES];
-            [self showCompletionPillWithTitle:@"Share ready" subtitle:nil completionImmediately:YES completion:^{
+            [self showCompletionPillWithTitle:@"Opened share sheet" subtitle:nil completionImmediately:YES completion:^{
                 [SCIUtils showShareVC:newURL];
                 SCIInvokeDownloadCompletion(self, newURL, nil);
                 SCIReleaseActiveDownloadDelegate(self);
@@ -365,7 +365,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
             [self.progressView setProgress:0.98f animated:YES];
             [[self class] saveFileURLToPhotos:newURL completion:^(BOOL success, NSError *error) {
                 if (success) {
-                    [self showCompletionPillWithTitle:@"Saved to Photos" subtitle:@"Tap to open Photos" completionImmediately:NO completion:^{
+                    [self showCompletionPillWithTitle:@"Saved! Tap to open Photos" subtitle:nil completionImmediately:NO completion:^{
                         SCIInvokeDownloadCompletion(self, newURL, nil);
                         SCIReleaseActiveDownloadDelegate(self);
                     }];
@@ -393,7 +393,7 @@ static BOOL SCIIsAudioFileAtURL(NSURL *fileURL) {
             NSError *error;
             SCIGalleryFile *file = [[self class] saveFileURLToGallery:newURL metadata:galleryMeta error:&error];
             if (file) {
-                [self showCompletionPillWithTitle:@"Saved to Gallery" subtitle:@"Tap to open Gallery" completionImmediately:NO completion:^{
+                [self showCompletionPillWithTitle:@"Saved! Tap to open Gallery" subtitle:nil completionImmediately:NO completion:^{
                     SCIInvokeDownloadCompletion(self, newURL, nil);
                     SCIReleaseActiveDownloadDelegate(self);
                 }];
