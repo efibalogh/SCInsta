@@ -16,8 +16,6 @@ static NSString *sSCIFFmpegLoadFailureSummary = nil;
 static NSString *SCIFFmpegStringPref(NSString *key, NSString *fallback);
 
 static NSString * const kSCIFFmpegLogsDirectoryName = @"SCInstaFFmpegLogs";
-static NSString * const kSCIDebugModeLogPath = @"/Users/efi/dev/SCInsta/.cursor/debug-ec62e7.log";
-static NSString * const kSCIDebugSessionID = @"ec62e7";
 
 static NSString *SCIFFmpegDylibDirectory(void) {
     Dl_info info;
@@ -50,14 +48,10 @@ static NSString *SCIFFmpegCommandStringFromArguments(NSArray<NSString *> *argume
     return [parts componentsJoinedByString:@" "];
 }
 
-static NSInteger SCIFFmpegDashSpeedTierBitrateKbps(void) {
-    NSString *speed = SCIFFmpegStringPref(@"media_encoding_speed", @"medium");
-    if ([speed isEqualToString:@"ultrafast"]) return 8000;
-    if ([speed isEqualToString:@"faster"])    return 12000;
-    if ([speed isEqualToString:@"slower"])    return 50000;
-    return 20000;
-}
-
+// Used by SCIFFmpegAdvancedMergeArguments' VideoToolbox branch to mirror the
+// "ultrafast → realtime" and "slower → max quality" semantics of the speed
+// picker. The default-mode merge command no longer uses these (it switched to
+// libx264+preset), but the advanced+VideoToolbox path still does.
 static BOOL SCIFFmpegDashSpeedTierUsesRealtime(void) {
     NSString *speed = SCIFFmpegStringPref(@"media_encoding_speed", @"medium");
     return [speed isEqualToString:@"ultrafast"];
@@ -160,42 +154,6 @@ static void SCIFFmpegPersistLoaderFailure(NSArray<NSString *> *details) {
     }
     sSCIFFmpegLoadFailureSummary = [details componentsJoinedByString:@"\n"];
     SCIFFmpegPersistErrorLog(@"loader", @"dlopen ffmpegkit", sSCIFFmpegLoadFailureSummary);
-}
-
-static void SCIDebugModeLog(NSString *runId,
-                            NSString *hypothesisId,
-                            NSString *location,
-                            NSString *message,
-                            NSDictionary *data) {
-    NSMutableDictionary *payload = [NSMutableDictionary dictionary];
-    payload[@"sessionId"] = kSCIDebugSessionID;
-    payload[@"runId"] = runId ?: @"unknown";
-    payload[@"hypothesisId"] = hypothesisId ?: @"";
-    payload[@"location"] = location ?: @"";
-    payload[@"message"] = message ?: @"";
-    payload[@"data"] = data ?: @{};
-    payload[@"timestamp"] = @((long long)([[NSDate date] timeIntervalSince1970] * 1000.0));
-
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
-    if (jsonData.length == 0) return;
-
-    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:kSCIDebugModeLogPath];
-    if (!handle) {
-        [[NSFileManager defaultManager] createFileAtPath:kSCIDebugModeLogPath contents:nil attributes:nil];
-        handle = [NSFileHandle fileHandleForWritingAtPath:kSCIDebugModeLogPath];
-    }
-    if (!handle) return;
-
-    @try {
-        [handle seekToEndOfFile];
-        [handle writeData:jsonData];
-        [handle writeData:[@"\n" dataUsingEncoding:NSUTF8StringEncoding]];
-        [handle closeFile];
-    } @catch (__unused NSException *exception) {
-        @try {
-            [handle closeFile];
-        } @catch (__unused NSException *closeException) {}
-    }
 }
 
 static NSArray<NSString *> *SCIFFmpegCandidateBinaryPaths(void) {
@@ -310,7 +268,18 @@ static NSString *SCIFFmpegPresetForSpeed(NSString *speed) {
     return preset.length > 0 ? preset : @"medium";
 }
 
-// Default DASH merge command — hardware H.264 video with copied audio.
+// Default DASH merge command — software libx264 with preset-driven effort and CRF rate control
+//
+// `-movflags +faststart` is deliberately omitted. Long libx264 encodes (preset
+// slow/slower) on iOS reliably trigger an FFmpeg muxer error during the
+// in-place "second pass" that relocates the moov atom:
+//
+//   [mp4] Starting second pass: moving the moov atom to the beginning of the file
+//   [mp4] Unable to re-open <path> output file for shifting data
+//   [out#0/mp4] Error writing trailer: No such file or directory
+//
+// Faststart is instead handled by a separate stream-copy pass driven by the
+// merge attempts orchestrator (see `SCIFFmpegFaststartArguments`).
 static NSString *SCIFFmpegDefaultMergeCommand(NSURL *videoFileURL,
                                                NSURL *audioFileURL,
                                                NSURL *outputURL,
@@ -320,7 +289,9 @@ static NSString *SCIFFmpegDefaultMergeCommand(NSURL *videoFileURL,
     (void)width;
     (void)height;
     (void)sourceBitrate;
-    NSInteger bitrate = SCIFFmpegDashSpeedTierBitrateKbps();
+
+    NSString *speed  = SCIFFmpegStringPref(@"media_encoding_speed", @"medium");
+    NSString *preset = SCIFFmpegPresetForSpeed(speed);
 
     NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithArray:@[
         @"-y",
@@ -339,28 +310,80 @@ static NSString *SCIFFmpegDefaultMergeCommand(NSURL *videoFileURL,
     }
 
     [parts addObjectsFromArray:@[
-        @"-c:v h264_videotoolbox",
-        [NSString stringWithFormat:@"-b:v %ldk", (long)bitrate],
+        @"-c:v libx264",
+        [NSString stringWithFormat:@"-preset %@", preset],
+        @"-pix_fmt yuv420p",
+        @"-profile:v main",
+        @"-level 4.0",
     ]];
-    if (SCIFFmpegDashSpeedTierUsesRealtime()) {
-        [parts addObject:@"-realtime 1"];
-    }
-    if (SCIFFmpegDashSpeedTierIsMaxQuality()) {
-        [parts addObjectsFromArray:@[@"-profile:v high", @"-level 5.1"]];
-    }
     if (audioFileURL) {
+        // Audio is stream-copied. The merge entry point pre-converts xHE-AAC
+        // sources to AAC-LC via AVFoundation before getting here, so a copy is
+        // safe; FFmpeg never decodes the audio.
+        //
+        // No `-shortest`: libx264 has a multi-second lookahead at slow presets
+        // (rc_lookahead=60 + B-frame reorder ≈ 2s). With `-c:a copy` (no
+        // encoder pipeline) the muxer would EOF on audio and discard the
+        // still-in-flight encoded video tail. DASH inputs are always within
+        // ~tens of ms, so output duration stays correct without it.
         [parts addObject:@"-c:a copy"];
-        [parts addObject:@"-shortest"];
     } else {
         [parts addObject:@"-an"];
     }
 
-    [parts addObjectsFromArray:@[
-        @"-movflags +faststart",
-        [NSString stringWithFormat:@"'%@'", outputURL.path],
-    ]];
+    [parts addObject:[NSString stringWithFormat:@"'%@'", outputURL.path]];
 
     return [parts componentsJoinedByString:@" "];
+}
+
+// Array form of the default merge command, used by the normalization fallback
+// retries. Mirrors SCIFFmpegDefaultMergeCommand exactly so the behavior stays
+// consistent across the primary attempt and the two normalized retries.
+static NSArray<NSString *> *SCIFFmpegDefaultMergeArguments(NSURL *videoFileURL,
+                                                           NSURL *audioFileURL,
+                                                           NSURL *outputURL,
+                                                           NSString *extraVideoFilter) {
+    NSString *speed  = SCIFFmpegStringPref(@"media_encoding_speed", @"medium");
+    NSString *preset = SCIFFmpegPresetForSpeed(speed);
+
+    NSMutableArray<NSString *> *args = [NSMutableArray arrayWithArray:@[
+        @"-y",
+        @"-hide_banner",
+        @"-analyzeduration", @"100M",
+        @"-probesize",       @"100M",
+        @"-fflags",          @"+genpts",
+        @"-i",               videoFileURL.path,
+    ]];
+
+    if (audioFileURL) {
+        [args addObjectsFromArray:@[@"-i", audioFileURL.path]];
+        [args addObjectsFromArray:@[@"-map", @"0:v:0", @"-map", @"1:a:0"]];
+    } else {
+        [args addObjectsFromArray:@[@"-map", @"0:v:0", @"-an"]];
+    }
+
+    if (extraVideoFilter.length > 0) {
+        [args addObjectsFromArray:@[@"-vf", extraVideoFilter]];
+    }
+
+    [args addObjectsFromArray:@[
+        @"-c:v",       @"libx264",
+        @"-preset",    preset,
+        @"-pix_fmt",   @"yuv420p",
+        @"-profile:v", @"main",
+        @"-level",     @"4.0",
+    ]];
+
+    if (audioFileURL) {
+        // See SCIFFmpegDefaultMergeCommand for the audio/no-`-shortest` rationale.
+        [args addObjectsFromArray:@[@"-c:a", @"copy"]];
+    }
+
+    // Faststart is intentionally NOT applied here — it is performed by a
+    // separate stream-copy pass (SCIFFmpegFaststartArguments) to avoid the
+    // in-place moov-relocation reopen failing on long iOS encodes.
+    [args addObject:outputURL.path];
+    return args;
 }
 
 
@@ -449,32 +472,21 @@ static NSArray<NSString *> *SCIFFmpegAdvancedMergeArguments(NSURL *videoFileURL,
         [args addObjectsFromArray:@[@"-pix_fmt", pixelFormat]];
     }
 
-    // Always add +faststart
-    [args addObjectsFromArray:@[@"-movflags", @"+faststart"]];
+    // Faststart is handled by a follow-up stream-copy pass; see
+    // SCIFFmpegFaststartArguments and the merge orchestrator. Doing the moov
+    // relocation in-place can fail on slow encodes inside the iOS sandbox.
 
     // Audio
     if (audioFileURL) {
         (void)copyAudio;
-        [args addObjectsFromArray:@[@"-c:a", @"copy", @"-shortest"]];
+        // See SCIFFmpegDefaultMergeCommand for the audio/no-`-shortest` rationale.
+        [args addObjectsFromArray:@[@"-c:a", @"copy"]];
     }
 
     [args addObject:outputURL.path];
     return args;
 }
 
-
-// Returns a command string (for executeAsync:) or nil to indicate advanced mode.
-static NSString *SCIFFmpegDefaultMergeCommandOrNil(NSURL *videoFileURL,
-                                                    NSURL *audioFileURL,
-                                                    NSURL *outputURL,
-                                                    NSInteger width,
-                                                    NSInteger height,
-                                                    NSInteger sourceBitrate) {
-    if ([SCIUtils getBoolPref:@"media_advanced_encoding_enabled"]) {
-        return nil;
-    }
-    return SCIFFmpegDefaultMergeCommand(videoFileURL, audioFileURL, outputURL, width, height, sourceBitrate);
-}
 
 static NSArray<NSString *> *SCIFFmpegNormalizationArguments(NSURL *videoFileURL, NSURL *normalizedVideoURL) {
     return @[
@@ -491,6 +503,29 @@ static NSArray<NSString *> *SCIFFmpegNormalizationArguments(NSURL *videoFileURL,
     ];
 }
 
+// Stream-copy faststart relocate: takes a freshly encoded MP4 and writes a new
+// MP4 with the moov atom shifted to the front. Cheap (just a remux) and avoids
+// FFmpeg's in-place reopen, which is unreliable for long encodes inside the
+// iOS sandbox.
+static NSArray<NSString *> *SCIFFmpegFaststartArguments(NSURL *sourceURL, NSURL *outputURL) {
+    return @[
+        @"-y",
+        @"-hide_banner",
+        @"-i", sourceURL.path,
+        @"-c", @"copy",
+        @"-map", @"0",
+        @"-movflags", @"+faststart",
+        outputURL.path
+    ];
+}
+
+static NSURL *SCIFFmpegPreFaststartURL(NSString *basename, NSString *suffix) {
+    NSString *safeBasename = basename.length > 0 ? basename : NSUUID.UUID.UUIDString;
+    NSString *safeSuffix = suffix.length > 0 ? suffix : @"pre-faststart";
+    NSString *fileName = [NSString stringWithFormat:@"%@-%@.mp4", safeBasename, safeSuffix];
+    return [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+}
+
 static NSURL *SCIFFmpegNormalizedVideoURL(NSString *basename, NSString *suffix) {
     NSString *safeBasename = basename.length > 0 ? basename : NSUUID.UUID.UUIDString;
     NSString *safeSuffix = suffix.length > 0 ? suffix : @"normalized";
@@ -502,6 +537,54 @@ static NSError *SCIFFmpegError(NSString *description, NSInteger code) {
     return [NSError errorWithDomain:@"SCInsta.MediaFFmpeg"
                                code:code
                            userInfo:@{NSLocalizedDescriptionKey: description ?: @"FFmpeg failed"}];
+}
+
+// Pre-convert an arbitrary audio source (including xHE-AAC, which the bundled
+// FFmpegKit cannot decode) to a plain AAC-LC m4a using AVFoundation.
+//  iOS's audio stack natively supports xHE-AAC, so the resulting file is
+// something FFmpeg can `-c:a copy` through without ever decoding the original.
+static void SCIFFmpegConvertAudioToAACLCAsync(NSURL *sourceURL,
+                                              NSURL *outputURL,
+                                              void (^completion)(NSURL * _Nullable, NSError * _Nullable)) {
+    [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
+
+    AVURLAsset *asset = [AVURLAsset URLAssetWithURL:sourceURL options:nil];
+    if (!asset) {
+        if (completion) completion(nil, SCIFFmpegError(@"Audio asset could not be opened", 10));
+        return;
+    }
+
+    AVAssetExportSession *export = [[AVAssetExportSession alloc] initWithAsset:asset
+                                                                    presetName:AVAssetExportPresetAppleM4A];
+    if (!export) {
+        if (completion) completion(nil, SCIFFmpegError(@"AVAssetExportSession unavailable", 11));
+        return;
+    }
+    export.outputURL = outputURL;
+    export.outputFileType = AVFileTypeAppleM4A;
+    export.shouldOptimizeForNetworkUse = YES;
+
+    [export exportAsynchronouslyWithCompletionHandler:^{
+        switch (export.status) {
+            case AVAssetExportSessionStatusCompleted: {
+                if ([[NSFileManager defaultManager] fileExistsAtPath:outputURL.path]) {
+                    if (completion) completion(outputURL, nil);
+                } else if (completion) {
+                    completion(nil, SCIFFmpegError(@"Audio conversion produced no output", 12));
+                }
+                break;
+            }
+            case AVAssetExportSessionStatusCancelled:
+                if (completion) completion(nil, SCIFFmpegError(@"Audio conversion cancelled", NSUserCancelledError));
+                break;
+            case AVAssetExportSessionStatusFailed:
+            default: {
+                NSString *desc = export.error.localizedDescription ?: @"Audio conversion failed";
+                if (completion) completion(nil, SCIFFmpegError(desc, 13));
+                break;
+            }
+        }
+    }];
 }
 
 // Preferred: string-based execution via FFmpegKit.
@@ -601,15 +684,6 @@ static void _SCIFFmpegRunAsyncImpl(id commandOrArgs,
         } else if ([session respondsToSelector:@selector(getOutput)]) {
             logs = ((id (*)(id, SEL))objc_msgSend)(session, @selector(getOutput));
         }
-        // #region agent log
-        SCILog(@"[DBG ec62e7 H2] ffmpeg end id=%@ stage=%@ success=%d cancel=%d type42=%d decoderErr=%d",
-               identifier ?: @"",
-               stage ?: @"",
-               success,
-               cancelled,
-               (int)([logs rangeOfString:@"Audio object type 42"].location != NSNotFound),
-               (int)([logs rangeOfString:@"Error while opening decoder"].location != NSNotFound));
-        // #endregion
 
         NSString *description = cancelled ? @"Cancelled" : (logs.length > 0 ? logs : (success ? @"FFmpeg command succeeded" : @"FFmpeg command failed"));
         SCIFFmpegPersistCommandLog(identifier, cancelled ? @"cancelled" : (success ? @"success" : @"failure"), commandForLog, description);
@@ -740,29 +814,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
     }
 
     NSDictionary<NSString *, id> *attempt = attempts[index];
-    NSString *runId = [NSString stringWithFormat:@"%@-%@", outputURL.lastPathComponent ?: @"merge", attempt[@"identifier"] ?: @"attempt"];
     [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
-    // #region agent log
-    NSString *attemptCommand = attempt[@"command"];
-    NSArray<NSString *> *attemptArgs = attempt[@"arguments"];
-    NSString *preview = attemptCommand.length > 0 ? attemptCommand : [attemptArgs componentsJoinedByString:@" "];
-    if (preview.length > 220) preview = [preview substringToIndex:220];
-    SCILog(@"[DBG ec62e7 H1] ffmpeg attempt idx=%lu id=%@ cmd=%@",
-           (unsigned long)index,
-           attempt[@"identifier"] ?: @"",
-           preview ?: @"");
-    SCIDebugModeLog(runId,
-                    @"H2",
-                    @"SCIMediaFFmpeg.m:SCIFFmpegRunMergeAttempts",
-                    @"ffmpeg attempt starting",
-                    @{
-                        @"index": @((long)index),
-                        @"identifier": attempt[@"identifier"] ?: @"",
-                        @"stage": attempt[@"stage"] ?: @"",
-                        @"isStringCommand": @((attempt[@"command"] != nil)),
-                        @"commandPreview": preview ?: @""
-                    });
-    // #endregion
 
     // Dispatch to string or array execution depending on what the attempt provides.
     NSString *commandString = attempt[@"command"];
@@ -772,68 +824,80 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
     NSURL *prepareOutputURL = attempt[@"prepareOutputURL"];
     NSArray<NSString *> *cleanupPaths = attempt[@"cleanupPaths"];
 
+    // The encode step may write to an intermediate file ("mainOutputURL") that
+    // a follow-up post-process step (e.g. +faststart relocate) consumes to
+    // produce the final outputURL. If no mainOutputURL is set, the encode
+    // writes directly to outputURL and there's no post-process step.
+    NSURL *mainOutputURL = attempt[@"mainOutputURL"] ?: outputURL;
+    NSArray<NSString *> *postProcessArguments = attempt[@"postProcessArguments"];
+
     void (^cleanupAttemptTemps)(void) = ^{
         for (NSString *path in cleanupPaths) {
             if (path.length > 0) {
                 [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
             }
         }
+        if (mainOutputURL && ![mainOutputURL isEqual:outputURL]) {
+            [[NSFileManager defaultManager] removeItemAtPath:mainOutputURL.path error:nil];
+        }
     };
 
-    void (^completionHandler)(NSURL *, NSError *) = ^(NSURL * _Nullable attemptOutputURL, NSError * _Nullable error) {
-        if (attemptOutputURL && !error) {
-            NSString *validationError = SCIFFmpegValidationErrorForOutputURL(attemptOutputURL, expectsVideo, expectsAudio, expectedDuration);
-            AVURLAsset *asset = [AVURLAsset URLAssetWithURL:attemptOutputURL options:@{AVURLAssetPreferPreciseDurationAndTimingKey: @NO}];
-            NSTimeInterval containerDuration = CMTimeGetSeconds(asset.duration);
-            AVAssetTrack *videoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;
-            AVAssetTrack *audioTrack = [asset tracksWithMediaType:AVMediaTypeAudio].firstObject;
-            NSTimeInterval videoDuration = videoTrack ? CMTimeGetSeconds(videoTrack.timeRange.duration) : 0.0;
-            NSTimeInterval audioDuration = audioTrack ? CMTimeGetSeconds(audioTrack.timeRange.duration) : 0.0;
-            SCIDebugModeLog(runId,
-                            @"H1",
-                            @"SCIMediaFFmpeg.m:SCIFFmpegRunMergeAttempts",
-                            @"ffmpeg attempt finished",
-                            @{
-                                @"identifier": attempt[@"identifier"] ?: @"",
-                                @"success": @YES,
-                                @"validationError": validationError ?: @"",
-                                @"containerDurationSec": @(containerDuration),
-                                @"videoDurationSec": @(videoDuration),
-                                @"audioDurationSec": @(audioDuration)
-                            });
-            if (validationError.length == 0) {
-                cleanupAttemptTemps();
-                if (completion) completion(attemptOutputURL, nil);
-                return;
-            }
-            NSString *loggedCommand = commandString ?: [argumentsArray componentsJoinedByString:@" "];
-            SCIFFmpegPersistCommandLog([NSString stringWithFormat:@"%@-validation", attempt[@"identifier"] ?: @"merge"],
-                                     @"validation-failure",
-                                     loggedCommand,
-                                     validationError);
+    void (^validateAndFinalize)(NSURL *) = ^(NSURL *finalURL) {
+        NSString *validationError = SCIFFmpegValidationErrorForOutputURL(finalURL, expectsVideo, expectsAudio, expectedDuration);
+        if (validationError.length == 0) {
             cleanupAttemptTemps();
-            NSError *invalidOutputError = SCIFFmpegError(validationError, 4);
-            SCIFFmpegRunMergeAttempts(attempts, index + 1, outputURL, expectedDuration,
-                                      expectsVideo, expectsAudio, progress, completion,
-                                      cancelCapture, invalidOutputError);
+            if (completion) completion(finalURL, nil);
             return;
         }
-        SCIDebugModeLog(runId,
-                        @"H4",
-                        @"SCIMediaFFmpeg.m:SCIFFmpegRunMergeAttempts",
-                        @"ffmpeg attempt failed",
-                        @{
-                            @"identifier": attempt[@"identifier"] ?: @"",
-                            @"error": error.localizedDescription ?: @"unknown"
-                        });
+        NSString *loggedCommand = commandString ?: [argumentsArray componentsJoinedByString:@" "];
+        SCIFFmpegPersistCommandLog([NSString stringWithFormat:@"%@-validation", attempt[@"identifier"] ?: @"merge"],
+                                 @"validation-failure",
+                                 loggedCommand,
+                                 validationError);
         cleanupAttemptTemps();
+        NSError *invalidOutputError = SCIFFmpegError(validationError, 4);
         SCIFFmpegRunMergeAttempts(attempts, index + 1, outputURL, expectedDuration,
                                   expectsVideo, expectsAudio, progress, completion,
-                                  cancelCapture, error);
+                                  cancelCapture, invalidOutputError);
     };
 
     void (^cancelHandler)(dispatch_block_t) = ^(dispatch_block_t cancelBlock) {
         if (cancelCapture) cancelCapture(cancelBlock);
+    };
+
+    void (^completionHandler)(NSURL *, NSError *) = ^(NSURL * _Nullable attemptOutputURL, NSError * _Nullable error) {
+        if (attemptOutputURL && !error) {
+            // If a post-process step is configured (e.g. +faststart relocate),
+            // run it now before validating the final output.
+            if (postProcessArguments.count > 0) {
+                NSString *postIdentifier = [NSString stringWithFormat:@"%@-faststart", attempt[@"identifier"] ?: @"merge"];
+                [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
+                SCIFFmpegRunAsyncCommand(postProcessArguments,
+                                         postIdentifier,
+                                         @"Finalizing",
+                                         0.0,
+                                         progress,
+                                         ^(NSURL * _Nullable postURL, NSError * _Nullable postError) {
+                    if (postURL && !postError && [[NSFileManager defaultManager] fileExistsAtPath:postURL.path]) {
+                        validateAndFinalize(postURL);
+                        return;
+                    }
+                    cleanupAttemptTemps();
+                    SCIFFmpegRunMergeAttempts(attempts, index + 1, outputURL, expectedDuration,
+                                              expectsVideo, expectsAudio, progress, completion,
+                                              cancelCapture, postError ?: SCIFFmpegError(@"Faststart relocate failed", 6));
+                },
+                                         cancelHandler,
+                                         outputURL);
+                return;
+            }
+            validateAndFinalize(attemptOutputURL);
+            return;
+        }
+        cleanupAttemptTemps();
+        SCIFFmpegRunMergeAttempts(attempts, index + 1, outputURL, expectedDuration,
+                                  expectsVideo, expectsAudio, progress, completion,
+                                  cancelCapture, error);
     };
 
     void (^startMainExecution)(void) = ^{
@@ -845,7 +909,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                                             progress,
                                             completionHandler,
                                             cancelHandler,
-                                            outputURL);
+                                            mainOutputURL);
         } else {
             SCIFFmpegRunAsyncCommand(argumentsArray,
                                      attempt[@"identifier"],
@@ -854,7 +918,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                                      progress,
                                      completionHandler,
                                      cancelHandler,
-                                     outputURL);
+                                     mainOutputURL);
         }
     };
 
@@ -1077,6 +1141,20 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
 
 @end
 
+@interface SCIMediaFFmpeg (SCIPrivate)
++ (void)_mergePreparedVideoFileURL:(NSURL *)videoFileURL
+                      audioFileURL:(nullable NSURL *)audioFileURL
+                    preCleanupURL:(nullable NSURL *)preCleanupURL
+                 preferredBasename:(NSString *)preferredBasename
+                 estimatedDuration:(NSTimeInterval)estimatedDuration
+                             width:(NSInteger)width
+                            height:(NSInteger)height
+                     sourceBitrate:(NSInteger)sourceBitrate
+                          progress:(nullable SCIMediaFFmpegProgressBlock)progress
+                        completion:(SCIMediaFFmpegCompletionBlock)completion
+                         cancelOut:(nullable SCIMediaFFmpegCancelBlockPublisher)cancelOut;
+@end
+
 @implementation SCIMediaFFmpeg
 
 + (BOOL)isAvailable {
@@ -1129,75 +1207,161 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                completion:(SCIMediaFFmpegCompletionBlock)completion
                 cancelOut:(SCIMediaFFmpegCancelBlockPublisher)cancelOut {
     NSString *basename = preferredBasename.length > 0 ? preferredBasename : NSUUID.UUID.UUIDString;
+
+    if (audioFileURL) {
+        // Pre-convert audio to AAC-LC m4a via AVFoundation before invoking FFmpeg.
+        // This handles xHE-AAC (mp4a.40.42) — which our FFmpegKit build can't decode —
+        // by letting iOS's native audio stack do the decode/transcode.
+        // Once converted, the merge happily stream-copies the audio.
+        NSURL *convertedAudioURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-audio-aaclc.m4a", basename]]];
+        if (progress) progress(0.0, @"Converting audio");
+        SCIFFmpegConvertAudioToAACLCAsync(audioFileURL, convertedAudioURL, ^(NSURL * _Nullable preparedAudioURL, NSError * _Nullable convertError) {
+            if (preparedAudioURL && !convertError) {
+                [self _mergePreparedVideoFileURL:videoFileURL
+                                    audioFileURL:preparedAudioURL
+                                  preCleanupURL:preparedAudioURL
+                              preferredBasename:basename
+                              estimatedDuration:estimatedDuration
+                                          width:width
+                                         height:height
+                                  sourceBitrate:sourceBitrate
+                                       progress:progress
+                                     completion:completion
+                                      cancelOut:cancelOut];
+                return;
+            }
+            // Conversion failed — log it, then fall back to the original
+            // audio. Stream-copy through FFmpeg may still work for AAC-LC
+            // sources that AVFoundation rejects for some other reason.
+            SCIFFmpegPersistErrorLog(@"audio-aaclc-prepare",
+                                     [NSString stringWithFormat:@"AVAssetExportSession m4a %@ -> %@", audioFileURL.path, convertedAudioURL.path],
+                                     convertError.localizedDescription ?: @"unknown");
+            [self _mergePreparedVideoFileURL:videoFileURL
+                                audioFileURL:audioFileURL
+                              preCleanupURL:nil
+                          preferredBasename:basename
+                          estimatedDuration:estimatedDuration
+                                      width:width
+                                     height:height
+                              sourceBitrate:sourceBitrate
+                                   progress:progress
+                                 completion:completion
+                                  cancelOut:cancelOut];
+        });
+        return;
+    }
+
+    [self _mergePreparedVideoFileURL:videoFileURL
+                        audioFileURL:nil
+                      preCleanupURL:nil
+                  preferredBasename:basename
+                  estimatedDuration:estimatedDuration
+                              width:width
+                             height:height
+                      sourceBitrate:sourceBitrate
+                           progress:progress
+                         completion:completion
+                          cancelOut:cancelOut];
+}
+
++ (void)_mergePreparedVideoFileURL:(NSURL *)videoFileURL
+                      audioFileURL:(nullable NSURL *)audioFileURL
+                    preCleanupURL:(nullable NSURL *)preCleanupURL
+                 preferredBasename:(NSString *)preferredBasename
+                 estimatedDuration:(NSTimeInterval)estimatedDuration
+                             width:(NSInteger)width
+                            height:(NSInteger)height
+                     sourceBitrate:(NSInteger)sourceBitrate
+                          progress:(SCIMediaFFmpegProgressBlock)progress
+                        completion:(SCIMediaFFmpegCompletionBlock)completion
+                         cancelOut:(SCIMediaFFmpegCancelBlockPublisher)cancelOut {
+    NSString *basename = preferredBasename.length > 0 ? preferredBasename : NSUUID.UUID.UUIDString;
     NSURL *outputURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-merged.mp4", basename]]];
     [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
 
+    SCIMediaFFmpegCompletionBlock wrappedCompletion = ^(NSURL * _Nullable url, NSError * _Nullable err) {
+        if (preCleanupURL) {
+            [[NSFileManager defaultManager] removeItemAtURL:preCleanupURL error:nil];
+        }
+        if (completion) completion(url, err);
+    };
+
     NSMutableArray<NSDictionary<NSString *, id> *> *attempts = [NSMutableArray array];
 
-    NSString *defaultCommand = SCIFFmpegDefaultMergeCommandOrNil(videoFileURL, audioFileURL, outputURL, width, height, sourceBitrate);
-    // #region agent log
-    SCILog(@"[DBG ec62e7 H4] merge setup advanced=%d default=%d size=%ldx%ld srcBitrate=%ld v=%@ a=%@",
-           [SCIUtils getBoolPref:@"media_advanced_encoding_enabled"],
-           (int)(defaultCommand.length > 0),
-           (long)width,
-           (long)height,
-           (long)sourceBitrate,
-           videoFileURL.path ?: @"",
-           audioFileURL.path ?: @"");
-    // #endregion
-    if (defaultCommand) {
-        // Default mode starts with the direct hardware-encode path, then retries
-        // with normalized video inputs if validation still fails.
+    BOOL useAdvanced = [SCIUtils getBoolPref:@"media_advanced_encoding_enabled"];
+    if (!useAdvanced) {
+        // Default mode starts with the direct libx264+preset path, then retries
+        // with normalized video inputs (and finally a setpts re-stamping pass)
+        // if validation still fails. All retries use the same libx264 settings
+        // so file-size/quality stays consistent across attempts.
+        //
+        // Each attempt encodes to an intermediate "pre-faststart" file, then a
+        // separate stream-copy pass relocates the moov atom to the front. This
+        // avoids FFmpeg's in-place +faststart reopen, which is unreliable on
+        // long iOS encodes inside the sandbox.
+        NSURL *defaultEncodeURL = SCIFFmpegPreFaststartURL(basename, @"default-pre-faststart");
+        [[NSFileManager defaultManager] removeItemAtURL:defaultEncodeURL error:nil];
+        NSString *defaultCommandToEncode = SCIFFmpegDefaultMergeCommand(videoFileURL,
+                                                                        audioFileURL,
+                                                                        defaultEncodeURL,
+                                                                        width,
+                                                                        height,
+                                                                        sourceBitrate);
         [attempts addObject:@{
             @"identifier": @"merge",
             @"stage": @"Merging video and audio",
-            @"command": defaultCommand,
+            @"command": defaultCommandToEncode,
+            @"mainOutputURL": defaultEncodeURL,
+            @"postProcessArguments": SCIFFmpegFaststartArguments(defaultEncodeURL, outputURL),
+            @"cleanupPaths": @[defaultEncodeURL.path ?: @""]
         }];
 
         NSURL *normalizedVideoURL = SCIFFmpegNormalizedVideoURL(basename, @"default-normalized");
         [[NSFileManager defaultManager] removeItemAtURL:normalizedVideoURL error:nil];
-        NSArray<NSString *> *normalizedArgs = SCIFFmpegAdvancedMergeArguments(normalizedVideoURL,
-                                                                              audioFileURL,
-                                                                              outputURL,
-                                                                              width,
-                                                                              height,
-                                                                              sourceBitrate,
-                                                                              YES,
-                                                                              @"videotoolbox",
-                                                                              nil);
+        NSURL *normalizedEncodeURL = SCIFFmpegPreFaststartURL(basename, @"default-normalized-pre-faststart");
+        [[NSFileManager defaultManager] removeItemAtURL:normalizedEncodeURL error:nil];
+        NSArray<NSString *> *normalizedArgs = SCIFFmpegDefaultMergeArguments(normalizedVideoURL,
+                                                                             audioFileURL,
+                                                                             normalizedEncodeURL,
+                                                                             nil);
         [attempts addObject:@{
             @"identifier": @"merge-normalized",
             @"stage": @"Merging video and audio",
             @"arguments": normalizedArgs,
             @"prepareArguments": SCIFFmpegNormalizationArguments(videoFileURL, normalizedVideoURL),
             @"prepareOutputURL": normalizedVideoURL,
-            @"cleanupPaths": @[normalizedVideoURL.path ?: @""]
+            @"mainOutputURL": normalizedEncodeURL,
+            @"postProcessArguments": SCIFFmpegFaststartArguments(normalizedEncodeURL, outputURL),
+            @"cleanupPaths": @[normalizedVideoURL.path ?: @"", normalizedEncodeURL.path ?: @""]
         }];
 
         NSURL *normalizedSetPTSVideoURL = SCIFFmpegNormalizedVideoURL(basename, @"default-normalized-setpts");
         [[NSFileManager defaultManager] removeItemAtURL:normalizedSetPTSVideoURL error:nil];
-        NSArray<NSString *> *normalizedSetPTSArgs = SCIFFmpegAdvancedMergeArguments(normalizedSetPTSVideoURL,
-                                                                                    audioFileURL,
-                                                                                    outputURL,
-                                                                                    width,
-                                                                                    height,
-                                                                                    sourceBitrate,
-                                                                                    YES,
-                                                                                    @"videotoolbox",
-                                                                                    @"setpts=PTS-STARTPTS");
+        NSURL *normalizedSetPTSEncodeURL = SCIFFmpegPreFaststartURL(basename, @"default-normalized-setpts-pre-faststart");
+        [[NSFileManager defaultManager] removeItemAtURL:normalizedSetPTSEncodeURL error:nil];
+        NSArray<NSString *> *normalizedSetPTSArgs = SCIFFmpegDefaultMergeArguments(normalizedSetPTSVideoURL,
+                                                                                   audioFileURL,
+                                                                                   normalizedSetPTSEncodeURL,
+                                                                                   @"setpts=PTS-STARTPTS");
         [attempts addObject:@{
             @"identifier": @"merge-normalized-setpts",
             @"stage": @"Merging video and audio",
             @"arguments": normalizedSetPTSArgs,
             @"prepareArguments": SCIFFmpegNormalizationArguments(videoFileURL, normalizedSetPTSVideoURL),
             @"prepareOutputURL": normalizedSetPTSVideoURL,
-            @"cleanupPaths": @[normalizedSetPTSVideoURL.path ?: @""]
+            @"mainOutputURL": normalizedSetPTSEncodeURL,
+            @"postProcessArguments": SCIFFmpegFaststartArguments(normalizedSetPTSEncodeURL, outputURL),
+            @"cleanupPaths": @[normalizedSetPTSVideoURL.path ?: @"", normalizedSetPTSEncodeURL.path ?: @""]
         }];
     } else {
         NSString *selectedCodec = SCIFFmpegStringPref(@"media_encoding_video_codec", @"videotoolbox");
+        BOOL isLibx264 = [selectedCodec isEqualToString:@"libx264"];
+
+        NSURL *advancedEncodeURL = SCIFFmpegPreFaststartURL(basename, isLibx264 ? @"advanced-libx264-pre-faststart" : @"advanced-videotoolbox-pre-faststart");
+        [[NSFileManager defaultManager] removeItemAtURL:advancedEncodeURL error:nil];
         NSArray<NSString *> *advancedArgs = SCIFFmpegAdvancedMergeArguments(videoFileURL,
                                                                             audioFileURL,
-                                                                            outputURL,
+                                                                            advancedEncodeURL,
                                                                             width,
                                                                             height,
                                                                             sourceBitrate,
@@ -1205,27 +1369,23 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                                                                             selectedCodec,
                                                                             nil);
         NSString *advancedCommand = SCIFFmpegCommandStringFromArguments(advancedArgs);
-        // #region agent log
-        SCIDebugModeLog(outputURL.lastPathComponent ?: @"merge",
-                        @"H3",
-                        @"SCIMediaFFmpeg.m:mergeVideoFileURL",
-                        @"advanced dash merge args built",
-                        @{
-                            @"args": advancedCommand ?: @""
-                        });
-        // #endregion
         [attempts addObject:@{
-            @"identifier": [selectedCodec isEqualToString:@"libx264"] ? @"merge-advanced-libx264-direct" : @"merge-advanced-videotoolbox-direct",
+            @"identifier": isLibx264 ? @"merge-advanced-libx264-direct" : @"merge-advanced-videotoolbox-direct",
             @"stage": @"Re-encoding video",
             @"command": advancedCommand,
             @"arguments": advancedArgs,
+            @"mainOutputURL": advancedEncodeURL,
+            @"postProcessArguments": SCIFFmpegFaststartArguments(advancedEncodeURL, outputURL),
+            @"cleanupPaths": @[advancedEncodeURL.path ?: @""]
         }];
 
-        NSURL *normalizedVideoURL = SCIFFmpegNormalizedVideoURL(basename, [selectedCodec isEqualToString:@"libx264"] ? @"advanced-libx264-normalized" : @"advanced-videotoolbox-normalized");
+        NSURL *normalizedVideoURL = SCIFFmpegNormalizedVideoURL(basename, isLibx264 ? @"advanced-libx264-normalized" : @"advanced-videotoolbox-normalized");
         [[NSFileManager defaultManager] removeItemAtURL:normalizedVideoURL error:nil];
+        NSURL *normalizedEncodeURL = SCIFFmpegPreFaststartURL(basename, isLibx264 ? @"advanced-libx264-normalized-pre-faststart" : @"advanced-videotoolbox-normalized-pre-faststart");
+        [[NSFileManager defaultManager] removeItemAtURL:normalizedEncodeURL error:nil];
         NSArray<NSString *> *normalizedArgs = SCIFFmpegAdvancedMergeArguments(normalizedVideoURL,
                                                                               audioFileURL,
-                                                                              outputURL,
+                                                                              normalizedEncodeURL,
                                                                               width,
                                                                               height,
                                                                               sourceBitrate,
@@ -1233,19 +1393,23 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                                                                               selectedCodec,
                                                                               nil);
         [attempts addObject:@{
-            @"identifier": [selectedCodec isEqualToString:@"libx264"] ? @"merge-advanced-libx264-normalized" : @"merge-advanced-videotoolbox-normalized",
+            @"identifier": isLibx264 ? @"merge-advanced-libx264-normalized" : @"merge-advanced-videotoolbox-normalized",
             @"stage": @"Re-encoding video",
             @"arguments": normalizedArgs,
             @"prepareArguments": SCIFFmpegNormalizationArguments(videoFileURL, normalizedVideoURL),
             @"prepareOutputURL": normalizedVideoURL,
-            @"cleanupPaths": @[normalizedVideoURL.path ?: @""]
+            @"mainOutputURL": normalizedEncodeURL,
+            @"postProcessArguments": SCIFFmpegFaststartArguments(normalizedEncodeURL, outputURL),
+            @"cleanupPaths": @[normalizedVideoURL.path ?: @"", normalizedEncodeURL.path ?: @""]
         }];
 
-        NSURL *normalizedSetPTSVideoURL = SCIFFmpegNormalizedVideoURL(basename, [selectedCodec isEqualToString:@"libx264"] ? @"advanced-libx264-setpts" : @"advanced-videotoolbox-setpts");
+        NSURL *normalizedSetPTSVideoURL = SCIFFmpegNormalizedVideoURL(basename, isLibx264 ? @"advanced-libx264-setpts" : @"advanced-videotoolbox-setpts");
         [[NSFileManager defaultManager] removeItemAtURL:normalizedSetPTSVideoURL error:nil];
+        NSURL *normalizedSetPTSEncodeURL = SCIFFmpegPreFaststartURL(basename, isLibx264 ? @"advanced-libx264-setpts-pre-faststart" : @"advanced-videotoolbox-setpts-pre-faststart");
+        [[NSFileManager defaultManager] removeItemAtURL:normalizedSetPTSEncodeURL error:nil];
         NSArray<NSString *> *normalizedSetPTSArgs = SCIFFmpegAdvancedMergeArguments(normalizedSetPTSVideoURL,
                                                                                     audioFileURL,
-                                                                                    outputURL,
+                                                                                    normalizedSetPTSEncodeURL,
                                                                                     width,
                                                                                     height,
                                                                                     sourceBitrate,
@@ -1253,12 +1417,14 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                                                                                     selectedCodec,
                                                                                     @"setpts=PTS-STARTPTS");
         [attempts addObject:@{
-            @"identifier": [selectedCodec isEqualToString:@"libx264"] ? @"merge-advanced-libx264-setpts" : @"merge-advanced-videotoolbox-setpts",
+            @"identifier": isLibx264 ? @"merge-advanced-libx264-setpts" : @"merge-advanced-videotoolbox-setpts",
             @"stage": @"Re-encoding video",
             @"arguments": normalizedSetPTSArgs,
             @"prepareArguments": SCIFFmpegNormalizationArguments(videoFileURL, normalizedSetPTSVideoURL),
             @"prepareOutputURL": normalizedSetPTSVideoURL,
-            @"cleanupPaths": @[normalizedSetPTSVideoURL.path ?: @""]
+            @"mainOutputURL": normalizedSetPTSEncodeURL,
+            @"postProcessArguments": SCIFFmpegFaststartArguments(normalizedSetPTSEncodeURL, outputURL),
+            @"cleanupPaths": @[normalizedSetPTSVideoURL.path ?: @"", normalizedSetPTSEncodeURL.path ?: @""]
         }];
     }
 
@@ -1277,7 +1443,7 @@ static void SCIFFmpegRunMergeAttempts(NSArray<NSDictionary<NSString *, id> *> *a
                               YES,
                               (audioFileURL != nil),
                               progress,
-                              completion,
+                              wrappedCompletion,
                               ^(dispatch_block_t cancelBlock) {
         currentCancel = [cancelBlock copy];
     },

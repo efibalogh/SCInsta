@@ -690,43 +690,6 @@ static NSInteger SCIMediaAudioCodecPreferenceScore(NSString *codec) {
     return 0;
 }
 
-static void SCIDebugModeLog(NSString *runId,
-                            NSString *hypothesisId,
-                            NSString *location,
-                            NSString *message,
-                            NSDictionary *data) {
-    NSString *logPath = @"/Users/efi/dev/SCInsta/.cursor/debug-ec62e7.log";
-    NSMutableDictionary *payload = [NSMutableDictionary dictionary];
-    payload[@"sessionId"] = @"ec62e7";
-    payload[@"runId"] = runId ?: @"unknown";
-    payload[@"hypothesisId"] = hypothesisId ?: @"";
-    payload[@"location"] = location ?: @"";
-    payload[@"message"] = message ?: @"";
-    payload[@"data"] = data ?: @{};
-    payload[@"timestamp"] = @((long long)([[NSDate date] timeIntervalSince1970] * 1000.0));
-
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
-    if (jsonData.length == 0) return;
-
-    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:logPath];
-    if (!handle) {
-        [[NSFileManager defaultManager] createFileAtPath:logPath contents:nil attributes:nil];
-        handle = [NSFileHandle fileHandleForWritingAtPath:logPath];
-    }
-    if (!handle) return;
-
-    @try {
-        [handle seekToEndOfFile];
-        [handle writeData:jsonData];
-        [handle writeData:[@"\n" dataUsingEncoding:NSUTF8StringEncoding]];
-        [handle closeFile];
-    } @catch (__unused NSException *exception) {
-        @try {
-            [handle closeFile];
-        } @catch (__unused NSException *closeException) {}
-    }
-}
-
 static SCIDashRepresentation *SCIMediaBestMergeAudioRepresentation(NSArray<SCIDashRepresentation *> *audioReps) {
     if (audioReps.count == 0) return nil;
 
@@ -764,32 +727,7 @@ static SCIMediaAnalysis *SCIMediaAnalyze(id mediaObject, NSURL *photoURL, NSURL 
     NSArray<SCIDashRepresentation *> *representations = [SCIDashParser parseManifest:manifest ?: @""];
     NSArray<SCIDashRepresentation *> *dashVideo = SCIMediaRepresentationsForType(representations, @"video");
     NSArray<SCIDashRepresentation *> *dashAudio = SCIMediaRepresentationsForType(representations, @"audio");
-    NSMutableArray<NSDictionary *> *audioCandidates = [NSMutableArray array];
-    for (SCIDashRepresentation *rep in dashAudio) {
-        [audioCandidates addObject:@{
-            @"codec": rep.codecs ?: @"",
-            @"bandwidth": @(rep.bandwidth)
-        }];
-    }
     SCIDashRepresentation *bestAudio = SCIMediaBestMergeAudioRepresentation(dashAudio);
-    // #region agent log
-    SCIDebugModeLog(@"media-analyze",
-                    @"H5",
-                    @"SCIMediaQualityManager.m:SCIMediaAnalyze",
-                    @"audio candidate list for merge",
-                    @{
-                        @"count": @((long)dashAudio.count),
-                        @"candidates": audioCandidates,
-                        @"selectedCodec": bestAudio.codecs ?: @"",
-                        @"selectedBandwidth": @(bestAudio.bandwidth)
-                    });
-    // #endregion
-    // #region agent log
-    SCILog(@"[DBG ec62e7 H5] selected merge-audio codec=%@ bw=%ld reps=%ld",
-           bestAudio.codecs ?: @"",
-           (long)bestAudio.bandwidth,
-           (long)dashAudio.count);
-    // #endregion
 
     NSArray<SCIMediaOption *> *mergedOptions = SCIMediaBuildMergedDashOptions(dashVideo, bestAudio, analysis.duration, analysis.ffmpegAvailable);
     NSArray<SCIMediaOption *> *videoOnlyOptions = SCIMediaBuildVideoOnlyDashOptions(dashVideo, analysis.duration);
@@ -1167,7 +1105,7 @@ static SCIMediaOption *SCIMediaResolveDefaultOption(SCIMediaAnalysis *analysis) 
     if ([SCIUtils getBoolPref:@"media_advanced_encoding_enabled"]) {
         return @"Advanced Encoding exposes codec, preset, bitrate, CRF, resolution, and audio overrides. In advanced mode, the selected video codec is used for DASH merges while audio remains copied.";
     }
-    return @"Controls the default DASH bitrate tier. Ultrafast uses the smallest output, while Slower uses the largest and highest-quality output.";
+    return @"Controls the libx264 encoding effort. Slower presets take longer but produce smaller files at the same visual quality. Ultrafast is fastest but produces larger files.";
 }
 
 - (NSString *)valueLabelForRow:(NSString *)row {
@@ -1714,24 +1652,7 @@ static void SCIMediaPerformOptionDownload(SCIMediaOption *option,
                                           BOOL copyToClipboard,
                                           NSString *notificationIdentifier,
                                           BOOL showProgress) {
-    // #region agent log
-    SCILog(@"[DBG ec62e7 H3] option kind=%ld title=%@ vCodec=%@ aCodec=%@ bw=%ld abw=%ld vURL=%@ aURL=%@",
-           (long)option.kind,
-           option.title ?: @"",
-           option.codec ?: @"",
-           option.audioCodec ?: @"",
-           (long)option.bandwidth,
-           (long)option.audioBandwidth,
-           option.primaryURL.absoluteString ?: @"",
-           option.secondaryURL.absoluteString ?: @"");
-    // #endregion
     if (SCIMediaShouldSkipDuplicateStart(option, action)) {
-        // #region agent log
-        SCILog(@"[DBG ec62e7 H6] duplicate option start suppressed kind=%ld vURL=%@ aURL=%@",
-               (long)option.kind,
-               option.primaryURL.absoluteString ?: @"",
-               option.secondaryURL.absoluteString ?: @"");
-        // #endregion
         return;
     }
 
