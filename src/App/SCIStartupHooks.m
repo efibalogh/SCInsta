@@ -67,7 +67,25 @@ FOUNDATION_EXPORT void SCIInstallDMAudioMsgConfirmHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallNotesCustomizationHooksIfNeeded(void);
 FOUNDATION_EXPORT void SCIInstallDMRefreshConfirmHooksIfEnabled(void);
 
+// Master kill switch: when YES, suppress all feature hook installation, but
+// keep the home long-press shortcut so users can still reach Settings to turn
+// it back off. Toggling requires a restart (each installer is dispatch_once).
+static BOOL SCITweakMasterDisabled(void) {
+    return [SCIUtils getBoolPref:@"tweak_master_disabled"];
+}
+
+// Hooks that must always install regardless of the kill switch so users keep
+// access to SCInsta Settings (home tab long-press → settings).
+static void SCIInstallEssentialAccessHooks(void) {
+    SCIInstallNavigationHooksIfNeeded();
+    SCIInstallSettingsShortcutsHooksIfNeeded();
+}
+
 void SCIInstallLaunchCriticalHooks(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallTweakLaunchCriticalHooks();
     SCIInstallLiquidGlassHooksIfEnabled();
     SCIInstallNavigationHooksIfNeeded();
@@ -77,6 +95,10 @@ void SCIInstallLaunchCriticalHooks(void) {
 }
 
 void SCIInstallFeedSurfaceHooksIfNeeded(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallTweakFeedHooksIfNeeded();
     SCIInstallFeedFilteringFeedHooksIfEnabled();
     SCIInstallFeedActionButtonHooksIfEnabled();
@@ -94,6 +116,10 @@ void SCIInstallFeedSurfaceHooksIfNeeded(void) {
 }
 
 void SCIInstallStorySurfaceHooksIfNeeded(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallTweakStoryHooksIfNeeded();
     SCIInstallFeedFilteringHooksIfEnabled();
     SCIInstallStoriesActionButtonHooksIfEnabled();
@@ -107,6 +133,10 @@ void SCIInstallStorySurfaceHooksIfNeeded(void) {
 }
 
 void SCIInstallReelsSurfaceHooksIfNeeded(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallTweakReelsHooksIfNeeded();
     SCIInstallReelsActionButtonHooksIfEnabled();
     SCIInstallFeedFilteringHooksIfEnabled();
@@ -119,6 +149,10 @@ void SCIInstallReelsSurfaceHooksIfNeeded(void) {
 }
 
 void SCIInstallMessagesSurfaceHooksIfNeeded(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallTweakMessagesHooksIfNeeded();
     SCIInstallMessagesActionButtonHooksIfEnabled();
     SCIInstallSeenButtonHooksIfNeeded();
@@ -143,6 +177,10 @@ void SCIInstallMessagesSurfaceHooksIfNeeded(void) {
 }
 
 void SCIInstallProfileSurfaceHooksIfNeeded(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallProfileActionButtonHooksIfEnabled();
     SCIInstallProfilePhotoZoomHooksIfEnabled();
     SCIInstallFollowConfirmHooksIfNeeded();
@@ -152,6 +190,10 @@ void SCIInstallProfileSurfaceHooksIfNeeded(void) {
 }
 
 void SCIInstallGeneralUIHooksIfNeeded(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallTweakGeneralUIHooksIfNeeded();
     SCIInstallLiquidGlassHooksIfEnabled();
     SCIInstallSharedLinkCleanupHooksIfEnabled();
@@ -170,6 +212,10 @@ void SCIInstallGeneralUIHooksIfNeeded(void) {
 }
 
 void SCIInstallEnabledFeatureHooks(void) {
+    if (SCITweakMasterDisabled()) {
+        SCIInstallEssentialAccessHooks();
+        return;
+    }
     SCIInstallLaunchCriticalHooks();
     SCIInstallGeneralUIHooksIfNeeded();
     SCIInstallFeedSurfaceHooksIfNeeded();

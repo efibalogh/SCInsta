@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)presentImportOptionsFromController:(UIViewController *)controller;
 - (void)exportFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeGallery:(BOOL)includeGallery;
 - (void)importFromController:(UIViewController *)controller includeSettings:(BOOL)includeSettings includeGallery:(BOOL)includeGallery;
+- (void)resetAllSettingsFromController:(UIViewController *)controller;
 
 @end
 

@@ -26,6 +26,7 @@ static NSDictionary *SCIBootstrapDefaults(void) {
         @"header_long_press_gallery": @(NO),
         @"gallery_long_press_tab": @"direct-inbox-tab",
         @"tweak_settings_app_launch": @(NO),
+        @"tweak_master_disabled": @(NO),
     };
 }
 
@@ -177,6 +178,21 @@ void SCICoreRegisterDefaults(void) {
         [[NSUserDefaults standardUserDefaults] registerDefaults:SCIFeatureDefaults()];
         SCIStartupMark(@"feature defaults registered");
     });
+}
+
+// Returns a merged snapshot of every default the tweak registers (bootstrap +
+// feature). Used by the master kill switch to fall back to the registered
+// default value when "Disable All Settings" is on.
+NSDictionary<NSString *, id> *SCICoreRegisteredDefaults(void) {
+    static NSDictionary<NSString *, id> *snapshot;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableDictionary *merged = [NSMutableDictionary dictionary];
+        [merged addEntriesFromDictionary:SCIBootstrapDefaults()];
+        [merged addEntriesFromDictionary:SCIFeatureDefaults()];
+        snapshot = [merged copy];
+    });
+    return snapshot;
 }
 
 void SCICoreInstallLaunchCriticalHooks(void) {

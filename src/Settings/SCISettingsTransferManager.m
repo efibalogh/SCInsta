@@ -712,4 +712,25 @@ static NSDictionary *SCITransferManifest(BOOL includeSettings, BOOL includeGalle
     [SCIUtils showRestartConfirmation];
 }
 
+- (void)resetAllSettingsFromController:(UIViewController *)controller {
+    [SCIIGAlertPresenter presentAlertFromViewController:controller
+                                                  title:@"Reset all settings?"
+                                                message:@"This restores every SCInsta preference to its default value. Gallery media is left untouched. This cannot be undone."
+                                                actions:@[
+        [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:nil],
+        [SCIIGAlertAction actionWithTitle:@"Reset" style:SCIIGAlertActionStyleDestructive handler:^{
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            for (NSString *key in SCIExportedPreferenceKeys()) {
+                [defaults removeObjectForKey:key];
+            }
+            SCINotify(kSCINotificationSettingsImport,
+                      @"Settings reset",
+                      @"All SCInsta preferences were restored to defaults.",
+                      @"circle_check_filled",
+                      SCINotificationToneForIconResource(@"circle_check_filled"));
+            [SCIUtils showRestartConfirmation];
+        }],
+    ]];
+}
+
 @end

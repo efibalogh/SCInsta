@@ -1,5 +1,6 @@
 #import "Utils.h"
 #import "AssetUtils.h"
+#import "App/SCICore.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import "Shared/MediaPreview/SCIMediaCacheManager.h"
@@ -466,20 +467,59 @@ static NSArray<NSURLQueryItem *> *SCISanitizedInstagramQueryItems(NSArray<NSURLQ
 
 @implementation SCIUtils
 
-+ (BOOL)getBoolPref:(NSString *)key {
-    if (![key length] || [[NSUserDefaults standardUserDefaults] objectForKey:key] == nil) return false;
+// Master kill switch overlay: when "Disable All Settings" is on, runtime
+// reads of feature prefs return the registered default instead of the user's
+// stored value. The toggles themselves still display the saved state because
+// the settings UI reads NSUserDefaults directly (boolForKey:), not these
+// accessors.
+//
+// A handful of keys must bypass the overlay so the kill switch and the
+// settings shortcut keep working. They're enumerated here.
+static NSSet<NSString *> *SCIMasterDisableBypassKeys(void) {
+    static NSSet<NSString *> *keys;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        keys = [NSSet setWithArray:@[
+            @"tweak_master_disabled",
+            @"settings_shortcut",
+            @"header_long_press_gallery",
+            @"gallery_long_press_tab",
+            @"tweak_settings_app_launch",
+            @"SCInstaFirstRun",
+        ]];
+    });
+    return keys;
+}
 
-    return [[NSUserDefaults standardUserDefaults] boolForKey:key];
+static BOOL SCIMasterDisableActive(void) {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"tweak_master_disabled"];
+}
+
+static id SCIPrefValueWithMasterOverlay(NSString *key) {
+    if (key.length == 0) return nil;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if (SCIMasterDisableActive() && ![SCIMasterDisableBypassKeys() containsObject:key]) {
+        return SCICoreRegisteredDefaults()[key];
+    }
+    return [defaults objectForKey:key];
+}
+
++ (BOOL)getBoolPref:(NSString *)key {
+    if (![key length]) return NO;
+    id value = SCIPrefValueWithMasterOverlay(key);
+    if ([value respondsToSelector:@selector(boolValue)]) return [value boolValue];
+    return NO;
 }
 + (double)getDoublePref:(NSString *)key {
-    if (![key length] || [[NSUserDefaults standardUserDefaults] objectForKey:key] == nil) return 0;
-
-    return [[NSUserDefaults standardUserDefaults] doubleForKey:key];
+    if (![key length]) return 0;
+    id value = SCIPrefValueWithMasterOverlay(key);
+    if ([value respondsToSelector:@selector(doubleValue)]) return [value doubleValue];
+    return 0;
 }
 + (NSString *)getStringPref:(NSString *)key {
-    if (![key length] || [[NSUserDefaults standardUserDefaults] objectForKey:key] == nil) return @"";
-
-    return [[NSUserDefaults standardUserDefaults] stringForKey:key];
+    if (![key length]) return @"";
+    id value = SCIPrefValueWithMasterOverlay(key);
+    return [value isKindOfClass:[NSString class]] ? value : @"";
 }
 
 // MARK: Misc

@@ -113,6 +113,17 @@ static NSArray *SCIManageSettingsDataSections(void) {
                                                                     icon:[SCIAssetUtils instagramIconNamed:@"arrow_down" pointSize:24.0]
                                                           viewController:[[SCISettingsTransferSelectionViewController alloc] initWithImportMode:YES]],
                                   [SCIUtils SCIColor_InstagramPrimaryText])
+        ], nil),
+        SCITopicSection(@"Reset", @[
+            SCISettingApplyIconTint([SCISetting buttonCellWithTitle:@"Reset All Settings"
+                                                            subtitle:@"Restore every preference to its default value"
+                                                                icon:[SCIAssetUtils instagramIconNamed:@"arrow_ccw" pointSize:24.0]
+                                                              action:^(void) {
+                UIWindowScene *scene = (UIWindowScene *)UIApplication.sharedApplication.connectedScenes.anyObject;
+                UIViewController *presenter = scene.windows.firstObject.rootViewController;
+                while (presenter.presentedViewController) presenter = presenter.presentedViewController;
+                [[SCISettingsTransferManager sharedManager] resetAllSettingsFromController:presenter];
+            }], [SCIUtils SCIColor_InstagramPrimaryText])
         ], nil)
     ];
 }
@@ -137,6 +148,7 @@ static NSArray *SCIManageSettingsDataSections(void) {
         SCITopicSection(@"Tweak", @[
             [SCISetting switchCellWithTitle:@"Quick Settings Access" subtitle:@"Long press the home tab" defaultsKey:@"settings_shortcut" requiresRestart:YES],
             [SCISetting switchCellWithTitle:@"Show Settings on App Launch" subtitle:@"" defaultsKey:@"tweak_settings_app_launch"],
+            [SCISetting switchCellWithTitle:@"Disable All Settings" subtitle:@"" defaultsKey:@"tweak_master_disabled" requiresRestart:YES],
             [SCISetting buttonCellWithTitle:@"Reset Onboarding Completion State" subtitle:@"" icon:nil action:^(void) {
                 [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"SCInstaFirstRun"];
                 [SCIUtils showRestartConfirmation];
