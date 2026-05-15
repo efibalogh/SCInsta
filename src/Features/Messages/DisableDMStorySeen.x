@@ -36,8 +36,7 @@ static inline BOOL SCIShouldPassThroughManualDirectSeen(id message) {
 %end
 
 void SCIInstallDisableDMStorySeenHooksIfNeeded(void) {
-    if (![SCIUtils getBoolPref:@"unlimited_replay"] &&
-        ![SCIUtils getBoolPref:@"no_seen_receipt"]) {
+    if (![SCIUtils getBoolPref:@"unlimited_replay"]) {
         return;
     }
 

@@ -28,7 +28,15 @@ static NSString * const kSCIReelsActionButtonDefaultActionKey = @"action_button_
         ], nil),
         SCITopicSection(@"Layout", @[
             [SCISetting switchCellWithTitle:@"Hide Reels Header" subtitle:@"" defaultsKey:@"hide_reels_header"],
-            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"" defaultsKey:@"hide_repost_button_reels" requiresRestart:YES]
+            [SCISetting switchCellWithTitle:@"Hide Repost Button" subtitle:@"" defaultsKey:@"hide_repost_button_reels" requiresRestart:YES],
+            [SCISetting switchCellWithTitle:@"Hide Suggested Accounts" subtitle:@"" defaultsKey:@"hide_suggested_users_reels"]
+        ], nil),
+        SCITopicSection(@"Metrics", @[
+            [SCISetting switchCellWithTitle:@"Hide Like Count" subtitle:@"" defaultsKey:@"hide_reels_like_count"],
+            [SCISetting switchCellWithTitle:@"Hide Comment Count" subtitle:@"" defaultsKey:@"hide_reels_comment_count"],
+            [SCISetting switchCellWithTitle:@"Hide Repost Count" subtitle:@"" defaultsKey:@"hide_reels_repost_count"],
+            [SCISetting switchCellWithTitle:@"Hide Reshare Count" subtitle:@"" defaultsKey:@"hide_reels_reshare_count"],
+            [SCISetting switchCellWithTitle:@"Hide Save Count" subtitle:@"" defaultsKey:@"hide_reels_save_count"]
         ], nil),
         SCITopicSection(@"Confirmation", @[
             [SCISetting switchCellWithTitle:@"Confirm Like" subtitle:@"" defaultsKey:@"like_confirm_reels"],

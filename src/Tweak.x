@@ -220,9 +220,9 @@ shouldPersistLastBugReportId:(id)arg6
 // Direct suggested chats (in search bar)
 BOOL showSearchSectionLabelForTag(NSInteger tag) {
     if (
-        (tag == 18 && [SCIUtils getBoolPref:@"hide_meta_ai"]) // AI
-        || (tag == 20 && [SCIUtils getBoolPref:@"hide_meta_ai"]) // Ask Meta AI
-        || (tag == 2 && [SCIUtils getBoolPref:@"no_suggested_users"]) // More suggestions
+        (tag == 18 && [SCIUtils getBoolPref:@"hide_meta_ai_direct"]) // AI
+        || (tag == 20 && [SCIUtils getBoolPref:@"hide_meta_ai_direct"]) // Ask Meta AI
+        || (tag == 2 && [SCIUtils getBoolPref:@"hide_suggested_users_direct"]) // More suggestions
         || (tag == 13 && [SCIUtils getBoolPref:@"no_suggested_chats"]) // Suggested channels
     ) {
         return false;
@@ -276,7 +276,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
          || [obj isKindOfClass:%c(IGDirectInboxSearchAIAgentsSuggestedPromptLoggingViewModel)]
         ) {
 
-            if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+            if ([SCIUtils getBoolPref:@"hide_meta_ai_direct"]) {
                 NSLog(@"[SCInsta] Hiding suggested chats (ai agents)");
 
                 shouldHide = YES;
@@ -298,7 +298,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             
             // Meta AI (special section types)
             else if (([obj sectionType] == 20) || [obj sectionType] == 18) {
-                if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+                if ([SCIUtils getBoolPref:@"hide_meta_ai_direct"]) {
                     NSLog(@"[SCInsta] Hiding meta ai suggested chats (meta ai recipient)");
 
                     shouldHide = YES;
@@ -307,7 +307,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
             // Meta AI (catch-all)
             else if ([[[obj recipient] threadName] isEqualToString:@"Meta AI"]) {
-                if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+                if ([SCIUtils getBoolPref:@"hide_meta_ai_direct"]) {
                     NSLog(@"[SCInsta] Hiding meta ai suggested chats (meta ai recipient)");
 
                     shouldHide = YES;
@@ -336,7 +336,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
         BOOL shouldHide = NO;
 
         // Meta AI suggested user in direct new message view
-        if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        if ([SCIUtils getBoolPref:@"hide_meta_ai_direct"]) {
             
             if ([obj isKindOfClass:%c(IGDirectCreateChatCellViewModel)]) {
 
@@ -363,7 +363,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
         }
 
         // Invite friends to insta contacts upsell
-        if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+        if ([SCIUtils getBoolPref:@"hide_suggested_users_direct"]) {
             if ([obj isKindOfClass:%c(IGContactInvitesSearchUpsellViewModel)]) {
                 NSLog(@"[SCInsta] Hiding suggested users: invite contacts upsell");
 
@@ -395,7 +395,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             
             // "Suggestions" header
             if ([[obj title] isEqualToString:@"Suggestions"]) {
-                if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+                if ([SCIUtils getBoolPref:@"hide_suggested_users_direct"]) {
                     NSLog(@"[SCInsta] Hiding suggested chats (header: messages tab)");
 
                     shouldHide = YES;
@@ -404,7 +404,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
             // "Accounts to follow/message" header
             else if ([[obj title] hasPrefix:@"Accounts to"]) {
-                if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+                if ([SCIUtils getBoolPref:@"hide_suggested_users_direct"]) {
                     NSLog(@"[SCInsta] Hiding suggested users: (header: inbox view)");
 
                     shouldHide = YES;
@@ -415,7 +415,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
         // Suggested recipients
         else if ([obj isKindOfClass:%c(IGDirectInboxSuggestedThreadCellViewModel)]) {
-            if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+            if ([SCIUtils getBoolPref:@"hide_suggested_users_direct"]) {
                 NSLog(@"[SCInsta] Hiding suggested chats (recipients: channels tab)");
 
                 shouldHide = YES;
@@ -424,7 +424,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
         // "Accounts to follow" recipients
         else if ([obj isKindOfClass:%c(IGDiscoverPeopleItemConfiguration)] || [obj isKindOfClass:%c(IGDiscoverPeopleConnectionItemConfiguration)]) {
-            if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+            if ([SCIUtils getBoolPref:@"hide_suggested_users_direct"]) {
                 NSLog(@"[SCInsta] Hiding suggested chats: (recipients: inbox view)");
 
                 shouldHide = YES;
@@ -465,7 +465,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
         BOOL shouldHide = NO;
 
         // Meta AI
-        if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        if ([SCIUtils getBoolPref:@"hide_meta_ai_explore"]) {
 
             // Section header 
             if ([obj isKindOfClass:%c(IGLabelItemViewModel)]) {
@@ -492,7 +492,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
                 // itemType 6 is meta ai suggestions
                 if ([obj itemType] == 6) {
-                    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+                    if ([SCIUtils getBoolPref:@"hide_meta_ai_explore"]) {
                         shouldHide = YES;
                     }
                     
@@ -500,7 +500,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
                 // Meta AI user account in search results
                 else if ([[[obj title] string] isEqualToString:@"meta.ai"]) {
-                    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+                    if ([SCIUtils getBoolPref:@"hide_meta_ai_explore"]) {
                         shouldHide = YES;
                     }
                 }
@@ -510,7 +510,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
         }
 
         // No suggested users
-        if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+        if ([SCIUtils getBoolPref:@"hide_suggested_users_search"]) {
 
             // Section header 
             if ([obj isKindOfClass:%c(IGLabelItemViewModel)]) {
@@ -558,7 +558,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
     for (IGStoryTrayViewModel *obj in originalObjs) {
         BOOL shouldHide = NO;
 
-        if ([SCIUtils getBoolPref:@"no_suggested_users"]) {
+        if ([SCIUtils getBoolPref:@"hide_suggested_users_feed"]) {
             if ([obj isKindOfClass:%c(IGStoryTrayViewModel)]) {
                 NSNumber *type = [((IGStoryTrayViewModel *)obj) valueForKey:@"type"];
                 
@@ -572,7 +572,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             }
         }
 
-        if ([SCIUtils getBoolPref:@"hide_ads"]) {
+        if ([SCIUtils getBoolPref:@"hide_ads_feed"]) {
             // "New!" account id is 3538572169
             if ([obj isKindOfClass:%c(IGStoryTrayViewModel)] && (obj.isUnseenNux == YES || [obj.pk isEqualToString:@"3538572169"])) {
                 NSLog(@"[SCInsta] Removing ads: story tray");
@@ -594,7 +594,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 // Story tray expanded footer (Suggested accounts to follow)
 %hook IGStoryTraySectionController
 - (void)storyTrayControllerShowSUPOGEducationBump {
-    if ([SCIUtils getBoolPref:@"no_suggested_users"]) return;
+    if ([SCIUtils getBoolPref:@"hide_suggested_users_feed"]) return;
 
     return %orig();
 }
@@ -618,7 +618,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
             || [[obj valueForKey:@"title"] isEqualToString:@"Meta AI"]
         ) {
             
-            if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+            if ([SCIUtils getBoolPref:@"hide_meta_ai_global"]) {
                 NSLog(@"[SCInsta] Hiding meta ai from IGDS menu");
 
                 shouldHide = YES;
@@ -647,16 +647,7 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
 %hook IGFeedItemUFICell
 - (void)UFIButtonBarDidTapOnLike:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {
-        NSLog(@"[SCInsta] Confirm post like triggered");
-
-        [SCIUtils showConfirmation:^(void) { %orig; }
-                                 title:@"Confirm Post Like"
-                               message:@"Are you sure you want to like this post?"];
-    }
-    else {
-        return %orig;
-    }  
+    %orig;
 }
 
 - (void)UFIButtonBarDidTapOnRepost:(id)arg1 {
@@ -702,25 +693,11 @@ BOOL showSearchSectionLabelForTag(NSInteger tag) {
 
 %hook IGSundialViewerVerticalUFI
 - (void)_didTapLikeButton:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"like_confirm_reels"]) {
-        NSLog(@"[SCInsta] Confirm reels like triggered");
-
-        [SCIUtils showConfirmation:^(void) { %orig; }
-                                 title:@"Confirm Reel Like"
-                               message:@"Are you sure you want to like this reel?"];
-    }
-    else {
-        return %orig;
-    }
+    %orig;
 }
 
 - (void)_didLongPressLikeButton:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"like_confirm_reels"]) {
-        NSLog(@"[SCInsta] Confirm repost triggered (long press ignored)");
-    }
-    else {
-        return %orig;
-    }
+    %orig;
 }
 
 - (void)_didTapRepostButton {
@@ -942,8 +919,8 @@ void SCIInstallTweakLaunchCriticalHooks(void) {
 
 void SCIInstallTweakFeedHooksIfNeeded(void) {
     if (SCIAnyPrefEnabled(@[
-        @"hide_ads",
-        @"no_suggested_users"
+        @"hide_ads_feed",
+        @"hide_suggested_users_feed"
     ])) {
         static dispatch_once_t feedOnceToken;
         dispatch_once(&feedOnceToken, ^{
@@ -952,7 +929,6 @@ void SCIInstallTweakFeedHooksIfNeeded(void) {
     }
 
     if (SCIAnyPrefEnabled(@[
-        @"like_confirm_feed",
         @"repost_confirm_feed"
     ])) {
         static dispatch_once_t confirmOnceToken;
@@ -971,7 +947,6 @@ void SCIInstallTweakReelsHooksIfNeeded(void) {
     SCIInstallTweakPrivacyHooksIfNeeded();
 
     if (!SCIAnyPrefEnabled(@[
-        @"like_confirm_reels",
         @"repost_confirm_reels"
     ])) {
         return;
@@ -987,8 +962,8 @@ void SCIInstallTweakMessagesHooksIfNeeded(void) {
     SCIInstallTweakPrivacyHooksIfNeeded();
 
     if (!SCIAnyPrefEnabled(@[
-        @"hide_meta_ai",
-        @"no_suggested_users",
+        @"hide_meta_ai_direct",
+        @"hide_suggested_users_direct",
         @"no_suggested_chats",
         @"hide_notes_tray"
     ])) {
@@ -1003,8 +978,8 @@ void SCIInstallTweakMessagesHooksIfNeeded(void) {
 
 void SCIInstallTweakGeneralUIHooksIfNeeded(void) {
     if (SCIAnyPrefEnabled(@[
-        @"hide_meta_ai",
-        @"no_suggested_users"
+        @"hide_meta_ai_explore",
+        @"hide_suggested_users_search"
     ])) {
         static dispatch_once_t generalOnceToken;
         dispatch_once(&generalOnceToken, ^{
@@ -1012,7 +987,7 @@ void SCIInstallTweakGeneralUIHooksIfNeeded(void) {
         });
     }
 
-    if (SCIPrefEnabled(@"hide_meta_ai")) {
+    if (SCIPrefEnabled(@"hide_meta_ai_global")) {
         static dispatch_once_t menuOnceToken;
         dispatch_once(&menuOnceToken, ^{
             %init(SCITweakGeneralMenuHooks);

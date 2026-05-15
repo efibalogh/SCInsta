@@ -1,6 +1,26 @@
 #import "../../Utils.h"
 #import "../../InstagramHeaders.h"
 
+static inline BOOL SCIHideMetaAIDirect(void) {
+    return [SCIUtils getBoolPref:@"hide_meta_ai_direct"];
+}
+
+static inline BOOL SCIHideMetaAIExplore(void) {
+    return [SCIUtils getBoolPref:@"hide_meta_ai_explore"];
+}
+
+static inline BOOL SCIHideMetaAIComments(void) {
+    return [SCIUtils getBoolPref:@"hide_meta_ai_comments"];
+}
+
+static inline BOOL SCIHideMetaAICreation(void) {
+    return [SCIUtils getBoolPref:@"hide_meta_ai_creation"];
+}
+
+static inline BOOL SCIHideMetaAIGlobal(void) {
+    return [SCIUtils getBoolPref:@"hide_meta_ai_global"];
+}
+
 %group SCIHideMetaAIHooks
 
 // Direct
@@ -8,7 +28,7 @@
 // Meta AI button functionality on direct search bar
 %hook IGDirectInboxViewController
 - (void)searchBarMetaAIButtonTappedOnSearchBar:(id)arg1 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"])
+    if (SCIHideMetaAIDirect())
 {
         NSLog(@"[SCInsta] Hiding meta ai: direct search bar functionality");
 
@@ -22,7 +42,7 @@
 // AI agents in direct new message view
 %hook IGDirectRecipientGenAIBotsResult
 - (id)initWithGenAIBots:(id)arg1 lastFetchedTimestamp:(id)arg2 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"])
+    if (SCIHideMetaAIDirect())
 {
         NSLog(@"[SCInsta] Hiding meta ai: direct recipient ai agents");
 
@@ -42,7 +62,7 @@
     for (id obj in originalObjs) {
         BOOL shouldHide = NO;
 
-        if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        if (SCIHideMetaAIDirect()) {
 
             if ([obj isKindOfClass:%c(IGDirectCommandSystemViewModel)]) {
                 IGDirectCommandSystemViewModel *typedObj = (IGDirectCommandSystemViewModel *)obj;
@@ -90,7 +110,7 @@
         userSession:(id)arg5
     loggingDelegate:(id)arg6
 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIDirect()) {
         NSLog(@"[SCInsta] Hiding meta ai: suggested ai chats in direct inbox header");
 
         @try {
@@ -117,7 +137,7 @@
      localSendSpeedLogger:(id)arg8
    sendAttributionFactory:(id)arg9 
 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIDirect()) {
         NSLog(@"[SCInsta] Hiding meta ai: imagine tile in media picker");
 
         @try {
@@ -175,7 +195,7 @@
 }
 
 %new - (IGDirectComposerConfig *)patchConfig:(IGDirectComposerConfig *)config {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIDirect()) {
 
         NSLog(@"[SCInsta] Hiding meta ai: reconfiguring direct composer");
 
@@ -196,7 +216,7 @@
 // Demangled name: IGAIRewrite.IGAIRewriteStoryRepliesPresenter
 %hook _TtC11IGAIRewrite32IGAIRewriteStoryRepliesPresenter
 - (BOOL)shouldShowAIRewriteButton:(id)arg1 input:(id)arg2 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIDirect()) {
         NSLog(@"[SCInsta] Hiding meta ai: disable ai rewrite story reply presenter");
 
         return NO;
@@ -216,7 +236,7 @@
     for (id obj in originalObjs) {
         BOOL shouldHide = NO;
 
-        if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        if (SCIHideMetaAIDirect()) {
 
             if ([obj isKindOfClass:%c(IGDirectUnifiedComposerAIStickerModel)]) {
                 NSLog(@"[SCInsta] Hiding meta ai: AI stickers option in sticker view");
@@ -252,8 +272,11 @@
 {
     // 31: Restyle
     // 41: Make AI image
-    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"NOT (SELF IN %@)", @[ @(31), @(41) ]];
-    NSArray *newOptions = [options filteredArrayUsingPredicate:predicate];
+    NSArray *newOptions = options;
+    if (SCIHideMetaAIDirect()) {
+        NSPredicate *predicate = [NSPredicate predicateWithFormat:@"NOT (SELF IN %@)", @[ @(31), @(41) ]];
+        newOptions = [options filteredArrayUsingPredicate:predicate];
+    }
 
     return %orig([newOptions copy], arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }
@@ -279,7 +302,7 @@
                       entryPoint:(long long)arg15
                     canTapAuthor:(_Bool)arg16
 {
-    BOOL showAiRestyle = [SCIUtils getBoolPref:@"hide_meta_ai"] ? false : arg6;
+    BOOL showAiRestyle = SCIHideMetaAIDirect() ? false : arg6;
 
     return %orig(arg1, arg2, arg3, arg4, arg5, showAiRestyle, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16);
 }
@@ -294,7 +317,7 @@
     for (id obj in originalObjs) {
         BOOL shouldHide = NO;
 
-        if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        if (SCIHideMetaAIDirect()) {
 
             if (
                 [obj isKindOfClass:%c(IGDirectThreadThemePickerOption)]
@@ -320,7 +343,11 @@
 // "Click to summarize" pill under DM navigation bar
 %hook IGDirectThreadViewMetaAISummaryFeatureController
 - (id)initWithUserSession:(id)arg1 mutableStateProvider:(id)arg2 threadViewControllerFeatureDelegate:(id)arg3 presentingViewController:(id)arg4 {
-    return nil;
+    if (SCIHideMetaAIDirect()) {
+        return nil;
+    }
+
+    return %orig(arg1, arg2, arg3, arg4);
 }
 %end
 
@@ -340,7 +367,7 @@
         // Meta AI summary
         if ([obj isKindOfClass:%c(IGSearchMetaAIHCMModel)]) {
             
-            if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+            if (SCIHideMetaAIExplore()) {
                 NSLog(@"[SCInsta] Hiding explore meta ai search summary");
 
                 shouldHide = YES;
@@ -364,7 +391,7 @@
 - (void)didMoveToWindow {
     %orig;
 
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIExplore()) {
         [self removeFromSuperview];
     }
 }
@@ -385,7 +412,7 @@ sponsoredSupportConfiguration:(id)supportConfig
      presentingViewController:(id)vc
    childCommentThreadDelegate:(id)threadDelegate 
 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIComments()) {
         [threadConfig setValue:@(YES) forKey:@"disableMetaAICarousel"];
     }
     return %orig(session, threadConfig, supportConfig, context, text, loggingDelegate, vc, threadDelegate);
@@ -395,7 +422,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 // Suggested AI searches in comment section (workaround if setting comment thread config fails)
 %hook IGCommentThreadAICarousel
 - (id)initWithLauncherSet:(id)arg1 hasSearchPrefix:(BOOL)arg2 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIComments()) {
         NSLog(@"[SCInsta] Hiding meta ai: suggested ai searches comment carousel");
 
         return nil;
@@ -407,7 +434,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 
 %hook _TtC34IGCommentThreadAICarouselPillSwift30IGCommentThreadAICarouselSwift
 - (id)initWithLauncherSet:(id)arg1 hasSearchPrefix:(BOOL)arg2 {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIComments()) {
         NSLog(@"[SCInsta] Hiding meta ai: suggested ai searches comment carousel");
 
         return nil;
@@ -427,9 +454,9 @@ sponsoredSupportConfiguration:(id)supportConfig
 - (void)setTools:(id)tools {
     NSArray *newTools = [tools copy];
 
-    NSLog(@"[SCInsta] Hiding meta ai: ai images add to story suggestion");
+    if (SCIHideMetaAICreation()) {
+        NSLog(@"[SCInsta] Hiding meta ai: ai images add to story suggestion");
 
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
         NSPredicate *predicate = [NSPredicate predicateWithFormat:@"NOT (SELF IN %@)", @[ @(9), @(10), @(11) ]];
         newTools = [tools filteredArrayUsingPredicate:predicate];
     }
@@ -443,7 +470,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 // AI generated fonts in text entry
 %hook IGCreationTextToolView
 - (id)initWithMenuConfiguration:(unsigned long long)configuration userSession:(id)session creationEntryPoint:(long long)point isAIFontsEnabled:(_Bool)enabled genAINuxManager:(id)manager showFontBadge:(_Bool)badge {
-    return %orig(configuration, session, point, [SCIUtils getBoolPref:@"hide_meta_ai"] ? false : enabled, manager, badge);
+    return %orig(configuration, session, point, SCIHideMetaAICreation() ? false : enabled, manager, badge);
 }
 %end
 
@@ -456,8 +483,8 @@ sponsoredSupportConfiguration:(id)supportConfig
            isEnabledForFeedCaption:(_Bool)arg5
                   isFeedEntryPoint:(_Bool)arg6
 {
-    _Bool isTextRewriteEnabled = [SCIUtils getBoolPref:@"hide_meta_ai"] ? false : arg1;
-    _Bool isImageRewriteEnabled = [SCIUtils getBoolPref:@"hide_meta_ai"] ? false : arg2;
+    _Bool isTextRewriteEnabled = SCIHideMetaAICreation() ? false : arg1;
+    _Bool isImageRewriteEnabled = SCIHideMetaAICreation() ? false : arg2;
 
     return %orig(isTextRewriteEnabled, isImageRewriteEnabled, arg3, arg4, arg5, arg6);
 }
@@ -468,7 +495,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 - (void)setButtons:(id)buttons maxItems:(NSInteger)max {
     NSArray *filteredObjs = buttons;
 
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAICreation()) {
         filteredObjs = [filteredObjs filteredArrayUsingPredicate:
             [NSPredicate predicateWithBlock:^BOOL(IGCreationActionBarLabeledButton *obj, NSDictionary *bindings) {
 
@@ -506,7 +533,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 }
 
 %new - (IGSearchBarConfig *)sanitizePlaceholderForConfig:(IGSearchBarConfig *)config {
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIGlobal()) {
 
         NSLog(@"[SCInsta] Hiding meta ai: reconfiguring search bar");
 
@@ -561,7 +588,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 - (void)didMoveToWindow {
     %orig;
 
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIGlobal()) {
 
         // Hide buttons that are associated with meta ai
         if ([self.accessibilityIdentifier containsString:@"meta_ai"]) {
@@ -578,7 +605,7 @@ sponsoredSupportConfiguration:(id)supportConfig
 %hook IGFloatingActionButton.IGFloatingActionButton
 - (void)didMoveToSuperview {
     %orig;
-    if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (SCIHideMetaAIGlobal()) {
         [self removeFromSuperview];
         NSLog(@"[SCInsta] Hiding meta ai: home feed meta ai button"); 
     }
@@ -594,7 +621,7 @@ sponsoredSupportConfiguration:(id)supportConfig
     for (id obj in originalObjs) {
         BOOL shouldHide = NO;
 
-        if ([SCIUtils getBoolPref:@"hide_meta_ai"]) {
+        if (SCIHideMetaAIDirect()) {
             if ([obj isKindOfClass:%c(IGDirectRecipientCellViewModel)]) {
 
                 // Meta AI (catch-all)
@@ -621,7 +648,11 @@ sponsoredSupportConfiguration:(id)supportConfig
 %end
 
 extern "C" void SCIInstallHideMetaAIHooksIfEnabled(void) {
-    if (![SCIUtils getBoolPref:@"hide_meta_ai"]) {
+    if (!SCIHideMetaAIDirect() &&
+        !SCIHideMetaAIExplore() &&
+        !SCIHideMetaAIComments() &&
+        !SCIHideMetaAICreation() &&
+        !SCIHideMetaAIGlobal()) {
         return;
     }
 

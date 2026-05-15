@@ -45,9 +45,45 @@
             [SCISetting switchCellWithTitle:@"Confirm Create Group Button" subtitle:@"" defaultsKey:@"confirm_create_group_button"],
     ], nil),
         SCITopicSection(@"Recommendations", @[
-            [SCISetting switchCellWithTitle:@"Hide Ads" subtitle:@"" defaultsKey:@"hide_ads"],
-            [SCISetting switchCellWithTitle:@"Hide Meta AI" subtitle:@"Hides the Meta AI buttons and related functionality" defaultsKey:@"hide_meta_ai"],
-            [SCISetting switchCellWithTitle:@"No Suggested Users" subtitle:@"Hides all suggested users for you to follow outside your feed" defaultsKey:@"no_suggested_users"]
+            [SCISetting navigationCellWithTitle:@"Ads"
+                                       subtitle:@"Control ad hiding by surface"
+                                           icon:nil
+                                    navSections:@[
+                SCITopicSection(@"Ads", @[
+                    [SCISetting switchCellWithTitle:@"Hide Feed Ads" subtitle:@"" defaultsKey:@"hide_ads_feed"],
+                    [SCISetting switchCellWithTitle:@"Hide Story Ads" subtitle:@"" defaultsKey:@"hide_ads_stories"],
+                    [SCISetting switchCellWithTitle:@"Hide Reels Ads" subtitle:@"" defaultsKey:@"hide_ads_reels"],
+                    [SCISetting switchCellWithTitle:@"Hide Explore Ads" subtitle:@"" defaultsKey:@"hide_ads_explore"],
+                    [SCISetting switchCellWithTitle:@"Hide Reels Shopping CTA" subtitle:@"" defaultsKey:@"hide_reels_shopping_cta"]
+                ], nil)
+            ]],
+            [SCISetting navigationCellWithTitle:@"Meta AI"
+                                       subtitle:@"Control AI hiding by surface"
+                                           icon:nil
+                                    navSections:@[
+                SCITopicSection(@"Meta AI", @[
+                    [SCISetting switchCellWithTitle:@"Hide in Direct" subtitle:@"Direct inbox, composer, recipients, themes, and message menus" defaultsKey:@"hide_meta_ai_direct"],
+                    [SCISetting switchCellWithTitle:@"Hide in Explore & Search" subtitle:@"Explore results and search entry points" defaultsKey:@"hide_meta_ai_explore"],
+                    [SCISetting switchCellWithTitle:@"Hide in Comments" subtitle:@"Comment-thread AI search carousel" defaultsKey:@"hide_meta_ai_comments"],
+                    [SCISetting switchCellWithTitle:@"Hide in Creation Tools" subtitle:@"Story editor AI images, fonts, rewrite, and backgrounds" defaultsKey:@"hide_meta_ai_creation"],
+                    [SCISetting switchCellWithTitle:@"Hide Global AI Chrome" subtitle:@"Generic Meta AI buttons, placeholders, and branded entry points" defaultsKey:@"hide_meta_ai_global"]
+                ], nil)
+            ]],
+            [SCISetting navigationCellWithTitle:@"Suggested Users"
+                                       subtitle:@"Control account suggestions by surface"
+                                           icon:nil
+                                    navSections:@[
+                SCITopicSection(@"Suggested Users", @[
+                    [SCISetting switchCellWithTitle:@"Hide Feed Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_feed"],
+                    [SCISetting switchCellWithTitle:@"Hide Reels Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_reels"],
+                    [SCISetting switchCellWithTitle:@"Hide Direct Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_direct"],
+                    [SCISetting switchCellWithTitle:@"Hide Search Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_search"],
+                    [SCISetting switchCellWithTitle:@"Hide Profile Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_profile"],
+                    [SCISetting switchCellWithTitle:@"Hide Activity Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_activity"],
+                    [SCISetting switchCellWithTitle:@"Hide Follow-List Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_follow_lists"],
+                    [SCISetting switchCellWithTitle:@"Hide Subscription Suggestions" subtitle:@"" defaultsKey:@"hide_suggested_users_subscriptions"]
+                ], nil)
+            ]]
         ], nil),
         SCITopicSection(@"Media Saving", @[
             [SCISetting switchCellWithTitle:@"Enhanced Media Resolution" subtitle:@"Allows higher-resolution media downloads" defaultsKey:@"enhanced_media_resolution"],

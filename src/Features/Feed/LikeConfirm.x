@@ -43,29 +43,28 @@ static void SCIStoryReplySideEffects(void) {
 
 // Confirmation handlers
 
-#define CONFIRMFEEDLIKE(orig)                             \
-    if ([SCIUtils getBoolPref:@"like_confirm_feed"]) {      \
-        NSLog(@"[SCInsta] Confirm feed like triggered");  \
-                                                          \
-        [SCIUtils showConfirmation:^(void) { orig; }      \
-                                 title:@"Confirm Post Like"     \
-                               message:@"Are you sure you want to like this post or comment?"]; \
-    }                                                     \
-    else {                                                \
-        return orig;                                      \
-    }                                                     \
+#define SCICONFIRMLIKE(prefKey, logText, titleText, messageText, orig) \
+    if ([SCIUtils getBoolPref:prefKey]) {                              \
+        NSLog(@"[SCInsta] %@", logText);                               \
+        [SCIUtils showConfirmation:^(void) { orig; }                   \
+                                 title:titleText                       \
+                               message:messageText];                   \
+    }                                                                  \
+    else {                                                             \
+        return orig;                                                   \
+    }                                                                  \
 
-#define CONFIRMREELSLIKE(orig)                            \
-    if ([SCIUtils getBoolPref:@"like_confirm_reels"]) {     \
-        NSLog(@"[SCInsta] Confirm reels like triggered"); \
-                                                          \
-        [SCIUtils showConfirmation:^(void) { orig; }      \
-                                 title:@"Confirm Reel Like"     \
-                               message:@"Are you sure you want to like this reel?"]; \
-    }                                                     \
-    else {                                                \
-        return orig;                                      \
-    }                                                     \
+#define CONFIRMFEEDPOSTLIKE(orig) \
+    SCICONFIRMLIKE(@"like_confirm_feed_post_likes", @"Confirm feed post like triggered", @"Confirm Post Like", @"Are you sure you want to like this post?", orig)
+
+#define CONFIRMFEEDDOUBLETAPLIKE(orig) \
+    SCICONFIRMLIKE(@"like_confirm_feed_double_tap_likes", @"Confirm feed double-tap like triggered", @"Confirm Post Like", @"Are you sure you want to like this post?", orig)
+
+#define CONFIRMCOMMENTLIKE(orig) \
+    SCICONFIRMLIKE(@"like_confirm_comment_likes", @"Confirm comment like triggered", @"Confirm Comment Like", @"Are you sure you want to like this comment?", orig)
+
+#define CONFIRMREELSLIKE(orig) \
+    SCICONFIRMLIKE(@"like_confirm_reels", @"Confirm reels like triggered", @"Confirm Reel Like", @"Are you sure you want to like this reel?", orig)
 
 ///////////////////////////////////////////////////////////
 
@@ -73,18 +72,24 @@ static void SCIStoryReplySideEffects(void) {
 %group SCILikeConfirmHooks
 
 %hook IGUFIButtonBarView
+- (void)_onLikeButtonPressed {
+    CONFIRMFEEDPOSTLIKE(%orig);
+}
 - (void)_onLikeButtonPressed:(id)arg1 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMFEEDPOSTLIKE(%orig);
 }
 %end
 %hook IGFeedPhotoView
+- (void)_onDoubleTap {
+    CONFIRMFEEDDOUBLETAPLIKE(%orig);
+}
 - (void)_onDoubleTap:(id)arg1 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMFEEDDOUBLETAPLIKE(%orig);
 }
 %end
 %hook IGVideoPlayerOverlayContainerView
 - (void)_handleDoubleTapGesture:(id)arg1 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMFEEDDOUBLETAPLIKE(%orig);
 }
 %end
 
@@ -107,6 +112,9 @@ static void SCIStoryReplySideEffects(void) {
 - (void)gestureController:(id)arg1 didObserveDoubleTap:(id)arg2 {
     CONFIRMREELSLIKE(%orig);
 }
+- (void)swift_photoCell:(id)arg1 didObserveDoubleTapWithLocationInfo:(id)arg2 gestureRecognizer:(id)arg3 {
+    CONFIRMREELSLIKE(%orig);
+}
 %end
 %hook IGSundialViewerCarouselCell
 - (void)controlsOverlayControllerDidTapLikeButton:(id)arg1 {
@@ -115,29 +123,32 @@ static void SCIStoryReplySideEffects(void) {
 - (void)gestureController:(id)arg1 didObserveDoubleTap:(id)arg2 {
     CONFIRMREELSLIKE(%orig);
 }
+- (void)carouselCell:(id)arg1 didObserveDoubleTapWithLocationInfo:(id)arg2 gestureRecognizer:(id)arg3 {
+    CONFIRMREELSLIKE(%orig);
+}
 %end
 
 // Liking comments
 %hook IGCommentCellController
 - (void)commentCell:(id)arg1 didTapLikeButton:(id)arg2 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMCOMMENTLIKE(%orig);
 }
 - (void)commentCell:(id)arg1 didTapLikedByButtonForUser:(id)arg2 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMCOMMENTLIKE(%orig);
 }
 - (void)commentCellDidLongPressOnLikeButton:(id)arg1 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMCOMMENTLIKE(%orig);
 }
 - (void)commentCellDidEndLongPressOnLikeButton:(id)arg1 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMCOMMENTLIKE(%orig);
 }
 - (void)commentCellDidDoubleTap:(id)arg1 {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMCOMMENTLIKE(%orig);
 }
 %end
 %hook IGFeedItemPreviewCommentCell
 - (void)_didTapLikeButton {
-    CONFIRMFEEDLIKE(%orig);
+    CONFIRMCOMMENTLIKE(%orig);
 }
 %end
 
@@ -221,6 +232,24 @@ static void SCIInstallStoryLikeConfirmHookIfNeeded(void) {
     %orig;
     SCIStoryReplySideEffects();
 }
+
+- (void)_didTapEmojiQuickReactionButton:(id)button {
+    if (SCIActiveStoryOverlayForInteractions()) {
+        %orig;
+        SCIStoryReplySideEffects();
+        return;
+    }
+    %orig;
+}
+
+- (void)_didTapEmojiReactionButton:(id)button {
+    if (SCIActiveStoryOverlayForInteractions()) {
+        %orig;
+        SCIStoryReplySideEffects();
+        return;
+    }
+    %orig;
+}
 %end
 
 static void (*orig_storyFooterEmojiQuick)(id, SEL, id, id);
@@ -303,14 +332,72 @@ static void SCIInstallStoryReplyHooksIfNeeded(void) {
 // DM like button (seems to be hidden)
 %hook IGDirectThreadViewController
 - (void)_didTapLikeButton {
-    CONFIRMFEEDLIKE(%orig);
+    %orig;
+}
+- (void)_didTapLikeButton:(id)arg1 {
+    %orig;
 }
 %end
 
 %end
 
+static void (*orig_sciReelsLikeHandlerTap)(id, SEL, id, id, BOOL) = NULL;
+static void sciReelsLikeHandlerTap(id self, SEL _cmd, id context, id likeButton, BOOL willAnimate) {
+    if (![SCIUtils getBoolPref:@"like_confirm_reels"]) {
+        if (orig_sciReelsLikeHandlerTap) orig_sciReelsLikeHandlerTap(self, _cmd, context, likeButton, willAnimate);
+        return;
+    }
+
+    __strong id strongContext = context;
+    __strong id strongButton = likeButton;
+    [SCIUtils showConfirmation:^{
+        if (orig_sciReelsLikeHandlerTap) orig_sciReelsLikeHandlerTap(self, _cmd, strongContext, strongButton, willAnimate);
+    } title:@"Confirm Reel Like"
+      message:@"Are you sure you want to like this reel?"];
+}
+
+static void (*orig_sciReelsLikeHandlerTapCompletion)(id, SEL, id, id, BOOL, id) = NULL;
+static void sciReelsLikeHandlerTapCompletion(id self, SEL _cmd, id context, id likeButton, BOOL willAnimate, id completion) {
+    if (![SCIUtils getBoolPref:@"like_confirm_reels"]) {
+        if (orig_sciReelsLikeHandlerTapCompletion) orig_sciReelsLikeHandlerTapCompletion(self, _cmd, context, likeButton, willAnimate, completion);
+        return;
+    }
+
+    __strong id strongContext = context;
+    __strong id strongButton = likeButton;
+    id strongCompletion = completion ? [completion copy] : nil;
+    [SCIUtils showConfirmation:^{
+        if (orig_sciReelsLikeHandlerTapCompletion) orig_sciReelsLikeHandlerTapCompletion(self, _cmd, strongContext, strongButton, willAnimate, strongCompletion);
+    } title:@"Confirm Reel Like"
+      message:@"Are you sure you want to like this reel?"];
+}
+
+static void SCIInstallReelsSwiftLikeConfirmHookIfNeeded(void) {
+    if (![SCIUtils getBoolPref:@"like_confirm_reels"]) return;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = NSClassFromString(@"_TtC30IGSundialOverlayActionHandlers38IGSundialViewerLikeButtonActionHandler");
+        if (!cls) cls = NSClassFromString(@"IGSundialViewerLikeButtonActionHandler");
+        Class meta = cls ? object_getClass(cls) : Nil;
+        if (!meta) return;
+
+        SEL tapSel = NSSelectorFromString(@"handleTapWithActionContext:likeButton:willPlayRingsCustomLikeAnimation:");
+        if (class_getClassMethod(cls, tapSel)) {
+            MSHookMessageEx(meta, tapSel, (IMP)sciReelsLikeHandlerTap, (IMP *)&orig_sciReelsLikeHandlerTap);
+        }
+
+        SEL tapCompletionSel = NSSelectorFromString(@"handleTapWithActionContext:likeButton:willPlayRingsCustomLikeAnimation:completion:");
+        if (class_getClassMethod(cls, tapCompletionSel)) {
+            MSHookMessageEx(meta, tapCompletionSel, (IMP)sciReelsLikeHandlerTapCompletion, (IMP *)&orig_sciReelsLikeHandlerTapCompletion);
+        }
+    });
+}
+
 void SCIInstallLikeConfirmHooksIfNeeded(void) {
-    if (![SCIUtils getBoolPref:@"like_confirm_feed"] &&
+    if (![SCIUtils getBoolPref:@"like_confirm_feed_post_likes"] &&
+        ![SCIUtils getBoolPref:@"like_confirm_feed_double_tap_likes"] &&
+        ![SCIUtils getBoolPref:@"like_confirm_comment_likes"] &&
         ![SCIUtils getBoolPref:@"like_confirm_reels"] &&
         !SCIStoryInteractionHooksNeeded()) {
         return;
@@ -323,4 +410,5 @@ void SCIInstallLikeConfirmHooksIfNeeded(void) {
 
     SCIInstallStoryLikeConfirmHookIfNeeded();
     SCIInstallStoryReplyHooksIfNeeded();
+    SCIInstallReelsSwiftLikeConfirmHookIfNeeded();
 }
