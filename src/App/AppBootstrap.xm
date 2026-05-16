@@ -8,10 +8,8 @@
 static void SCIScheduleEnabledFeatureHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            SCICoreInstallEnabledFeatureHooks();
-            SCIStartupMark(@"enabled feature hooks installed");
-        });
+        SCICoreInstallEnabledFeatureHooks();
+        SCIStartupMark(@"enabled feature hooks installed");
     });
 }
 
@@ -45,9 +43,9 @@ static void SCIScheduleEnabledFeatureHooks(void) {
 
 - (_Bool)application:(UIApplication *)application didFinishLaunchingWithOptions:(id)arg2 {
     SCIStartupMark(@"didFinishLaunching begin");
+    SCIScheduleEnabledFeatureHooks();
     %orig;
     SCIStartupMark(@"didFinishLaunching orig returned");
-    SCIScheduleEnabledFeatureHooks();
 
     double openDelay = [SCIUtils getBoolPref:@"tweak_settings_app_launch"] ? 0.0 : 5.0;
 
