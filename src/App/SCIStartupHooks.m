@@ -64,6 +64,7 @@ FOUNDATION_EXPORT void SCIInstallHideFriendsMapHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallKeepDeletedMessagesHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallCallConfirmHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallDMAudioMsgConfirmHooksIfEnabled(void);
+FOUNDATION_EXPORT void SCIInstallDMInteractionConfirmHooksIfEnabled(void);
 FOUNDATION_EXPORT void SCIInstallNotesCustomizationHooksIfNeeded(void);
 FOUNDATION_EXPORT void SCIInstallDMRefreshConfirmHooksIfEnabled(void);
 
@@ -170,6 +171,7 @@ void SCIInstallMessagesSurfaceHooksIfNeeded(void) {
     SCIInstallKeepDeletedMessagesHooksIfEnabled();
     SCIInstallCallConfirmHooksIfEnabled();
     SCIInstallDMAudioMsgConfirmHooksIfEnabled();
+    SCIInstallDMInteractionConfirmHooksIfEnabled();
     SCIInstallNotesCustomizationHooksIfNeeded();
     SCIInstallDMRefreshConfirmHooksIfEnabled();
     SCIInstallNoRecentSearchesHooksIfEnabled();

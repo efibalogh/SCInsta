@@ -45,6 +45,8 @@ static NSString * const kSCIMessagesActionButtonDefaultActionKey = @"action_butt
         ], nil),
         SCITopicSection(@"Confirmation", @[
             [SCISetting switchCellWithTitle:@"Confirm Call" subtitle:@"" defaultsKey:@"call_confirm"],
+            [SCISetting switchCellWithTitle:@"Confirm Message Double Tap" subtitle:@"Shows an alert before double-tap liking a message" defaultsKey:@"dm_message_double_tap_confirm"],
+            [SCISetting switchCellWithTitle:@"Confirm Message Reactions" subtitle:@"Shows an alert before sending a message reaction" defaultsKey:@"dm_message_reaction_confirm"],
             [SCISetting switchCellWithTitle:@"Confirm Voice Messages" subtitle:@"" defaultsKey:@"voice_message_confirm"],
             [SCISetting switchCellWithTitle:@"Confirm Follow Requests" subtitle:@"" defaultsKey:@"follow_request_confirm"],
             [SCISetting switchCellWithTitle:@"Confirm Vanish Mode" subtitle:@"" defaultsKey:@"shh_mode_confirm"],

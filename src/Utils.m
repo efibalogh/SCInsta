@@ -1037,7 +1037,7 @@ static id SCIPrefValueWithMasterOverlay(NSString *key) {
         [SCIIGAlertAction actionWithTitle:@"Cancel" style:SCIIGAlertActionStyleCancel handler:^{
             if (cancelHandler) cancelHandler();
         }],
-        [SCIIGAlertAction actionWithTitle:@"Continue" style:SCIIGAlertActionStyleDefault handler:^{
+        [SCIIGAlertAction actionWithTitle:@"Confirm" style:SCIIGAlertActionStyleDefault handler:^{
             if (okHandler) okHandler();
         }],
     ]];
